@@ -302,17 +302,32 @@ class InputHub:
     和遥测分开成两条流，因为它们的失败代价不同：
     遥测断了只是看不到数据，控制断了会让人以为杆在中位 —— 所以控制侧
     必须有自己的看门狗（在 vjoy_out.py 里，500ms 没消息就回中）。
+
+    通道分两类，这个区分很重要：
+
+      **回中类**（x/y/r/vx/vy，-1..1）
+          松手就该回零。断线时全部归零是安全的。
+
+      **保持类**（t 油门，0..1）
+          松手**不该**回零 —— 油门就是要停在原地。所以它可以是缺省的：
+          手机未解锁时不发这个字段，桥接和 vjoy_out 都不去碰这根轴，
+          DCS 里的油门保持原样。断线看门狗也只回中，不动油门。
     """
 
     MAX_ABS = 1.0
     VJOY_STALE_S = 2.5
+    SPRING = ("x", "y", "r", "vx", "vy")     # 松手回零的轴
+    HOLD = ("t",)                            # 松手保持的轴
+    MAX_BUTTONS = 16
 
     def __init__(self):
         self._lock = threading.Lock()
         # vJoy 状态单独一把锁：snapshot() 会持有 _lock 再读它，
         # 共用一把 Lock 就是自死锁（Lock 不可重入）。
         self._vlock = threading.Lock()
-        self._axes = {"x": 0.0, "y": 0.0}
+        self._axes = {k: 0.0 for k in self.SPRING}
+        self._axes["t"] = None               # None = 手机没在管油门
+        self._buttons = 0
         self._seq = 0
         self._last_rx = 0.0
         self._sink: tuple[str, int] | None = None
@@ -352,39 +367,61 @@ class InputHub:
 
     @classmethod
     def _clamp(cls, v) -> float:
+        """-1..1。非数字、NaN、Inf 全部当 0 —— 绝不能把 NaN 传进驱动。"""
         try:
             f = float(v)
         except (TypeError, ValueError):
             return 0.0
-        if f != f:                       # NaN
+        if f != f or f in (float("inf"), float("-inf")):
             return 0.0
         return max(-cls.MAX_ABS, min(cls.MAX_ABS, f))
 
+    @classmethod
+    def _clamp01(cls, v) -> float:
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return 0.0
+        if f != f or f in (float("inf"), float("-inf")):
+            return 0.0
+        return max(0.0, min(1.0, f))
+
     def feed(self, obj: dict) -> dict:
-        x = self._clamp(obj.get("x", 0.0))
-        y = self._clamp(obj.get("y", 0.0))
+        axes = {k: self._clamp(obj.get(k, 0.0)) for k in self.SPRING}
+        # 油门单独处理：字段缺失表示「这次别管油门」，不能当成 0，
+        # 否则手机一解锁中没动油门，DCS 里的油门就被拽到慢车。
+        raw_t = obj.get("t")
+        axes["t"] = None if raw_t is None else self._clamp01(raw_t)
+
+        try:
+            buttons = int(obj.get("b", 0)) & ((1 << self.MAX_BUTTONS) - 1)
+        except (TypeError, ValueError):
+            buttons = 0
+
         with self._lock:
-            self._axes = {"x": x, "y": y}
+            self._axes = dict(axes)
+            self._buttons = buttons
             self._seq += 1
             self._last_rx = time.time()
             seq = self._seq
             sink = self._sink
 
         if sink:
+            payload = {k: v for k, v in axes.items() if v is not None}
+            payload["b"] = buttons
+            payload["seq"] = seq
             try:
-                self._sock.sendto(
-                    json.dumps({"x": x, "y": y, "seq": seq}).encode(),
-                    sink,
-                )
+                self._sock.sendto(json.dumps(payload).encode(), sink)
             except OSError:
                 pass
-        return {"x": x, "y": y, "seq": seq}
+        return {"axes": axes, "buttons": buttons, "seq": seq}
 
     def snapshot(self) -> dict:
         with self._lock:
             age = (time.time() - self._last_rx) if self._last_rx else None
             return {
                 "axes": dict(self._axes),
+                "buttons": self._buttons,
                 "seq": self._seq,
                 "age_ms": int(age * 1000) if age is not None else None,
                 "forwarding": self._sink is not None,
@@ -603,11 +640,13 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         st = INPUT.feed(obj)
-        # 顺手把 vJoy 的存活状态塞进回包：手机每帧都会读这个响应，
-        # 于是「虚拟摇杆没起来」这件事不用额外查询、不用额外轮询，
-        # 顺路就送到了屏幕上。多花 8 个字节，省一个接口。
-        alive = 1 if INPUT.vjoy_status()["alive"] else 0
-        self._send(200, b'{"s":%d,"v":%d}' % (st["seq"], alive), "application/json")
+        # 顺手把 vJoy 的状态塞进回包：手机每帧都会读这个响应，于是
+        # 「虚拟摇杆没起来 / 缺轴」不用额外查询、不用额外轮询，顺路就
+        # 送到屏幕上了。多几个字节，省一个接口。
+        #   0 = vjoy_out 没在跑   1 = 就绪   2 = 在跑但有轴/按钮不可用
+        vs = INPUT.vjoy_status()
+        flag = 1 if (vs["alive"] and vs["ok"]) else (2 if vs["alive"] else 0)
+        self._send(200, b'{"s":%d,"v":%d}' % (st["seq"], flag), "application/json")
 
 
 class V4Server(socketserver.ThreadingTCPServer):

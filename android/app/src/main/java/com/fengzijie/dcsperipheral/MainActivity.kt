@@ -59,6 +59,7 @@ import com.fengzijie.dcsperipheral.input.YokeState
 import com.fengzijie.dcsperipheral.net.BridgePoller
 import com.fengzijie.dcsperipheral.net.LinkEvent
 import com.fengzijie.dcsperipheral.ui.AttitudeIndicator
+import com.fengzijie.dcsperipheral.ui.CalibScreen
 import com.fengzijie.dcsperipheral.ui.DcsTheme
 import com.fengzijie.dcsperipheral.ui.HeadingTape
 import com.fengzijie.dcsperipheral.ui.Ink
@@ -156,13 +157,14 @@ private fun Root() {
     // 换了服务器地址会造出一个新的 controller，这时必须把「解锁」状态丢掉 ——
     // 不能让新链路上电就是满杆
     LaunchedEffect(mode, ctl) {
-        if (mode == "yoke" && ctl != null) ctl.start() else ctl?.stop()
+        val live = mode == "yoke" || mode == "calib"
+        if (live && ctl != null) ctl.start() else ctl?.stop()
     }
 
-    // 摇杆页要一直亮屏：手握着手机看杆位，屏幕灭掉等于失控
+    // 摇杆/校准页要一直亮屏：手握着手机看杆位，屏幕灭掉等于失控
     val view = LocalView.current
     DisposableEffect(view, mode) {
-        view.keepScreenOn = (mode == "yoke")
+        view.keepScreenOn = (mode == "yoke" || mode == "calib")
         onDispose { view.keepScreenOn = false }
     }
 
@@ -198,14 +200,33 @@ private fun Root() {
 
         Spacer(Modifier.height(6.dp))
 
-        if (mode == "yoke") {
+        if (mode == "yoke" || mode == "calib") {
             if (server.isBlank()) {
                 EmptyHint(
                     "先设置服务器地址，摇杆才有地方发数据",
                     Modifier.fillMaxWidth().weight(1f),
                 )
-            } else {
+            } else if (mode == "yoke") {
                 YokeScreen(
+                    st = yokeSt,
+                    set = yset,
+                    onThrottle = { ctl?.nudgeThrottle(it) },
+                    onView = { x, y -> ctl?.setView(x, y) },
+                    onViewRelease = { ctl?.releaseView() },
+                    onButtonDown = { ctl?.pressButton(it) },
+                    onButtonUp = { ctl?.releaseButton(it) },
+                    onToggleArm = { ctl?.toggleArmed() },
+                    onCalibrate = { ctl?.captureNeutral() },
+                    onSettings = {
+                        mode = "calib"
+                        prefs.edit().putString("mode", "calib").apply()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            } else {
+                CalibScreen(
                     st = yokeSt,
                     set = yset,
                     onSettings = { ns ->
@@ -213,7 +234,6 @@ private fun Root() {
                         saveYokeSettings(prefs, ns)
                         ctl?.updateSettings(ns)
                     },
-                    onToggleArm = { ctl?.toggleArmed() },
                     onCalibrate = { ctl?.captureNeutral() },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -357,6 +377,11 @@ private fun loadYokeSettings(p: android.content.SharedPreferences) = YokeSetting
     invertX = p.getBoolean("yk_invx", false),
     invertY = p.getBoolean("yk_invy", false),
     swapAxes = p.getBoolean("yk_swap", true),
+    rudderOn = p.getBoolean("yk_rudder_on", true),
+    rudderDeadbandDeg = p.getFloat("yk_rudder_db", 4f),
+    rudderRangeDeg = p.getFloat("yk_rudder_range", 28f),
+    invertRudder = p.getBoolean("yk_rudder_inv", false),
+    throttleInvert = p.getBoolean("yk_thr_inv", false),
 )
 
 private fun saveYokeSettings(p: android.content.SharedPreferences, s: YokeSettings) {
@@ -367,6 +392,11 @@ private fun saveYokeSettings(p: android.content.SharedPreferences, s: YokeSettin
         .putBoolean("yk_invx", s.invertX)
         .putBoolean("yk_invy", s.invertY)
         .putBoolean("yk_swap", s.swapAxes)
+        .putBoolean("yk_rudder_on", s.rudderOn)
+        .putFloat("yk_rudder_db", s.rudderDeadbandDeg)
+        .putFloat("yk_rudder_range", s.rudderRangeDeg)
+        .putBoolean("yk_rudder_inv", s.invertRudder)
+        .putBoolean("yk_thr_inv", s.throttleInvert)
         .apply()
 }
 
@@ -425,6 +455,8 @@ private fun Header(
             armed = yokeArmed,
             onClick = { onMode("yoke") },
         )
+        Spacer(Modifier.width(4.dp))
+        ModeTab("校准", on = mode == "calib", onClick = { onMode("calib") })
         Spacer(Modifier.width(6.dp))
         TextButton(onClick = onSetup) {
             Text("设置", color = Ink.Fg, fontSize = 13.sp)

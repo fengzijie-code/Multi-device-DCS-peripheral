@@ -1,6 +1,7 @@
 package com.fengzijie.dcsperipheral.input
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,7 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import android.os.SystemClock
+import java.util.Locale
 import kotlin.math.abs
 
 /** 手感参数。全部可以在手机上实时调，不需要重编译。 */
@@ -27,8 +28,15 @@ data class YokeSettings(
     val expo: Float = 0.35f,
     val invertX: Boolean = false,
     val invertY: Boolean = false,
-    /** 横握（配合横屏 UI）：左右倾斜绕的是设备长边，对应横滚。 */
+    /** 横握（配合横屏 UI）：左右倾斜绕的是设备 X 轴，对应横滚。 */
     val swapAxes: Boolean = true,
+    // ---- 脚舵：靠「拧手机」（绕屏幕法线旋转）----
+    val rudderOn: Boolean = true,
+    val rudderDeadbandDeg: Float = 4f,
+    val rudderRangeDeg: Float = 28f,
+    val invertRudder: Boolean = false,
+    // ---- 油门 ----
+    val throttleInvert: Boolean = false,
 )
 
 data class YokeState(
@@ -36,36 +44,51 @@ data class YokeState(
     val sensorOk: Boolean = false,
     val hasNeutral: Boolean = false,
     val ready: Boolean = false,
-    /** 原始倾斜角（已按握法解算，未过曲线），给界面上的十字准星用 */
+    /** 原始倾斜角（已按握法解算，未过曲线），给界面上的杆位盘用 */
     val pitchDeg: Float = 0f,
     val rollDeg: Float = 0f,
-    /** 实际发出去的量，-1..1 */
+    val yawDeg: Float = 0f,
+    /** 实际发出去的量 */
     val x: Float = 0f,
     val y: Float = 0f,
+    val r: Float = 0f,
+    val vx: Float = 0f,
+    val vy: Float = 0f,
+    /** 0..1；`throttleTaken` 为 false 时这个值不发给飞机 */
+    val throttle: Float = 0f,
+    val throttleTaken: Boolean = false,
+    val buttons: Int = 0,
     val sent: Long = 0L,
-    /** PC 端 vjoy_out.py 是否活着。false 时杆不会动，界面必须直说。 */
-    val vjoyOk: Boolean = false,
     val hz: Float = 0f,
     val rttMs: Long = 0L,
-    /** 非空表示原因，界面上直接显示 */
+    /** 0 = vjoy_out 没在跑  1 = 就绪  2 = 在跑但缺轴/缺按钮 */
+    val vjoy: Int = 0,
     val notice: String? = null,
 )
 
 /**
- * 把倾斜变成 vJoy 轴，并推给 PC。
+ * 把手机变成一台六通道控制器。
+ *
+ * 通道：左右 / 前后 / 脚舵（拧手机）/ 油门（触摸）/ 视角横纵（触摸）/ 按钮。
  *
  * 三件事必须分开想，否则会写出「一卡全卡」的东西：
  *   1. 采传感器  —— 200Hz，在系统回调线程里，只做存四元数，绝不联网
  *   2. 算操纵量  —— 50Hz，在协程里，纯数学
  *   3. 发出去    —— 跟第 2 步同频，但可以失败、可以慢，失败了不能影响第 1 步
  *
- * 安全策略（这一段比功能重要）：
- *   - 默认**未解锁**。上电不会自己开始操纵飞机。
- *   - 网络一断立刻自动上锁。不能出现「链路恢复瞬间满杆回弹」——
- *     飞机会突然横滚，比失控更危险。
- *   - 倾角超过阈值持续 400ms 自动上锁。手机掉了/放桌上时，
- *     不能让飞机保持住那个舵量一直转。
- *   - PC 侧还有一道 500ms 看门狗兜底（vjoy_out.py），三层互不依赖。
+ * ═══ 安全策略（这一段比功能重要）═══
+ * 为什么要区分「回中类」和「保持类」通道：
+ *   杆、脚舵、视角松手就该回零，断线归零是安全的。
+ *   油门**不是** —— 它天生要停在原地。断线时把它拽回慢车，飞机在进近中
+ *   会直接掉下去。所以油门有三重保护：
+ *     · 未解锁不发（飞机保持自己的油门）
+ *     · 用户没碰过滑块也不发（不会一解锁就把油门拽到 0）
+ *     · PC 端看门狗只回中，不动油门
+ *
+ * 其余：
+ *   - 默认**未解锁**，上电不会自己开始操纵飞机。
+ *   - 网络一断立刻自动上锁，避免「链路恢复瞬间满杆回弹」。
+ *   - 倾角超过阈值持续 400ms 自动上锁（手机掉了/放桌上）。
  */
 class YokeController(
     context: Context,
@@ -81,11 +104,24 @@ class YokeController(
         private set
 
     @Volatile private var armed = false
-    @Volatile private var vjoyOk = false
+    @Volatile private var vjoyFlag = 0
     @Volatile private var notice: String? = null
     private var job: Job? = null
 
     private val url = "${baseUrl.trimEnd('/')}/input"
+
+    // ---- 触摸类通道：UI 线程写，IO 线程读 ----
+    @Volatile private var throttle = 0f
+    /** 用户碰过油门滑块没有。没碰过就绝不发油门 —— 见类注释。 */
+    @Volatile private var throttleTaken = false
+    @Volatile private var viewX = 0f
+    @Volatile private var viewY = 0f
+
+    // ---- 按钮 ----
+    private val btnLock = Any()
+    private var btnHeld = 0
+    private var btnPulse = 0
+    private val btnDeadline = LongArray(BUTTON_COUNT)
 
     fun start() {
         if (job?.isActive == true) return
@@ -94,10 +130,12 @@ class YokeController(
     }
 
     fun stop() {
-        // 停之前一定回中并把「已上锁」的状态发出去，否则 PC 那边要等
-        // 500ms 看门狗才回中，白白多一段时间的满杆
+        // 停之前一定把「已上锁 + 全零」发出去，否则 PC 那边要等 500ms
+        // 看门狗才回中，白白多一段时间的满杆
         armed = false
-        runCatching { post(0f, 0f) }
+        viewX = 0f; viewY = 0f
+        synchronized(btnLock) { btnHeld = 0; btnPulse = 0 }
+        runCatching { post(0f, 0f, 0f, 0f, 0f, null, 0) }
         job?.cancel()
         job = null
         tilt.stop()
@@ -133,6 +171,63 @@ class YokeController(
 
     fun toggleArmed() = setArmed(!armed)
 
+    // ------------------------------------------------------------ 触摸输入
+
+    /** 相对拖动。绝对定位会让一根误触的手指直接把油门甩到满。 */
+    fun nudgeThrottle(delta: Float) {
+        throttleTaken = true
+        throttle = (throttle + delta).coerceIn(0f, 1f)
+    }
+
+    /** 界面上的 ±1% 微调按钮 */
+    fun throttleStep(d: Float) {
+        nudgeThrottle(d)
+    }
+
+    fun setView(x: Float, y: Float) {
+        viewX = x.coerceIn(-1f, 1f)
+        viewY = y.coerceIn(-1f, 1f)
+    }
+
+    fun releaseView() {
+        viewX = 0f; viewY = 0f
+    }
+
+    /**
+     * 按下按钮。会保证至少 [MIN_PULSE_MS] 的按下时间 —— DCS 在每个模拟帧
+     * 采样按钮状态，如果按下和抬起发生在同一次轮询之间，这一下就丢了。
+     * 触摸屏上一次快速点按可能只有 20ms，所以必须由我们兜住。
+     */
+    fun pressButton(index: Int) {
+        if (index !in 0 until BUTTON_COUNT) return
+        synchronized(btnLock) {
+            btnHeld = btnHeld or (1 shl index)
+            btnPulse = btnPulse or (1 shl index)
+            btnDeadline[index] = SystemClock.elapsedRealtime() + MIN_PULSE_MS
+        }
+    }
+
+    fun releaseButton(index: Int) {
+        if (index !in 0 until BUTTON_COUNT) return
+        synchronized(btnLock) { btnHeld = btnHeld and (1 shl index).inv() }
+    }
+
+    private fun effectiveButtons(now: Long): Int {
+        synchronized(btnLock) {
+            var v = btnHeld
+            var i = 0
+            while (i < BUTTON_COUNT) {
+                val bit = 1 shl i
+                if (btnPulse and bit != 0) {
+                    if (now < btnDeadline[i]) v = v or bit
+                    else btnPulse = btnPulse and bit.inv()
+                }
+                i++
+            }
+            return v
+        }
+    }
+
     // ------------------------------------------------------------ 曲线
 
     /**
@@ -142,13 +237,13 @@ class YokeController(
      * 否则死区边界上会有一个跳变：刚出死区就到 12% 杆量。
      * 这种小跳变在接近中位修正时特别难受。
      */
-    private fun curve(raw: Float, s: YokeSettings): Float {
+    private fun curve(raw: Float, deadband: Float, range: Float, expo: Float): Float {
         val a = abs(raw)
-        if (a <= s.deadbandDeg) return 0f
-        val span = (s.rangeDeg - s.deadbandDeg).coerceAtLeast(1f)
-        val v = ((a - s.deadbandDeg) / span).coerceAtMost(1f)
+        if (a <= deadband) return 0f
+        val span = (range - deadband).coerceAtLeast(1f)
+        val v = ((a - deadband) / span).coerceAtMost(1f)
         // 经典 RC 指数曲线：(1-e)·v + e·v³。端点仍是 0 和 1，中间被压细
-        val out = v * (1f - s.expo) + v * v * v * s.expo
+        val out = v * (1f - expo) + v * v * v * expo
         return if (raw < 0f) -out else out
     }
 
@@ -178,16 +273,29 @@ class YokeController(
             val hasNeutral = rv != null
             var rollRaw = 0f
             var pitchRaw = 0f
+            var yawRaw = 0f
             if (rv != null) {
-                if (s.swapAxes) { rollRaw = rv[0]; pitchRaw = rv[1] }
-                else { pitchRaw = rv[0]; rollRaw = rv[1] }
+                // 握法决定哪根分量对应哪个动作。三根轴必须一起换，
+                // 只换两根（早期版本就是这样）会让脚舵在竖握时对不上。
+                if (s.swapAxes) {                       // 横握：屏幕朝上
+                    rollRaw = rv[0]; pitchRaw = rv[1]; yawRaw = rv[2]
+                } else {                                // 竖握：屏幕朝自己
+                    pitchRaw = rv[0]; rollRaw = rv[2]; yawRaw = rv[1]
+                }
             }
 
             // --- 掉手机保护 ---
+            //
+            // 超过这个角度就认为「不是在操纵，而是在重新握/掉了」。
+            // 关键点：超限时**输出零**，而不是让曲线把它钳到满舵 ——
+            // 曲线对超出量程的输入会 clamp 到 1.0，也就是满杆。用户只是
+            // 把手机翻过来看一眼，飞机就会突然满舵横滚，这种事故比断线
+            // 更难理解。钳位是数学上正确、操作上危险的行为。
             val limit = maxOf(55f, s.rangeDeg * 1.8f)
-            if (abs(rollRaw) > limit || abs(pitchRaw) > limit) {
+            val overLimit = abs(rollRaw) > limit || abs(pitchRaw) > limit
+            if (overLimit) {
                 if (overSince == 0L) overSince = now
-                else if (now - overSince > 400 && armed) {
+                else if (now - overSince > OVER_LIMIT_MS && armed) {
                     armed = false
                     notice = "倾角过大，已自动上锁（手机是不是掉了？）"
                 }
@@ -195,23 +303,37 @@ class YokeController(
                 overSince = 0L
             }
 
-            var x = curve(rollRaw, s)
-            var y = curve(pitchRaw, s)
+            var x = curve(rollRaw, s.deadbandDeg, s.rangeDeg, s.expo)
+            var y = curve(pitchRaw, s.deadbandDeg, s.rangeDeg, s.expo)
+            var r = if (s.rudderOn)
+                curve(yawRaw, s.rudderDeadbandDeg, s.rudderRangeDeg, s.expo) else 0f
             if (s.invertX) x = -x
             if (s.invertY) y = -y
+            if (s.invertRudder) r = -r
+            if (overLimit) {
+                x = 0f; y = 0f; r = 0f
+            }
 
-            // 未解锁就发精确的 0：不是「不发」。持续发 0 有两个用处 ——
-            // PC 端看门狗不会误判为断线，界面也能靠 hz 反映链路活着。
+            val btnNow = effectiveButtons(now)
+            val thrNow = if (s.throttleInvert) 1f - throttle else throttle
+
+            // 未解锁一律发零。油门例外：它压根不发（字段缺失），
+            // 让 DCS 保持自己那边的油门位置。
             val sendX = if (armed) x else 0f
             val sendY = if (armed) y else 0f
+            val sendR = if (armed) r else 0f
+            val sendVX = if (armed) viewX else 0f
+            val sendVY = if (armed) viewY else 0f
+            val sendB = if (armed) btnNow else 0
+            val sendT = if (armed && throttleTaken) thrNow else null
 
             // --- 发 ---
             val tt = SystemClock.elapsedRealtime()
-            val res = post(sendX, sendY)
+            val res = post(sendX, sendY, sendR, sendVX, sendVY, sendT, sendB)
             val postMs = SystemClock.elapsedRealtime() - tt
             if (res >= 0) {
                 rttMs = postMs
-                vjoyOk = res == 1
+                vjoyFlag = res
                 sent++
                 hzN++
                 failStreak = 0
@@ -228,7 +350,7 @@ class YokeController(
 
             // --- 发状态 ---
             // 50Hz 全量发给 Compose 会让整屏每 20ms 重组一次，白烧电。
-            // 20Hz 对准星来说已经完全跟手。
+            // 20Hz 对指针/数值来说已经完全跟手。
             val now2 = SystemClock.elapsedRealtime()
             if (now2 - lastEmit >= 50) {
                 lastEmit = now2
@@ -242,12 +364,19 @@ class YokeController(
                     ready = tilt.available && hasNeutral,
                     pitchDeg = pitchRaw,
                     rollDeg = rollRaw,
+                    yawDeg = yawRaw,
                     x = sendX,
                     y = sendY,
+                    r = sendR,
+                    vx = sendVX,
+                    vy = sendVY,
+                    throttle = throttle,
+                    throttleTaken = throttleTaken,
+                    buttons = sendB,
                     sent = sent,
                     hz = if (hz >= 0f) hz else prev.hz,
                     rttMs = rttMs,
-                    vjoyOk = vjoyOk,
+                    vjoy = vjoyFlag,
                     notice = notice,
                 )
             }
@@ -263,15 +392,17 @@ class YokeController(
             if (postMs > maxPost) maxPost = postMs
             postSum += postMs
             loopN++
-            if (now2 - diagT0 >= 2000 && loopN > 0) {
+            if (now2 - diagT0 >= 4000 && loopN > 0) {
                 Log.i(
                     TAG,
                     "post 平均 ${postSum / loopN} ms / 峰值 $maxPost ms / 整圈 " +
                         "${(now2 - diagT0) / loopN} ms（${loopN} 次）│ " +
                         "传感器 ${tilt.ageMs} ms 前更新  rotvec=" +
                         (rv?.joinToString(",") { "%.1f".format(it) } ?: "未校零") +
-                        "  轴 x=${"%.2f".format(sendX)} y=${"%.2f".format(sendY)}" +
-                        "  解锁=$armed  vJoy=$vjoyOk",
+                        "  x=${"%.2f".format(sendX)} y=${"%.2f".format(sendY)}" +
+                        " r=${"%.2f".format(sendR)} t=${sendT ?: "-"}" +
+                        " b=${sendB.toString(2)}  解锁=$armed  vJoy=$vjoyFlag" +
+                        "  失败连击=$failStreak  提示=${notice ?: "-"}",
                 )
                 diagT0 = now2; loopN = 0; postSum = 0; maxPost = 0
             }
@@ -283,10 +414,40 @@ class YokeController(
     private val ch = HttpChannel(baseUrl)
 
     /** 见 HttpChannel 的注释：走裸 socket 是为了能设 TCP_NODELAY。 */
-    private fun post(x: Float, y: Float): Int =
-        ch.post("""{"x":${x},"y":${y}}""".toByteArray())
+    private fun post(
+        x: Float, y: Float, r: Float, vx: Float, vy: Float,
+        t: Float?, b: Int,
+    ): Int {
+        val sb = StringBuilder(96)
+        sb.append("{\"x\":").append(f(x))
+        sb.append(",\"y\":").append(f(y))
+        sb.append(",\"r\":").append(f(r))
+        sb.append(",\"vx\":").append(f(vx))
+        sb.append(",\"vy\":").append(f(vy))
+        // 油门缺省 = 这次别管油门。见类注释里的「保持类通道」。
+        if (t != null) sb.append(",\"t\":").append(f(t))
+        sb.append(",\"b\":").append(b)
+        sb.append('}')
+        return ch.post(sb.toString().toByteArray(Charsets.US_ASCII))
+    }
+
+    /** 固定 3 位小数：够精确，且不会出现科学计数法。 */
+    private fun f(v: Float): String = String.format(Locale.US, "%.3f", v)
 
     private companion object {
         const val TAG = "DcsPeripheral"
+        const val BUTTON_COUNT = 16
+        const val MIN_PULSE_MS = 120L
+
+        /**
+         * 超过倾角上限多久才真正上锁。
+         *
+         * 400ms 太短：把手上的手机从横握换到竖握、或者低头看一眼，都会
+         * 短暂超过 55°，结果莫名其妙被锁。但也不能太长 —— 手机真掉了的
+         * 时候，这段时间飞机是在无人操纵状态。1.2 秒是「够活人换姿势、
+         * 不够让飞机飞走」的折中。超限期间输出为零，所以这段时间飞机
+         * 只是杆回中，不会满舵乱滚。
+         */
+        const val OVER_LIMIT_MS = 1200L
     }
 }
