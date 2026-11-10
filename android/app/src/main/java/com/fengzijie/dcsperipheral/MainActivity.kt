@@ -28,7 +28,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,14 +38,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.fengzijie.dcsperipheral.data.Frame
+import com.fengzijie.dcsperipheral.input.TiltSelfTest
+import com.fengzijie.dcsperipheral.input.YokeController
+import com.fengzijie.dcsperipheral.input.YokeSettings
+import com.fengzijie.dcsperipheral.input.YokeState
 import com.fengzijie.dcsperipheral.net.BridgePoller
 import com.fengzijie.dcsperipheral.net.LinkEvent
 import com.fengzijie.dcsperipheral.ui.AttitudeIndicator
@@ -51,12 +63,16 @@ import com.fengzijie.dcsperipheral.ui.DcsTheme
 import com.fengzijie.dcsperipheral.ui.HeadingTape
 import com.fengzijie.dcsperipheral.ui.Ink
 import com.fengzijie.dcsperipheral.ui.VerticalTape
+import com.fengzijie.dcsperipheral.ui.YokeScreen
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // 四元数解算没法靠眼睛验：跑一遍自检打 logcat，几微秒的事
+        TiltSelfTest.run()
         setContent {
             DcsTheme {
                 Surface(
@@ -83,6 +99,9 @@ private fun Root() {
 
     var server by remember { mutableStateOf(prefs.getString("server", "") ?: "") }
     var showSetup by remember { mutableStateOf(server.isBlank()) }
+    // 记住上次停在哪一页：切到摇杆页后被系统回收，回来不该又跳回仪表
+    var mode by remember { mutableStateOf(prefs.getString("mode", "pfd") ?: "pfd") }
+    var yset by remember { mutableStateOf(loadYokeSettings(prefs)) }
 
     var frame by remember { mutableStateOf(Frame()) }
     var hasData by remember { mutableStateOf(false) }
@@ -122,6 +141,42 @@ private fun Root() {
         }
     }
 
+    // ---------------------------------------------------------------- 摇杆
+    val ctl = remember(server) {
+        if (server.isBlank()) null else YokeController(ctx, server)
+    }
+    val emptyFlow = remember { MutableStateFlow(YokeState()) }
+    val yokeSt by (ctl?.state ?: emptyFlow).collectAsState()
+
+    DisposableEffect(ctl) {
+        ctl?.updateSettings(yset)
+        onDispose { ctl?.shutdown() }
+    }
+
+    // 换了服务器地址会造出一个新的 controller，这时必须把「解锁」状态丢掉 ——
+    // 不能让新链路上电就是满杆
+    LaunchedEffect(mode, ctl) {
+        if (mode == "yoke" && ctl != null) ctl.start() else ctl?.stop()
+    }
+
+    // 摇杆页要一直亮屏：手握着手机看杆位，屏幕灭掉等于失控
+    val view = LocalView.current
+    DisposableEffect(view, mode) {
+        view.keepScreenOn = (mode == "yoke")
+        onDispose { view.keepScreenOn = false }
+    }
+
+    // 退到后台立刻停手。系统会限流后台传感器，这时候还挂着解锁状态
+    // 却收不到新姿态 = 保持住最后一帧的舵量，是最坏的情况。
+    val activity = ctx as? androidx.activity.ComponentActivity
+    DisposableEffect(activity, ctl) {
+        val obs = LifecycleEventObserver { _, ev ->
+            if (ev == Lifecycle.Event.ON_PAUSE) ctl?.stop()
+        }
+        activity?.lifecycle?.addObserver(obs)
+        onDispose { activity?.lifecycle?.removeObserver(obs) }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -132,116 +187,146 @@ private fun Root() {
             status = status,
             server = server,
             dirty = frame.dirty,
+            mode = mode,
+            yokeArmed = yokeSt.armed,
+            onMode = {
+                mode = it
+                prefs.edit().putString("mode", it).apply()
+            },
             onSetup = { showSetup = true },
         )
 
         Spacer(Modifier.height(6.dp))
 
-        // 断线时整块读数区压暗：旧数字停在那里看起来和实时数据一模一样，
-        // 在飞行中这是危险的。必须让人一眼看出「这不是当前姿态」。
-        val dataAlpha = if (connected) 1f else 0.18f
+        if (mode == "yoke") {
+            if (server.isBlank()) {
+                EmptyHint(
+                    "先设置服务器地址，摇杆才有地方发数据",
+                    Modifier.fillMaxWidth().weight(1f),
+                )
+            } else {
+                YokeScreen(
+                    st = yokeSt,
+                    set = yset,
+                    onSettings = { ns ->
+                        yset = ns
+                        saveYokeSettings(prefs, ns)
+                        ctl?.updateSettings(ns)
+                    },
+                    onToggleArm = { ctl?.toggleArmed() },
+                    onCalibrate = { ctl?.captureNeutral() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
+        } else {
+            // 断线时整块读数区压暗：旧数字停在那里看起来和实时数据一模一样，
+            // 在飞行中这是危险的。必须让人一眼看出「这不是当前姿态」。
+            val dataAlpha = if (connected) 1f else 0.18f
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentAlignment = Alignment.Center,
-        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    // 左速度、右高度（用户习惯）
+                    VerticalTape(
+                        value = frame.iasKt,
+                        range = 60.0,
+                        minorStep = 10.0,
+                        labelStep = 20.0,
+                        unit = "kt",
+                        alignEnd = true,
+                        modifier = Modifier
+                            .width(80.dp)
+                            .fillMaxHeight()
+                            .alpha(dataAlpha),
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .alpha(dataAlpha),
+                    ) {
+                        AttitudeIndicator(
+                            pitchRad = frame.pitch,
+                            bankRad = frame.bank,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        HeadingTape(
+                            headingDeg = frame.hdgDegF,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(32.dp),
+                        )
+                    }
+
+                    VerticalTape(
+                        value = frame.altFt,
+                        range = 1000.0,
+                        minorStep = 100.0,
+                        labelStep = 200.0,
+                        unit = "ft",
+                        alignEnd = false,
+                        modifier = Modifier
+                            .width(80.dp)
+                            .fillMaxHeight()
+                            .alpha(dataAlpha),
+                    )
+                }
+
+                if (!connected) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .background(Color(0xE6101216), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 18.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = if (hasData) "数据已冻结" else "尚未收到数据",
+                            color = Ink.Red,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = errMsg.ifBlank { "正在重连…" },
+                            color = Ink.Dim,
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+
             Row(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(dataAlpha),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                // 左速度、右高度（用户习惯）
-                VerticalTape(
-                    value = frame.iasKt,
-                    range = 60.0,
-                    minorStep = 10.0,
-                    labelStep = 20.0,
-                    unit = "kt",
-                    alignEnd = true,
-                    modifier = Modifier
-                        .width(80.dp)
-                        .fillMaxHeight()
-                        .alpha(dataAlpha),
-                )
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .alpha(dataAlpha),
-                ) {
-                    AttitudeIndicator(
-                        pitchRad = frame.pitch,
-                        bankRad = frame.bank,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    HeadingTape(
-                        headingDeg = frame.hdgDegF,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(32.dp),
-                    )
-                }
-
-                VerticalTape(
-                    value = frame.altFt,
-                    range = 1000.0,
-                    minorStep = 100.0,
-                    labelStep = 200.0,
-                    unit = "ft",
-                    alignEnd = false,
-                    modifier = Modifier
-                        .width(80.dp)
-                        .fillMaxHeight()
-                        .alpha(dataAlpha),
-                )
+                Tile("VS", fmt(frame.vsFpm, 0, signed = true), "fpm", Modifier.weight(1f))
+                Tile("G", fmt(frame.g, 1), "g", Modifier.weight(1f))
+                Tile("AOA", fmt(frame.aoaDeg, 0), "°", Modifier.weight(1f))
+                Tile("MACH", fmt(frame.mach, 2), "", Modifier.weight(1f))
             }
 
-            if (!connected) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .background(Color(0xE6101216), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 18.dp, vertical = 10.dp),
-                ) {
-                    Text(
-                        text = if (hasData) "数据已冻结" else "尚未收到数据",
-                        color = Ink.Red,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        text = errMsg.ifBlank { "正在重连…" },
-                        color = Ink.Dim,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
+            Spacer(Modifier.height(6.dp))
+
+            Footer(status = status, rtt = rtt, hz = hz, err = errMsg, server = server)
         }
-
-        Spacer(Modifier.height(6.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .alpha(dataAlpha),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Tile("VS", fmt(frame.vsFpm, 0, signed = true), "fpm", Modifier.weight(1f))
-            Tile("G", fmt(frame.g, 1), "g", Modifier.weight(1f))
-            Tile("AOA", fmt(frame.aoaDeg, 0), "°", Modifier.weight(1f))
-            Tile("MACH", fmt(frame.mach, 2), "", Modifier.weight(1f))
-        }
-
-        Spacer(Modifier.height(6.dp))
-
-        Footer(status = status, rtt = rtt, hz = hz, err = errMsg, server = server)
     }
 
     if (showSetup) {
@@ -259,10 +344,40 @@ private fun Root() {
 }
 
 @Composable
+private fun EmptyHint(text: String, modifier: Modifier = Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Text(text, color = Ink.Dim, fontSize = 13.sp)
+    }
+}
+
+private fun loadYokeSettings(p: android.content.SharedPreferences) = YokeSettings(
+    deadbandDeg = p.getFloat("yk_deadband", 2.5f),
+    rangeDeg = p.getFloat("yk_range", 22f),
+    expo = p.getFloat("yk_expo", 0.35f),
+    invertX = p.getBoolean("yk_invx", false),
+    invertY = p.getBoolean("yk_invy", false),
+    swapAxes = p.getBoolean("yk_swap", true),
+)
+
+private fun saveYokeSettings(p: android.content.SharedPreferences, s: YokeSettings) {
+    p.edit()
+        .putFloat("yk_deadband", s.deadbandDeg)
+        .putFloat("yk_range", s.rangeDeg)
+        .putFloat("yk_expo", s.expo)
+        .putBoolean("yk_invx", s.invertX)
+        .putBoolean("yk_invy", s.invertY)
+        .putBoolean("yk_swap", s.swapAxes)
+        .apply()
+}
+
+@Composable
 private fun Header(
     status: String,
     server: String,
     dirty: Boolean,
+    mode: String,
+    yokeArmed: Boolean,
+    onMode: (String) -> Unit,
     onSetup: () -> Unit,
 ) {
     val dotColor = when {
@@ -302,9 +417,50 @@ private fun Header(
                 modifier = Modifier.padding(end = 8.dp),
             )
         }
+        ModeTab("仪表", on = mode == "pfd", onClick = { onMode("pfd") })
+        Spacer(Modifier.width(4.dp))
+        ModeTab(
+            text = if (yokeArmed) "摇杆 ●" else "摇杆",
+            on = mode == "yoke",
+            armed = yokeArmed,
+            onClick = { onMode("yoke") },
+        )
+        Spacer(Modifier.width(6.dp))
         TextButton(onClick = onSetup) {
             Text("设置", color = Ink.Fg, fontSize = 13.sp)
         }
+    }
+}
+
+/** 顶部的页面切换。摇杆页在解锁时左边会亮一个红点，人在仪表页也能看见。 */
+@Composable
+private fun ModeTab(
+    text: String,
+    on: Boolean,
+    armed: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val line = when {
+        armed -> Ink.Red
+        on -> Ink.Teal.copy(alpha = 0.7f)
+        else -> Ink.Line
+    }
+    val fg = when {
+        armed -> Ink.Red
+        on -> Ink.Teal
+        else -> Ink.Dim
+    }
+    Box(
+        modifier = Modifier
+            .height(30.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (on) Ink.Teal.copy(alpha = 0.14f) else Ink.Surface)
+            .border(1.dp, line, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = fg, fontSize = 12.sp, maxLines = 1, softWrap = false)
     }
 }
 

@@ -294,6 +294,107 @@ class TelemetryHub:
 HUB = TelemetryHub()
 
 
+# ---------------------------------------------------------------- 输入汇聚
+
+class InputHub:
+    """收手机发来的操纵量，转发给 vJoy 进程。
+
+    和遥测分开成两条流，因为它们的失败代价不同：
+    遥测断了只是看不到数据，控制断了会让人以为杆在中位 —— 所以控制侧
+    必须有自己的看门狗（在 vjoy_out.py 里，500ms 没消息就回中）。
+    """
+
+    MAX_ABS = 1.0
+    VJOY_STALE_S = 2.5
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        # vJoy 状态单独一把锁：snapshot() 会持有 _lock 再读它，
+        # 共用一把 Lock 就是自死锁（Lock 不可重入）。
+        self._vlock = threading.Lock()
+        self._axes = {"x": 0.0, "y": 0.0}
+        self._seq = 0
+        self._last_rx = 0.0
+        self._sink: tuple[str, int] | None = None
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._vjoy: dict = {}
+
+    def set_sink(self, host: str, port: int) -> None:
+        self._sink = (host, port)
+
+    def mark_vjoy(self, obj: dict) -> None:
+        """vjoy_out.py 每隔一秒来报一次活。
+
+        为什么值得专门做这条心跳：操纵链是「手机 → 桥接 → vjoy_out → 驱动
+        → DCS」五跳，任何一跳断了，飞行员看到的现象都是**杆不动**。
+        没有这条心跳，只能靠猜；有了它，桥接自己就能回答「操纵量到底走到
+        第几跳断的」。
+        """
+        with self._vlock:
+            self._vjoy = {
+                "at": time.time(),
+                "ok": bool(obj.get("ok", True)),
+                "msg": str(obj.get("msg", ""))[:200],
+            }
+
+    def vjoy_status(self) -> dict:
+        with self._vlock:
+            v = dict(self._vjoy)
+        if not v:
+            return {"alive": False, "ok": False, "age_ms": None, "msg": "vjoy_out.py 没在跑"}
+        age = time.time() - v["at"]
+        return {
+            "alive": age <= self.VJOY_STALE_S,
+            "ok": v["ok"],
+            "age_ms": int(age * 1000),
+            "msg": v["msg"],
+        }
+
+    @classmethod
+    def _clamp(cls, v) -> float:
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return 0.0
+        if f != f:                       # NaN
+            return 0.0
+        return max(-cls.MAX_ABS, min(cls.MAX_ABS, f))
+
+    def feed(self, obj: dict) -> dict:
+        x = self._clamp(obj.get("x", 0.0))
+        y = self._clamp(obj.get("y", 0.0))
+        with self._lock:
+            self._axes = {"x": x, "y": y}
+            self._seq += 1
+            self._last_rx = time.time()
+            seq = self._seq
+            sink = self._sink
+
+        if sink:
+            try:
+                self._sock.sendto(
+                    json.dumps({"x": x, "y": y, "seq": seq}).encode(),
+                    sink,
+                )
+            except OSError:
+                pass
+        return {"x": x, "y": y, "seq": seq}
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            age = (time.time() - self._last_rx) if self._last_rx else None
+            return {
+                "axes": dict(self._axes),
+                "seq": self._seq,
+                "age_ms": int(age * 1000) if age is not None else None,
+                "forwarding": self._sink is not None,
+                "vjoy": self.vjoy_status(),
+            }
+
+
+INPUT = InputHub()
+
+
 class Recorder:
     """把收到的每一帧落成 jsonl，用于回放和回归。
 
@@ -388,19 +489,34 @@ class Handler(BaseHTTPRequestHandler):
             msg = fmt % args
         except Exception:
             msg = str(fmt)
-        if "/ping" in msg:
+        if "/ping" in msg or "/input" in msg or "/vjoy" in msg:
             return
         sys.stderr.write(f"  [{self.client_address[0]}] {msg}\n")
 
     def _send(self, code: int, body: bytes, ctype: str):
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
+        """把状态行 + 头部 + 响应体合成**一次** write 发出去。
+
+        标准写法是先 send_response/send_header 再单独写 body，也就是两个
+        小包。在本机环回上这没任何问题（实测 0.21ms），但走 USB / 真实
+        链路就不行：第二个小包会撞上 Nagle 与 delayed-ACK 的相互等待，
+        实测给每个请求凭空加了 20–45ms。
+
+        这类毛病在本机测不出来，只有在「延迟不可忽略且不是环回」的链路
+        上才现形 —— 所以统一压成一个包，不依赖对端和对端协议栈的脾气。
+        """
+        reason = self.responses.get(code, ("Unknown", ""))[0]
+        head = (
+            f"HTTP/1.1 {code} {reason}\r\n"
+            f"Server: {self.server_version}\r\n"
+            f"Date: {self.date_time_string()}\r\n"
+            f"Content-Type: {ctype}\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            f"Cache-Control: no-store\r\n"
+            f"Access-Control-Allow-Origin: *\r\n"
+            f"\r\n"
+        ).encode("latin-1")
         try:
-            self.wfile.write(body)
+            self.wfile.write(head + body)
         except (BrokenPipeError, ConnectionResetError):
             pass
 
@@ -423,6 +539,12 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, body, "application/json")
             return
 
+        if u.path == "/input":
+            # 只读快照，用来确认手机端的操纵量有没有真的到桥接、转发有没有开
+            body = json.dumps(INPUT.snapshot(), ensure_ascii=False).encode()
+            self._send(200, body, "application/json")
+            return
+
         if u.path == "/info":
             body = json.dumps({
                 "ipv4": enumerate_ipv4(),
@@ -440,6 +562,52 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         self._send(404, b"not found", "text/plain; charset=utf-8")
+
+    # ------------------------------------------------------------ 控制入口
+    #
+    # 为什么控制走 HTTP POST 而不是另开一条裸 TCP：
+    #   手机经 USB 接进来时，唯一现成的隧道是 `adb reverse tcp:8080`，
+    #   它只转 TCP，不转 UDP。既然拥有一条 keep-alive 的 HTTP 连接，
+    #   就沿用它，少一层自研协议、少一处能出错的地方。
+    #   50Hz 下每包 ~40 字节 + 头部，USB 上可忽略。
+    #
+    # 为什么响应体只有 {"s":n}：
+    #   50Hz × 每字节都是白扔的带宽。序号够手机判断「对端还活着」。
+    def do_POST(self):
+        u = urlparse(self.path)
+        if u.path not in ("/input", "/vjoy"):
+            self._send(404, b"not found", "text/plain; charset=utf-8")
+            return
+
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        # 控制报文只该有几十字节。超过 4KB 一律当异常丢弃，
+        # 免得某个客户端发错东西把内存吃掉。
+        if n <= 0 or n > 4096:
+            self._send(413, b"bad length", "text/plain; charset=utf-8")
+            return
+
+        try:
+            obj = json.loads(self.rfile.read(n).decode("utf-8", "replace"))
+        except Exception:
+            obj = None
+        if not isinstance(obj, dict):
+            self._send(400, b"bad json", "text/plain; charset=utf-8")
+            return
+
+        if u.path == "/vjoy":
+            INPUT.mark_vjoy(obj)
+            self._send(200, b'{"ok":1}', "application/json")
+            return
+
+        st = INPUT.feed(obj)
+        # 顺手把 vJoy 的存活状态塞进回包：手机每帧都会读这个响应，
+        # 于是「虚拟摇杆没起来」这件事不用额外查询、不用额外轮询，
+        # 顺路就送到了屏幕上。多花 8 个字节，省一个接口。
+        alive = 1 if INPUT.vjoy_status()["alive"] else 0
+        self._send(200, b'{"s":%d,"v":%d}' % (st["seq"], alive), "application/json")
 
 
 class V4Server(socketserver.ThreadingTCPServer):
@@ -488,6 +656,9 @@ def main() -> int:
                     help="遥测 UDP 端口，0 表示不接收遥测")
     ap.add_argument("--record", metavar="PATH", default=None,
                     help="把收到的每一帧录成 jsonl，用于回放与回归")
+    ap.add_argument("--input-out", metavar="HOST:PORT", default="127.0.0.1:5011",
+                    help="把手机发来的操纵量转成 UDP 发给 vjoy_out.py"
+                         "（默认 127.0.0.1:5011，给 none 关闭转发）")
     args = ap.parse_args()
 
     stop = threading.Event()
@@ -518,6 +689,16 @@ def main() -> int:
             daemon=True,
         ).start()
 
+    # 控制转发目标。解析不出来就明确报错，不要静默按默认值跑 ——
+    # 否则「杆没反应」会变成又一个查不出原因的谜。
+    if args.input_out and args.input_out.lower() != "none":
+        try:
+            ih, ip = args.input_out.rsplit(":", 1)
+            INPUT.set_sink(ih.strip("[]"), int(ip))
+        except ValueError:
+            print(f"  [x] --input-out 格式应为 host:port，收到 {args.input_out!r}")
+            return 1
+
     print()
     print("· 候选地址")
     n = 0
@@ -542,6 +723,9 @@ def main() -> int:
         print(f"  5) 遥测出口 http://<上面的IP>:{args.port}/state —— Android 客户端读这个")
     if recorder:
         print(f"  6) 正在录制到 {recorder.path} —— 关掉本窗口即结束")
+    if INPUT.snapshot()["forwarding"]:
+        print(f"  7) 操纵量转发到 {args.input_out} —— 手机 POST /input 即生效")
+        print("     没装 vJoy 也不会报错，只是 DCS 看不见轴；用 /input 可查收包数")
     print()
     print(f"  服务端时间 {datetime.now().strftime('%H:%M:%S')}   Ctrl+C 退出")
     print("═" * 62)
