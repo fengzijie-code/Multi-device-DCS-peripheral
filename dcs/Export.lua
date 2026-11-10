@@ -196,6 +196,45 @@ local function load_socket()
     return nil, table.concat(tried, " ; ")
 end
 
+-- ============================ 结构探针 ============================
+
+-- LoGetEngineInfo / LoGetMechInfo / LoGetPayloadInfo 返回的是嵌套表，
+-- 各机型字段还不完全一样，网上没有可靠文档。与其猜，不如开局时把真实结构
+-- 打进日志，照着写编码器。只在启动时跑一次，对性能没有影响。
+local function describe_table(name, fn, max_keys)
+    local ok, t = pcall(fn)
+    if not ok then
+        log_info(name .. " -> 调用失败: " .. tostring(t))
+        return
+    end
+    if type(t) ~= "table" then
+        log_info(name .. " -> " .. type(t) .. ": " .. tostring(t))
+        return
+    end
+
+    local parts, n = {}, 0
+    for k, v in pairs(t) do
+        n = n + 1
+        if max_keys and n > max_keys then
+            parts[#parts + 1] = "..."
+            break
+        end
+        local desc
+        if type(v) == "table" then
+            local sub = {}
+            for k2 in pairs(v) do
+                sub[#sub + 1] = tostring(k2)
+                if #sub >= 8 then break end
+            end
+            desc = "table{" .. table.concat(sub, ",") .. "}"
+        else
+            desc = type(v) .. "=" .. tostring(v)
+        end
+        parts[#parts + 1] = tostring(k) .. ":" .. desc
+    end
+    log_info(name .. " = {" .. table.concat(parts, ", ") .. "}")
+end
+
 -- ============================ 发送 ============================
 
 local function send_frame()
@@ -257,6 +296,15 @@ function LuaExportStart()
 
     udp = sock
     send_ok = true
+
+    -- 探针：把后续要用的表结构打一次，供后续扩展字段时对照
+    describe_table("LoGetEngineInfo",   LoGetEngineInfo,   16)
+    describe_table("LoGetMechInfo",     LoGetMechInfo,     16)
+    describe_table("LoGetPayloadInfo",  LoGetPayloadInfo,  10)
+    describe_table("LoGetNavigationInfo", LoGetNavigationInfo, 12)
+    log_info("AoA=" .. tostring(safe_call(LoGetAngleOfAttack))
+             .. "  AoS=" .. tostring(safe_call(LoGetAngleOfSlide)))
+
     log_info(string.format(
         "已启动：发往 %s:%d，目标 %d Hz。LuaSocket OK。",
         CFG.host, CFG.port, CFG.rate
