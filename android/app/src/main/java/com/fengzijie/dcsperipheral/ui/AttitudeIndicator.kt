@@ -64,18 +64,26 @@ fun AttitudeIndicator(
                         color = Ink.Fg,
                         start = Offset(cx - w, cy),
                         end = Offset(cx + w, cy),
-                        strokeWidth = 2f * density,
+                        strokeWidth = 2.6f * density,
                     )
-                    // 俯仰梯：每 5° 一道，10° 的加长
-                    for (d in -30..30 step 5) {
-                        if (d == 0) continue
-                        val y = cy - d * pxPerDeg
-                        val half = if (d % 10 == 0) w * 0.20f else w * 0.11f
+                    // 俯仰梯：真实 ADI 的梯线是**中间断开的两段**，不是整条横线。
+                    // 画成整条会横穿机翼符号，看起来像随手划的棍子。
+                    val gap = w * 0.055f
+                    for (dpts in -30..30 step 5) {
+                        if (dpts == 0) continue
+                        val y = cy - dpts * pxPerDeg
+                        val half = if (dpts % 10 == 0) w * 0.085f else w * 0.05f
                         drawLine(
                             color = Ink.Dim,
-                            start = Offset(cx - half, y),
-                            end = Offset(cx + half, y),
-                            strokeWidth = 1.2f * density,
+                            start = Offset(cx - gap - half, y),
+                            end = Offset(cx - gap, y),
+                            strokeWidth = 1.3f * density,
+                        )
+                        drawLine(
+                            color = Ink.Dim,
+                            start = Offset(cx + gap, y),
+                            end = Offset(cx + gap + half, y),
+                            strokeWidth = 1.3f * density,
                         )
                     }
                 }
@@ -100,12 +108,21 @@ fun AttitudeIndicator(
         )
         drawCircle(color = Ink.Fg, radius = 2.5f * density, center = Offset(cx, cy))
 
-        // 顶部滚转带：中线 + ±30° 刻度 + 随滚转滑动的指针
-        val tapeY = 10f * density
-        val span = w * 0.30f
-        drawLine(Ink.Dim, Offset(cx, 0f), Offset(cx, tapeY * 1.7f), 2f * density)
-        drawLine(Ink.Dim, Offset(cx - span * 0.5f, 0f), Offset(cx - span * 0.5f, tapeY), 1.5f * density)
-        drawLine(Ink.Dim, Offset(cx + span * 0.5f, 0f), Offset(cx + span * 0.5f, tapeY), 1.5f * density)
+        // 顶部滚转带：固定参考刻度（0/±30/±60）+ 随滚转滑动的指针。
+        // 只有滑动的小圆点而没有参考刻度时，看不出「偏了多少」，等于没画。
+        val tapeY = 11f * density
+        val span = w * 0.26f          // ±60° 对应的横向距离
+
+        for (deg in intArrayOf(-60, -30, 0, 30, 60)) {
+            val tx = cx + (deg / 60f) * span
+            val long = deg == 0
+            drawLine(
+                color = if (long) Ink.Fg else Ink.Dim,
+                start = Offset(tx, 0f),
+                end = Offset(tx, if (long) tapeY * 1.6f else tapeY),
+                strokeWidth = (if (long) 2f else 1.4f) * density,
+            )
+        }
 
         val bx = cx + (bankDeg.coerceIn(-60f, 60f) / 60f) * span
         val tickColor = when {
@@ -113,6 +130,12 @@ fun AttitudeIndicator(
             abs(bankDeg) > 45f -> Ink.Amber
             else -> Ink.Fg
         }
-        drawCircle(color = tickColor, radius = 3.5f * density, center = Offset(bx, tapeY * 0.55f))
+        val tip = Path().apply {
+            moveTo(bx - 4f * density, tapeY * 0.9f)
+            lineTo(bx + 4f * density, tapeY * 0.9f)
+            lineTo(bx, tapeY * 1.9f)
+            close()
+        }
+        drawPath(tip, tickColor)
     }
 }

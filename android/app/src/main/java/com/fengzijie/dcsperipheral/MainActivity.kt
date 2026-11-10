@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,7 +48,9 @@ import com.fengzijie.dcsperipheral.net.BridgePoller
 import com.fengzijie.dcsperipheral.net.LinkEvent
 import com.fengzijie.dcsperipheral.ui.AttitudeIndicator
 import com.fengzijie.dcsperipheral.ui.DcsTheme
+import com.fengzijie.dcsperipheral.ui.HeadingTape
 import com.fengzijie.dcsperipheral.ui.Ink
+import com.fengzijie.dcsperipheral.ui.VerticalTape
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -123,7 +126,7 @@ private fun Root() {
         modifier = Modifier
             .fillMaxSize()
             .systemBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
         Header(
             status = status,
@@ -132,7 +135,7 @@ private fun Root() {
             onSetup = { showSetup = true },
         )
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(6.dp))
 
         // 断线时整块读数区压暗：旧数字停在那里看起来和实时数据一模一样，
         // 在飞行中这是危险的。必须让人一眼看出「这不是当前姿态」。
@@ -144,23 +147,57 @@ private fun Root() {
                 .weight(1f),
             contentAlignment = Alignment.Center,
         ) {
-            AttitudeIndicator(
-                pitchRad = frame.pitch,
-                bankRad = frame.bank,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(dataAlpha),
-            )
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                    .alpha(dataAlpha),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                BigReadout("ALT", fmt(frame.altFt), "ft", TextAlign.Start)
-                BigReadout("IAS", fmt(frame.iasKt), "kt", TextAlign.End)
+                VerticalTape(
+                    value = frame.altFt,
+                    range = 1000.0,
+                    minorStep = 100.0,
+                    labelStep = 200.0,
+                    unit = "ft",
+                    alignEnd = true,
+                    modifier = Modifier
+                        .width(80.dp)
+                        .fillMaxHeight()
+                        .alpha(dataAlpha),
+                )
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .alpha(dataAlpha),
+                ) {
+                    AttitudeIndicator(
+                        pitchRad = frame.pitch,
+                        bankRad = frame.bank,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    HeadingTape(
+                        headingDeg = frame.hdgDegF,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp),
+                    )
+                }
+
+                VerticalTape(
+                    value = frame.iasKt,
+                    range = 60.0,
+                    minorStep = 10.0,
+                    labelStep = 20.0,
+                    unit = "kt",
+                    alignEnd = false,
+                    modifier = Modifier
+                        .width(80.dp)
+                        .fillMaxHeight()
+                        .alpha(dataAlpha),
+                )
             }
 
             if (!connected) {
@@ -168,15 +205,15 @@ private fun Root() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .background(Color(0xE6101216), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
                 ) {
                     Text(
                         text = if (hasData) "数据已冻结" else "尚未收到数据",
                         color = Ink.Red,
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(3.dp))
                     Text(
                         text = errMsg.ifBlank { "正在重连…" },
                         color = Ink.Dim,
@@ -187,31 +224,21 @@ private fun Root() {
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(6.dp))
 
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .alpha(dataAlpha),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Tile("VS", fmt(frame.vsFpm, 0, signed = true), "fpm", Modifier.weight(1f))
-                Tile("G", fmt(frame.g, 1), "g", Modifier.weight(1f))
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Tile("HDG", "%03d".format(Locale.US, frame.hdgDeg), "°", Modifier.weight(1f))
-                Tile("MACH", fmt(frame.mach, 2), "", Modifier.weight(1f))
-            }
+            Tile("VS", fmt(frame.vsFpm, 0, signed = true), "fpm", Modifier.weight(1f))
+            Tile("G", fmt(frame.g, 1), "g", Modifier.weight(1f))
+            Tile("AOA", fmt(frame.aoaDeg, 0), "°", Modifier.weight(1f))
+            Tile("MACH", fmt(frame.mach, 2), "", Modifier.weight(1f))
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(6.dp))
 
         Footer(status = status, rtt = rtt, hz = hz, err = errMsg, server = server)
     }
@@ -276,40 +303,6 @@ private fun Header(
         }
         TextButton(onClick = onSetup) {
             Text("设置", color = Ink.Fg, fontSize = 13.sp)
-        }
-    }
-}
-
-@Composable
-private fun BigReadout(label: String, value: String, unit: String, align: TextAlign) {
-    // 数字压在会移动的地平线上，加一层半透明底保证任何时候都能读
-    Column(
-        horizontalAlignment = if (align == TextAlign.End) Alignment.End else Alignment.Start,
-        modifier = Modifier
-            .background(Color(0x73000000), RoundedCornerShape(8.dp))
-            .padding(horizontal = 9.dp, vertical = 4.dp),
-    ) {
-        Text(
-            text = label,
-            color = Ink.Dim,
-            fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace,
-            textAlign = align,
-        )
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = value,
-                color = Ink.Fg,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Medium,
-                fontFamily = FontFamily.Monospace,
-            )
-            Text(
-                text = unit,
-                color = Ink.Dim,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(start = 3.dp, bottom = 4.dp),
-            )
         }
     }
 }

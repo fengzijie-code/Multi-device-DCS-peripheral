@@ -24,6 +24,20 @@ data class Frame(
     val g: Double = 1.0,        // 过载，G
     val mach: Double = 0.0,
     val dirty: Boolean = false, // 该帧被清洗过（含 NaN/Inf）
+
+    // 以下是按 dcs.log 探针实测结构扩展出来的字段。
+    // 老录制文件没有这些键，optDouble 会取默认 0，不会崩。
+    val aoa: Double = 0.0,      // 迎角，弧度
+    val rpmL: Double = 0.0,     // 左发转速 %
+    val rpmR: Double = 0.0,
+    val tempL: Double = 0.0,    // 左发排气温度
+    val tempR: Double = 0.0,
+    val fuel: Double = 0.0,     // 内油 0..1
+    val fuelExt: Double = 0.0,
+    val gear: Double = 0.0,     // 起落架 0..1
+    val flaps: Double = 0.0,
+    val sbrake: Double = 0.0,   // 减速板 0..1
+    val shells: Double = 0.0,   // 机炮余弹
 ) {
     companion object {
         private fun num(o: JSONObject, key: String, fallback: Double = 0.0): Double {
@@ -44,6 +58,17 @@ data class Frame(
             g = num(o, "g", 1.0),
             mach = num(o, "mach"),
             dirty = o.optBoolean("dirty", false),
+            aoa = num(o, "aoa"),
+            rpmL = num(o, "rpm_l"),
+            rpmR = num(o, "rpm_r"),
+            tempL = num(o, "temp_l"),
+            tempR = num(o, "temp_r"),
+            fuel = num(o, "fuel"),
+            fuelExt = num(o, "fuelx"),
+            gear = num(o, "gear"),
+            flaps = num(o, "flaps"),
+            sbrake = num(o, "sbrk"),
+            shells = num(o, "shells"),
         )
     }
 
@@ -52,4 +77,6 @@ data class Frame(
     val iasKt: Double get() = ias * 1.94384
     val vsFpm: Double get() = vs * 196.85
     val hdgDeg: Int get() = (((Math.toDegrees(hdg).toInt()) % 360) + 360) % 360
+    val hdgDegF: Double get() = ((Math.toDegrees(hdg) % 360) + 360) % 360
+    val aoaDeg: Double get() = Math.toDegrees(aoa)
 }
