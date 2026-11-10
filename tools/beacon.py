@@ -754,17 +754,21 @@ def main() -> int:
 
     print()
     print("· 提示")
-    print("  1) 手机必须连同一个 Wi-Fi（或已接入同一 Tailscale 网络）")
-    print("  2) 首次启动 Windows 会弹防火墙框，务必勾选「专用网络」并允许")
-    print("  3) 页面上能看到 RTT 数字跳动 = 链路通；一直 --  = 不通")
-    print("  4) 逐个地址试，哪个通用哪个 —— 不同地址走的是不同路径")
+    tips = [
+        "手机必须连同一个 Wi-Fi（或已接入同一 Tailscale 网络）",
+        "首次启动 Windows 会弹防火墙框，务必勾选「专用网络」并允许",
+        "页面上能看到 RTT 数字跳动 = 链路通；一直 --  = 不通",
+        "逐个地址试，哪个通用哪个 —— 不同地址走的是不同路径",
+    ]
     if args.udp_in:
-        print(f"  5) 遥测出口 http://<上面的IP>:{args.port}/state —— Android 客户端读这个")
+        tips.append(f"遥测出口 http://<上面的IP>:{args.port}/state —— Android 客户端读这个")
     if recorder:
-        print(f"  6) 正在录制到 {recorder.path} —— 关掉本窗口即结束")
+        tips.append(f"正在录制到 {recorder.path} —— 关掉本窗口即结束")
     if INPUT.snapshot()["forwarding"]:
-        print(f"  7) 操纵量转发到 {args.input_out} —— 手机 POST /input 即生效")
-        print("     没装 vJoy 也不会报错，只是 DCS 看不见轴；用 /input 可查收包数")
+        tips.append(f"操纵量转发到 {args.input_out} —— 手机 POST /input 即生效")
+        tips.append("  没装 vJoy 也不会报错，只是 DCS 看不见轴；用 /input 可查收包数")
+    for i, t in enumerate(tips, 1):
+        print(f"  {i}) {t}")
     print()
     print(f"  服务端时间 {datetime.now().strftime('%H:%M:%S')}   Ctrl+C 退出")
     print("═" * 62)

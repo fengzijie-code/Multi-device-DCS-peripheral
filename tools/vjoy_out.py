@@ -66,6 +66,10 @@ GREEN, YELLOW, RED, DIM, BOLD, RESET = (
     "\033[32m", "\033[33m", "\033[31m", "\033[2m", "\033[1m", "\033[0m"
 )
 
+# 状态行默认原地刷新。但输出被重定向（比如被启动器收进管道统一打标签）时，
+# 回车符只会把多路输出搅成一团 —— 那种情况下改成换行，一行一条。
+CR = "\r" if sys.stdout.isatty() else "\n"
+
 # vJoy 的轴编号用的是 HID Usage ID，不是「第几根轴」。
 AXIS = {"x": 0x30, "y": 0x31, "z": 0x32, "rx": 0x33, "ry": 0x34, "rz": 0x35,
         "sl0": 0x36, "sl1": 0x37}
@@ -520,7 +524,7 @@ def run(args) -> int:
                 prob = dev.problem()
                 if prob:
                     warned = True
-                    print(f"\r  {YELLOW}[!]{RESET} {prob}{' ' * 20}")
+                    print(f"{CR}  {YELLOW}[!]{RESET} {prob}{' ' * 20}", end=CR)
 
         elif not centered and (now - last_rx) * 1000.0 >= args.timeout:
             # 只在「从有到无」的那一次写，不要每 20ms 反复写 ——
@@ -534,10 +538,12 @@ def run(args) -> int:
                         dev.button(i + 1, False)
                 btn_state = 0
             centered = True
-            print(f"\r  {YELLOW}[!]{RESET} {(now - last_rx) * 1000:.0f} ms 无消息 → 已回中"
-                  f"（油门保持）{' ' * 20}")
+            print(f"{CR}  {YELLOW}[!]{RESET} {(now - last_rx) * 1000:.0f} ms 无消息 → 已回中"
+                  f"（油门保持）{' ' * 20}", end=CR)
 
-        if now - last_stat >= 2.0:
+        if now - last_stat >= (10.0 if n == 0 else 2.0):
+            # 空转时拉长到 10 秒一次：启动器里三路输出汇在一起，每 2 秒
+            # 一条「等待手机」会把别的消息顶上去，看起来像在重复报错。
             # 用**窗口内**的增量算速率。用累计数除以总时长会得到一个
             # 只降不升的平均值，空转时一路衰减到 0，看起来像链路挂了。
             hz = (n - last_n) / max(0.001, now - last_stat)
@@ -552,7 +558,8 @@ def run(args) -> int:
                     v = dev.values.get(a, 0)
                     parts.append(f"{AXIS_CN[a]}={v:5d}")
                 extra = "  " + " ".join(parts) + f"  B={dev.buttons:04x}"
-            print(f"\r  {state}  {n} 包  {hz:.0f} Hz{extra}{' ' * 8}", end="")
+            pad = " " * 8 if CR == "\r" else ""
+            print(f"{CR}  {state}  {n} 包  {hz:.0f} Hz{extra}{pad}", end=CR)
 
     s.close()
     hb_stop.set()

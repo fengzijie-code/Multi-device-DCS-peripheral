@@ -97,14 +97,36 @@ def ensure_reverse(adb: str, port: int) -> bool:
     return False
 
 
-def data_age(port: int) -> tuple[bool, int | None, float]:
-    """问桥接服务要一次状态，返回 (有数据?, age_ms, hz)。"""
+# 空 ProxyHandler = 不走任何代理，直连
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def bridge_state(port: int) -> tuple[bool, bool, int | None, float, str]:
+    """问桥接服务要一次状态。
+
+    返回 (连得上?, 有数据?, age_ms, hz, 错误原因)。
+
+    为什么要把「连不上」和「没数据」分开：这两件事的处理方式完全相反。
+    连不上 = USB 隧道/桥接进程有问题；没数据 = 桥接好好的，只是 DCS 没开。
+    早期版本用一个 `age is None` 同时表示两者，于是只要没开 DCS，看守就会
+    喊「桥接服务未响应」—— 一个纯假警报，还把人往错的方向带。
+
+    **必须绕过系统代理**：这台机器上开了 HTTP 代理，`urllib` 默认会把发往
+    127.0.0.1 的请求也交给代理，代理不知道本机 8080 是什么，直接失败。
+    """
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/state", timeout=2) as r:
+        with _OPENER.open(f"http://127.0.0.1:{port}/state", timeout=2) as r:
             d = json.loads(r.read().decode())
-        return bool(d.get("has_data")), d["stats"].get("age_ms"), float(d["stats"].get("hz") or 0)
-    except Exception:
-        return False, None, 0.0
+    except Exception as e:
+        return False, False, None, 0.0, f"{type(e).__name__}: {e}"
+    stats = d.get("stats") or {}
+    return (
+        True,
+        bool(d.get("has_data")),
+        stats.get("age_ms"),
+        float(stats.get("hz") or 0),
+        "",
+    )
 
 
 def main() -> int:
@@ -157,13 +179,15 @@ def main() -> int:
             now = time.time()
             if not args.quiet and now - last_heartbeat >= 30:
                 last_heartbeat = now
-                has_data, age, hz = data_age(args.port)
-                if age is None:
-                    stat = "桥接服务未响应"
+                reachable, has_data, age, hz, err = bridge_state(args.port)
+                if not reachable:
+                    stat = f"桥接服务未响应（{err}）"
                 elif has_data:
                     stat = f"数据正常 age={age}ms {hz:.1f}Hz"
+                elif age is None:
+                    stat = "桥接在线，但还没收到过遥测（DCS 没开 / 不在任务里 / mock 没运行）"
                 else:
-                    stat = f"无数据 age={age}ms（DCS 没开 / 不在任务里 / mock 没运行）"
+                    stat = f"遥测中断 age={age}ms（DCS 退出了？）"
                 print(f"  [{datetime.now():%H:%M:%S}] 心跳：{stat}")
 
             time.sleep(args.interval)
