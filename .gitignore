@@ -44,6 +44,9 @@ tests/fixtures/recording/_tmp*.jsonl
 .tmp/
 *.pcap
 
+# ---- 第三方安装包（11MB 二进制，不该进版本库；放根目录是为了好找）----
+vJoySetup.exe
+
 # ---- Agent 工作区（决策日志留在本地即可，知识已沉淀到 docs/）----
 .workbuddy/
 

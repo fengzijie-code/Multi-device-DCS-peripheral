@@ -131,7 +131,7 @@ def load_vjoy():
         raise RuntimeError("找到 vJoyInterface.dll 但加载失败：\n    " + "\n    ".join(tried))
     raise RuntimeError(
         "找不到 vJoyInterface.dll。装一次 vJoy 即可：\n"
-        "    安装包在 .tmp/vjoy/vJoySetup.exe（右键 → 以管理员身份运行）\n"
+        "    安装包在项目根目录的 vJoySetup.exe（右键 → 以管理员身份运行）\n"
         "    装完在开始菜单搜 “Configure vJoy”，确认 Device 1 已启用"
     )
 
