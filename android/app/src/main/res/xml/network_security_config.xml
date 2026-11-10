@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  P0 阶段桥接服务还是明文 HTTP，所以这里放行 cleartext。
+  P1 换成 HTTPS + 自签名证书后，这里要改成只信任本项目的 CA：
+      <trust-anchors>
+          <certificates src="@raw/bridge_ca" />
+      </trust-anchors>
+  并且把 cleartextTrafficPermitted 改回 false —— 别让这条留到正式版。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

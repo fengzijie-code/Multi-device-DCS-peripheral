@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 纯 Compose 应用，窗口装饰交给系统主题，避免启动时白屏闪一下 -->
+    <style name="Theme.DcsPeripheral" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0D1117</item>
+        <item name="android:statusBarColor">#0D1117</item>
+        <item name="android:navigationBarColor">#0D1117</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

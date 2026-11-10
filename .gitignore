@@ -1,0 +1,53 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# ---- Rust ----
+# 注意：二进制项目要提交 Cargo.lock，别忽略它
+target/
+
+# ---- Android / Gradle ----
+.gradle/
+build/
+android/local.properties
+android/.idea/
+*.apk
+*.aab
+captures/
+
+# 构建产物
+/bridge/target/
+/dist/
+*.exe
+
+# ---- 证书与密钥：绝不入库 ----
+certs/
+*.pem
+*.key
+*.pfx
+*.p12
+
+# ---- 录制件（体积大，按需另行分发）----
+tests/fixtures/recording/*.jsonl
+
+# ---- 本地配置与日志 ----
+*.log
+/local.settings.json
+
+# ---- 临时产物（截图、抓包、一次性验证输出）----
+.tmp/
+*.pcap
+
+# ---- Agent 工作区（决策日志留在本地即可，知识已沉淀到 docs/）----
+.workbuddy/
+
+# ---- 编辑器与系统 ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
