@@ -94,8 +94,10 @@ class YokeController(
     context: Context,
     private val baseUrl: String,
 ) {
-    private val tilt = TiltSource(context.applicationContext)
+    private val app = context.applicationContext
+    private val tilt = TiltSource(app)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val prefs = app.getSharedPreferences("dcs_peripheral", Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow(YokeState(sensorOk = tilt.available))
     val state: StateFlow<YokeState> = _state.asStateFlow()
@@ -111,11 +113,18 @@ class YokeController(
     private val url = "${baseUrl.trimEnd('/')}/input"
 
     // ---- 触摸类通道：UI 线程写，IO 线程读 ----
-    @Volatile private var throttle = 0f
+    //
+    // 油门值要在进程重启后活下来。否则「空中 App 被杀 → 重启 → 第一次碰
+    // 滑块」会把油门从上次的位置（比如 70%）瞬间拽到 0，等于空中收油门。
+    // 只持久化**值**，不持久化「已接管」：新会话默认仍是不接管的状态，
+    // 飞机保持自己的油门，直到用户真的去碰它。
+    @Volatile private var throttle = prefs.getFloat("yk_throttle", 0f).coerceIn(0f, 1f)
+
     /** 用户碰过油门滑块没有。没碰过就绝不发油门 —— 见类注释。 */
     @Volatile private var throttleTaken = false
     @Volatile private var viewX = 0f
     @Volatile private var viewY = 0f
+    @Volatile private var lastThrottleSave = 0L
 
     // ---- 按钮 ----
     private val btnLock = Any()
@@ -136,6 +145,7 @@ class YokeController(
         viewX = 0f; viewY = 0f
         synchronized(btnLock) { btnHeld = 0; btnPulse = 0 }
         runCatching { post(0f, 0f, 0f, 0f, 0f, null, 0) }
+        saveThrottle(force = true)
         job?.cancel()
         job = null
         tilt.stop()
@@ -177,11 +187,17 @@ class YokeController(
     fun nudgeThrottle(delta: Float) {
         throttleTaken = true
         throttle = (throttle + delta).coerceIn(0f, 1f)
+        saveThrottle(force = false)
     }
 
     /** 界面上的 ±1% 微调按钮 */
-    fun throttleStep(d: Float) {
-        nudgeThrottle(d)
+    fun throttleStep(d: Float) = nudgeThrottle(d)
+
+    private fun saveThrottle(force: Boolean) {
+        val now = SystemClock.elapsedRealtime()
+        if (!force && now - lastThrottleSave < 500) return
+        lastThrottleSave = now
+        prefs.edit().putFloat("yk_throttle", throttle).apply()
     }
 
     fun setView(x: Float, y: Float) {

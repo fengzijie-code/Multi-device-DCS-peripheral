@@ -232,8 +232,10 @@ fun ThrottleStrip(
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Text("油门", color = accent, fontSize = 10.sp, maxLines = 1, softWrap = false)
+            // 没接管时也显示数值：它代表「碰一下会发出去多少」。显示「--」
+            // 的话，用户不知道第一次触摸会把油门带到哪里。
             Text(
-                text = if (taken) "${(value * 100).toInt()}" else "--",
+                text = "${(value * 100).toInt()}",
                 color = accent,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
