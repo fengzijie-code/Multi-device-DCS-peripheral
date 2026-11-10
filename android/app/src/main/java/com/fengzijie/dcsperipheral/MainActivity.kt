@@ -151,12 +151,13 @@ private fun Root() {
                 modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                // 左速度、右高度（用户习惯）
                 VerticalTape(
-                    value = frame.altFt,
-                    range = 1000.0,
-                    minorStep = 100.0,
-                    labelStep = 200.0,
-                    unit = "ft",
+                    value = frame.iasKt,
+                    range = 60.0,
+                    minorStep = 10.0,
+                    labelStep = 20.0,
+                    unit = "kt",
                     alignEnd = true,
                     modifier = Modifier
                         .width(80.dp)
@@ -187,11 +188,11 @@ private fun Root() {
                 }
 
                 VerticalTape(
-                    value = frame.iasKt,
-                    range = 60.0,
-                    minorStep = 10.0,
-                    labelStep = 20.0,
-                    unit = "kt",
+                    value = frame.altFt,
+                    range = 1000.0,
+                    minorStep = 100.0,
+                    labelStep = 200.0,
+                    unit = "ft",
                     alignEnd = false,
                     modifier = Modifier
                         .width(80.dp)
