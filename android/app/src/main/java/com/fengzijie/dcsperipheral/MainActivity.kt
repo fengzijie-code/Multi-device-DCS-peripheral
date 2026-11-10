@@ -403,6 +403,9 @@ private fun loadYokeSettings(p: android.content.SharedPreferences): YokeSettings
         rudderRangeDeg = p.getFloat("yk_rudder_range", 28f),
         invertRudder = p.getBoolean("yk_rudder_inv", false),
         throttleInvert = p.getBoolean("yk_thr_inv", true),
+        swapViewAxes = p.getBoolean("yk_view_swap", false),
+        invertViewX = p.getBoolean("yk_view_invx", false),
+        invertViewY = p.getBoolean("yk_view_invy", false),
     )
 }
 
@@ -419,6 +422,9 @@ private fun saveYokeSettings(p: android.content.SharedPreferences, s: YokeSettin
         .putFloat("yk_rudder_range", s.rudderRangeDeg)
         .putBoolean("yk_rudder_inv", s.invertRudder)
         .putBoolean("yk_thr_inv", s.throttleInvert)
+        .putBoolean("yk_view_swap", s.swapViewAxes)
+        .putBoolean("yk_view_invx", s.invertViewX)
+        .putBoolean("yk_view_invy", s.invertViewY)
         .apply()
 }
 

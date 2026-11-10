@@ -39,6 +39,11 @@ data class YokeSettings(
     // ---- 油门 ----
     /** 油门方向：DCS 里这根轴是反的，默认翻过来。 */
     val throttleInvert: Boolean = true,
+    // ---- 视角 ----
+    /** 横纵互换。DCS 自动识别轴的时候容易认错，互换一下不用重绑。 */
+    val swapViewAxes: Boolean = false,
+    val invertViewX: Boolean = false,
+    val invertViewY: Boolean = false,
 )
 
 data class YokeState(
@@ -381,11 +386,22 @@ class YokeController(
 
             // 未解锁一律发零。油门例外：它压根不发（字段缺失），
             // 让 DCS 保持自己那边的油门位置。
+            // 视角：手机上是「按住拖哪算哪」，但发出去之前允许互换和翻转。
+            // 互换是为了救 DCS 自动识别认错轴的场景（拖横的它认成 JOY_RY），
+            // 那种情况重绑一遍很烦，换个开关就解决了。
+            var vX = viewX
+            var vY = viewY
+            if (s.swapViewAxes) {
+                val tmp = vX; vX = vY; vY = tmp
+            }
+            if (s.invertViewX) vX = -vX
+            if (s.invertViewY) vY = -vY
+
             val sendX = if (armed) x else 0f
             val sendY = if (armed) y else 0f
             val sendR = if (armed) r else 0f
-            val sendVX = if (armed) viewX else 0f
-            val sendVY = if (armed) viewY else 0f
+            val sendVX = if (armed) vX else 0f
+            val sendVY = if (armed) vY else 0f
             val sendB = if (armed) btnNow else 0
             val sendT = if (armed && throttleTaken) thrNow else null
 

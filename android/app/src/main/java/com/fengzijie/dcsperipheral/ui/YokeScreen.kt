@@ -172,8 +172,6 @@ fun YokeScreen(
 
             Spacer(Modifier.height(4.dp))
             ViewPad(
-                vx = st.vx,
-                vy = st.vy,
                 enabled = st.armed,
                 onChange = onView,
                 onRelease = onViewRelease,
@@ -335,6 +333,29 @@ fun CalibScreen(
                     text = if (set.throttleInvert) "油门 反转" else "油门 正常",
                     on = set.throttleInvert,
                     onClick = { onSettings(set.copy(throttleInvert = !set.throttleInvert)) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Chip(
+                    // 这三个是给「DCS 自动识别认错轴」准备的。DCS 绑定轴时
+                    // 是「动一下它自己认」，横着拖的时候如果手指按得偏上/偏下，
+                    // 它可能认成另一根轴。重绑很烦，这里互换一下就行。
+                    text = if (set.swapViewAxes) "视角 横纵互换" else "视角 横纵正常",
+                    on = set.swapViewAxes,
+                    onClick = { onSettings(set.copy(swapViewAxes = !set.swapViewAxes)) },
+                    modifier = Modifier.weight(1.3f),
+                )
+                Chip(
+                    text = if (set.invertViewX) "视角横 反转" else "视角横 正常",
+                    on = set.invertViewX,
+                    onClick = { onSettings(set.copy(invertViewX = !set.invertViewX)) },
+                    modifier = Modifier.weight(1f),
+                )
+                Chip(
+                    text = if (set.invertViewY) "视角纵 反转" else "视角纵 正常",
+                    on = set.invertViewY,
+                    onClick = { onSettings(set.copy(invertViewY = !set.invertViewY)) },
                     modifier = Modifier.weight(1f),
                 )
             }

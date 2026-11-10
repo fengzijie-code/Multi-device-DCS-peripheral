@@ -370,14 +370,19 @@ fun RudderBar(
  */
 @Composable
 fun ViewPad(
-    vx: Float,
-    vy: Float,
     enabled: Boolean,
     onChange: (Float, Float) -> Unit,
     onRelease: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var touching by remember { mutableStateOf(false) }
+    // 点画在**手指相对按下点的位移**上，不画在映射后的 vx/vy 上：
+    // 开了横纵互换或反转以后映射值和手指位置对不上，照映射值画会让点
+    // 跑向反方向，像坏了。
+    var dotX by remember { mutableStateOf(0f) }
+    var dotY by remember { mutableStateOf(0f) }
+    var baseX by remember { mutableStateOf(0f) }
+    var baseY by remember { mutableStateOf(0f) }
 
     Box(
         modifier = modifier
@@ -388,13 +393,24 @@ fun ViewPad(
                 if (!enabled) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown()
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
+                    // **相对按下点**，不是相对面板中心。
+                    //
+                    // 绝对定位（按到哪算到哪）有个隐蔽的副作用：手指一按下去，
+                    // 两个轴同时跳到一个较大的值。在 DCS 里绑轴时 DCS 是
+                    // 「动一下它自己认」，于是只要按得偏上一点，它就把
+                    // 「Horizontal View」认成 JOY_RY —— 这正是用户遇到的情况。
+                    // 改成相对以后，按下瞬间恒为零，只有拖动才产生偏转，
+                    // 顺手也把手感改好了（不会一碰就甩到底）。
+                    val ox = down.position.x
+                    val oy = down.position.y
+                    baseX = ox
+                    baseY = oy
+                    val r = min(size.width, size.height) / 2f - 10f
                     fun emit(p: Offset) {
-                        onChange(
-                            ((p.x - cx) / (size.width / 2f)).coerceIn(-1f, 1f),
-                            (-(p.y - cy) / (size.height / 2f)).coerceIn(-1f, 1f),
-                        )
+                        val nx = ((p.x - ox) / r).coerceIn(-1f, 1f)
+                        val ny = (-(p.y - oy) / r).coerceIn(-1f, 1f)
+                        dotX = nx; dotY = ny
+                        onChange(nx, ny)
                     }
                     touching = true
                     emit(down.position)
@@ -414,18 +430,23 @@ fun ViewPad(
         Canvas(Modifier.fillMaxSize()) {
             val cx = size.width / 2f
             val cy = size.height / 2f
+            val r = min(size.width, size.height) / 2f - 10f
             drawLine(Ink.Line, Offset(0f, cy), Offset(size.width, cy), 1f)
             drawLine(Ink.Line, Offset(cx, 0f), Offset(cx, size.height), 1f)
-            val g = Ink.Line.copy(alpha = 0.45f)
-            drawCircle(g, radius = min(size.width, size.height) * 0.32f, center = Offset(cx, cy), style = Stroke(1f))
 
             if (touching) {
-                val px = cx + vx * (size.width / 2f - 10f)
-                val py = cy - vy * (size.height / 2f - 10f)
-                drawCircle(Ink.Teal.copy(alpha = 0.16f), radius = 18f, center = Offset(px, py))
+                // 按下点画一个底盘，手指偏出去多少一目了然
+                drawCircle(
+                    Ink.Line, radius = r, center = Offset(baseX, baseY),
+                    style = Stroke(1.5f),
+                )
+                val px = baseX + dotX * r
+                val py = baseY - dotY * r
+                drawCircle(Ink.Teal.copy(alpha = 0.16f), radius = 16f, center = Offset(px, py))
                 drawCircle(Ink.Teal, radius = 7f, center = Offset(px, py))
+            } else {
+                drawCircle(Ink.Dim.copy(alpha = 0.5f), radius = 3f, center = Offset(cx, cy))
             }
-            drawCircle(Ink.Dim.copy(alpha = 0.5f), radius = 3f, center = Offset(cx, cy))
         }
 
         if (!touching) {
