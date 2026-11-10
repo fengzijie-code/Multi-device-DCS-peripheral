@@ -31,7 +31,11 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 EXPORT_LUA = ROOT / "dcs" / "Export.lua"
 
-EXPECTED_FIELDS = ["t", "alt", "agl", "ias", "gs", "vs", "pitch", "bank", "hdg", "g", "mach"]
+EXPECTED_FIELDS = [
+    "t", "alt", "agl", "ias", "gs", "vs", "pitch", "bank", "hdg", "g", "mach",
+    "aoa", "rpm_l", "rpm_r", "temp_l", "temp_r", "fuel", "fuelx",
+    "gear", "flaps", "sbrk", "shells",
+]
 
 
 # ---------------------------------------------------------------- Lua 环境
@@ -81,6 +85,14 @@ STATE = {
     g = 1.02,
     mach = 0.42,
     nan_alt = false,
+    aoa = 0.0873,      -- 5 度
+    rpm = 87.5,
+    temp = 640.0,
+    fuel = 0.62,
+    gear = 1.0,
+    flaps = 0.0,
+    sbrake = 0.0,
+    shells = 510,
 }
 
 function set_state(k, v) STATE[k] = v end
@@ -99,6 +111,34 @@ function LoGetTrueAirSpeed()             return STATE.tas end
 function LoGetVerticalVelocity()         return STATE.vs end
 function LoGetMachNumber()               return STATE.mach end
 function LoGetAccelerationUnits()        return { x = 0, y = STATE.g, z = 0 } end
+function LoGetAngleOfAttack()            return STATE.aoa end
+
+-- 下面三个的表结构照抄 dcs.log 里的探针实测输出
+function LoGetEngineInfo()
+    return {
+        RPM = { left = STATE.rpm, right = STATE.rpm },
+        Temperature = { left = STATE.temp, right = STATE.temp },
+        FuelConsumption = { left = 1.0, right = 1.0 },
+        HydraulicPressure = { left = 1.0, right = 1.0 },
+        EngineStart = { left = true, right = true },
+        fuel_internal = STATE.fuel,
+        fuel_external = 0,
+    }
+end
+function LoGetMechInfo()
+    return {
+        gear = { value = STATE.gear, nose = 0, main = 0, status = 0 },
+        flaps = { value = STATE.flaps, status = 0 },
+        speedbrakes = { value = STATE.sbrake, status = 0 },
+        wheelbrakes = { value = 0, status = 0 },
+        canopy = { value = 0, status = 0 },
+        parachute = { value = 0, status = 0 },
+        controlsurfaces = { eleron = 0, elevator = 0, rudder = 0 },
+    }
+end
+function LoGetPayloadInfo()
+    return { CurrentStation = 0, Stations = {}, Cannon = { shells = STATE.shells } }
+end
 """
 
 
@@ -171,6 +211,12 @@ def main() -> int:
             r.check("alt 数值正确", abs(obj["alt"] - 1520.25) < 0.01, str(obj["alt"]))
             r.check("pitch 精度到 1e-5", abs(obj["pitch"] + 0.021) < 1e-5, str(obj["pitch"]))
             r.check("g 取自 AccelerationUnits.y", abs(obj["g"] - 1.02) < 0.01, str(obj["g"]))
+            r.check("aoa 从 LoGetAngleOfAttack 取到", abs(obj["aoa"] - 0.0873) < 1e-4, str(obj["aoa"]))
+            r.check("发动机转速取自嵌套表 RPM.left", abs(obj["rpm_l"] - 87.5) < 0.1, str(obj["rpm_l"]))
+            r.check("排气温度取自 Temperature.left", abs(obj["temp_l"] - 640.0) < 0.1, str(obj["temp_l"]))
+            r.check("内油取自 fuel_internal", abs(obj["fuel"] - 0.62) < 1e-3, str(obj["fuel"]))
+            r.check("起落架取自 gear.value", abs(obj["gear"] - 1.0) < 1e-3, str(obj["gear"]))
+            r.check("机炮余弹取自 Cannon.shells", obj["shells"] == 510, str(obj["shells"]))
         except json.JSONDecodeError as e:
             r.check("可被 JSON 解析", False, str(e))
         r.check("目标地址为回环", frames[0]["host"] == "127.0.0.1", frames[0]["host"])

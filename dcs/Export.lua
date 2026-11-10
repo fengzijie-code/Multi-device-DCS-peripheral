@@ -113,10 +113,24 @@ local function collect()
     local tas  = safe_call(LoGetTrueAirSpeed) or 0
     local vs   = safe_call(LoGetVerticalVelocity) or 0
     local mach = safe_call(LoGetMachNumber) or (ias / 295.0)
+    local aoa  = safe_call(LoGetAngleOfAttack)
 
     local g = 1.0
     local acc = safe_call(LoGetAccelerationUnits)
     if type(acc) == "table" and acc.y then g = acc.y end
+
+    -- 以下的表结构是探针实测出来的（各机型可能不同），全部做存在性检查
+    local eng  = safe_call(LoGetEngineInfo)  or {}
+    local mech = safe_call(LoGetMechInfo)    or {}
+    local pay  = safe_call(LoGetPayloadInfo) or {}
+
+    local function deep(t, k1, k2)
+        if type(t) ~= "table" then return nil end
+        local a = t[k1]
+        if k2 == nil then return a end
+        if type(a) ~= "table" then return nil end
+        return a[k2]
+    end
 
     return {
         alt   = alt,
@@ -129,27 +143,51 @@ local function collect()
         hdg   = sd.Heading or 0,
         g     = g,
         mach  = mach,
+
+        aoa      = aoa,
+        rpm_l    = deep(eng, "RPM", "left"),
+        rpm_r    = deep(eng, "RPM", "right"),
+        temp_l   = deep(eng, "Temperature", "left"),
+        temp_r   = deep(eng, "Temperature", "right"),
+        fuel     = eng.fuel_internal,
+        fuel_ext = eng.fuel_external,
+        gear     = deep(mech, "gear", "value"),
+        flaps    = deep(mech, "flaps", "value"),
+        sbrake   = deep(mech, "speedbrakes", "value"),
+        shells   = deep(pay, "Cannon", "shells"),
     }
 end
 
 local function encode(d, t)
-    -- 字段顺序固定，方便对比 mock 与真机的输出
-    return string.format(
-        '{"t":%.3f,"alt":%s,"agl":%s,"ias":%s,"gs":%s,"vs":%s,'
-        .. '"pitch":%s,"bank":%s,"hdg":%s,"g":%s,"mach":%s%s}',
-        t,
-        num(d.alt,   "%.2f"),
-        num(d.agl,   "%.2f"),
-        num(d.ias,   "%.2f"),
-        num(d.gs,    "%.2f"),
-        num(d.vs,    "%.2f"),
-        num(d.pitch, "%.5f"),
-        num(d.bank,  "%.5f"),
-        num(d.hdg,   "%.5f"),
-        num(d.g,     "%.2f"),
-        num(d.mach,  "%.3f"),
-        dirty and ',"dirty":true' or ""
-    )
+    -- 字段顺序固定，方便对比 mock 与真机的输出。
+    -- 用拼表而不是一大串 format：字段一多，format 的参数错位根本看不出来。
+    local p = {
+        '"t":'      .. num(t,       "%.3f"),
+        '"alt":'    .. num(d.alt,   "%.2f"),
+        '"agl":'    .. num(d.agl,   "%.2f"),
+        '"ias":'    .. num(d.ias,   "%.2f"),
+        '"gs":'     .. num(d.gs,    "%.2f"),
+        '"vs":'     .. num(d.vs,    "%.2f"),
+        '"pitch":'  .. num(d.pitch, "%.5f"),
+        '"bank":'   .. num(d.bank,  "%.5f"),
+        '"hdg":'    .. num(d.hdg,   "%.5f"),
+        '"g":'      .. num(d.g,     "%.2f"),
+        '"mach":'   .. num(d.mach,  "%.3f"),
+        '"aoa":'    .. num(d.aoa,    "%.4f"),
+        '"rpm_l":'  .. num(d.rpm_l,  "%.1f"),
+        '"rpm_r":'  .. num(d.rpm_r,  "%.1f"),
+        '"temp_l":' .. num(d.temp_l, "%.1f"),
+        '"temp_r":' .. num(d.temp_r, "%.1f"),
+        '"fuel":'   .. num(d.fuel,   "%.3f"),
+        '"fuelx":'  .. num(d.fuel_ext, "%.3f"),
+        '"gear":'   .. num(d.gear,   "%.3f"),
+        '"flaps":'  .. num(d.flaps,  "%.3f"),
+        '"sbrk":'   .. num(d.sbrake, "%.3f"),
+        '"shells":' .. num(d.shells, "%.0f"),
+    }
+    -- dirty 由上面的 num() 置位，所以要全部算完再判断
+    if dirty then p[#p + 1] = '"dirty":true' end
+    return "{" .. table.concat(p, ",") .. "}"
 end
 
 -- ============================ 加载 LuaSocket ============================

@@ -85,6 +85,19 @@ class FlightModel:
             "hdg": round(self._norm_hdg(0.6 + 0.35 * math.sin(t / 55)), 5),
             "g": round(max(0.0, g + j(-0.03, 0.03)), 2),
             "mach": round(ias / 295.0, 3),
+
+            # 扩展字段：模拟 DCS 探针实测出的结构（RPM/Temperature 是左右两个值）
+            "aoa": round(pitch * 0.85 + 0.015, 4),
+            "rpm_l": round(84 + 6 * math.sin(t / 30) + j(-0.4, 0.4), 1),
+            "rpm_r": round(84 + 6 * math.sin(t / 30 + 0.05) + j(-0.4, 0.4), 1),
+            "temp_l": round(560 + 90 * abs(math.sin(t / 30)) + j(-3, 3), 1),
+            "temp_r": round(560 + 90 * abs(math.sin(t / 30 + 0.05)) + j(-3, 3), 1),
+            "fuel": round(max(0.0, 0.82 - t * 0.0006), 4),
+            "fuelx": 0.0,
+            "gear": 0.0 if alt > 50 else 1.0,
+            "flaps": 0.0,
+            "sbrk": 0.0,
+            "shells": 510,
         }
 
     def _core(self, t: float):
