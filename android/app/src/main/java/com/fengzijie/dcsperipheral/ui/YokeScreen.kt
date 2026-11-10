@@ -307,6 +307,7 @@ fun CalibScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
+            // 四个方向开关分两行两列，比挤成一行四个窄条好点
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Chip(
                     text = if (set.invertX) "左右 反转" else "左右 正常",
@@ -320,10 +321,20 @@ fun CalibScreen(
                     onClick = { onSettings(set.copy(invertY = !set.invertY)) },
                     modifier = Modifier.weight(1f),
                 )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Chip(
                     text = if (set.invertRudder) "脚舵 反转" else "脚舵 正常",
                     on = set.invertRudder,
                     onClick = { onSettings(set.copy(invertRudder = !set.invertRudder)) },
+                    modifier = Modifier.weight(1f),
+                )
+                Chip(
+                    // 这个开关以前只存在于设置结构里，界面上没有入口 —— 等于不存在。
+                    // 油门方向反了的人会卡在这里，因为他根本找不到地方翻。
+                    text = if (set.throttleInvert) "油门 反转" else "油门 正常",
+                    on = set.throttleInvert,
+                    onClick = { onSettings(set.copy(throttleInvert = !set.throttleInvert)) },
                     modifier = Modifier.weight(1f),
                 )
             }

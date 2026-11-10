@@ -372,19 +372,39 @@ private fun EmptyHint(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-private fun loadYokeSettings(p: android.content.SharedPreferences) = YokeSettings(
-    deadbandDeg = p.getFloat("yk_deadband", 2.5f),
-    rangeDeg = p.getFloat("yk_range", 22f),
-    expo = p.getFloat("yk_expo", 0.35f),
-    invertX = p.getBoolean("yk_invx", false),
-    invertY = p.getBoolean("yk_invy", false),
-    swapAxes = p.getBoolean("yk_swap", true),
-    rudderOn = p.getBoolean("yk_rudder_on", true),
-    rudderDeadbandDeg = p.getFloat("yk_rudder_db", 4f),
-    rudderRangeDeg = p.getFloat("yk_rudder_range", 28f),
-    invertRudder = p.getBoolean("yk_rudder_inv", false),
-    throttleInvert = p.getBoolean("yk_thr_inv", false),
-)
+/**
+ * 参数存储版本。
+ *
+ * 为什么需要它：`loadYokeSettings` 读的是 SharedPreferences，只要某个键已经
+ * 存在，改代码里的默认值就**不会生效**。实测发现俯仰和油门方向相反，光把
+ * 默认值改成 true 对已经装过的机器没用，必须显式迁移一次。
+ */
+private const val SETTINGS_VER = 2
+
+private fun loadYokeSettings(p: android.content.SharedPreferences): YokeSettings {
+    if (p.getInt("yk_ver", 1) < 2) {
+        // v2：俯仰与油门在 DCS 里方向相反，默认翻过来。
+        // 只覆盖这两项，其他偏好原样保留。
+        p.edit()
+            .putBoolean("yk_invy", true)
+            .putBoolean("yk_thr_inv", true)
+            .putInt("yk_ver", SETTINGS_VER)
+            .apply()
+    }
+    return YokeSettings(
+        deadbandDeg = p.getFloat("yk_deadband", 2.5f),
+        rangeDeg = p.getFloat("yk_range", 22f),
+        expo = p.getFloat("yk_expo", 0.35f),
+        invertX = p.getBoolean("yk_invx", false),
+        invertY = p.getBoolean("yk_invy", true),
+        swapAxes = p.getBoolean("yk_swap", true),
+        rudderOn = p.getBoolean("yk_rudder_on", true),
+        rudderDeadbandDeg = p.getFloat("yk_rudder_db", 4f),
+        rudderRangeDeg = p.getFloat("yk_rudder_range", 28f),
+        invertRudder = p.getBoolean("yk_rudder_inv", false),
+        throttleInvert = p.getBoolean("yk_thr_inv", true),
+    )
+}
 
 private fun saveYokeSettings(p: android.content.SharedPreferences, s: YokeSettings) {
     p.edit()

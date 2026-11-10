@@ -27,7 +27,8 @@ data class YokeSettings(
     /** 曲线指数混合：0 = 线性，1 = 纯三次方（中间极细、末端仍满）。 */
     val expo: Float = 0.35f,
     val invertX: Boolean = false,
-    val invertY: Boolean = false,
+    /** 俯仰：实测这架飞机方向相反，默认翻过来。 */
+    val invertY: Boolean = true,
     /** 横握（配合横屏 UI）：左右倾斜绕的是设备 X 轴，对应横滚。 */
     val swapAxes: Boolean = true,
     // ---- 脚舵：靠「拧手机」（绕屏幕法线旋转）----
@@ -36,7 +37,8 @@ data class YokeSettings(
     val rudderRangeDeg: Float = 28f,
     val invertRudder: Boolean = false,
     // ---- 油门 ----
-    val throttleInvert: Boolean = false,
+    /** 油门方向：DCS 里这根轴是反的，默认翻过来。 */
+    val throttleInvert: Boolean = true,
 )
 
 data class YokeState(
@@ -44,7 +46,11 @@ data class YokeState(
     val sensorOk: Boolean = false,
     val hasNeutral: Boolean = false,
     val ready: Boolean = false,
-    /** 原始倾斜角（已按握法解算，未过曲线），给界面上的杆位盘用 */
+    /**
+     * 杆位角度：已按握法解算、已含反转，但**没过曲线**。
+     * 给界面上的杆位盘用 —— 它表示「飞机往哪边动多少」，不是手机的物理倾角。
+     * 幅度保持线性，所以调死区和行程时看它仍然直观。
+     */
     val pitchDeg: Float = 0f,
     val rollDeg: Float = 0f,
     val yawDeg: Float = 0f,
@@ -406,8 +412,12 @@ class YokeController(
                     sensorOk = tilt.available,
                     hasNeutral = hasNeutral,
                     ready = tilt.available && hasNeutral,
-                    pitchDeg = pitchRaw,
-                    rollDeg = rollRaw,
+                    // 杆位盘要显示**指令方向**，不是原始倾斜方向。
+                    // 开了反转以后，往后仰手机（原始角为正）实际是在让飞机
+                    // 低头；这时盘上的点应该往下走，否则看着和飞机的反应相反。
+                    // 幅度不受反转影响，所以调死区/行程时照样好用。
+                    pitchDeg = if (s.invertY) -pitchRaw else pitchRaw,
+                    rollDeg = if (s.invertX) -rollRaw else rollRaw,
                     yawDeg = yawRaw,
                     x = sendX,
                     y = sendY,
