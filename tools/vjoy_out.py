@@ -142,6 +142,7 @@ class VJoy:
         self.id = dev_id
         self.failed: set[str] = set()        # 写不进去的轴（通常是没在 vJoyConf 里启用）
         self.failed_btn = False
+        self.buttons = 0
         d = self.dll
 
         d.vJoyEnabled.restype = wintypes.BOOL
@@ -164,6 +165,13 @@ class VJoy:
         d.SetBtn.argtypes = [wintypes.BOOL, ctypes.c_uint, ctypes.c_uint]
         d.ResetVJD.restype = wintypes.BOOL
         d.ResetVJD.argtypes = [ctypes.c_uint]
+
+        # 配置审计用。这两个函数是「问驱动这根轴配了没有」，
+        # 比「写一次看返回 false」早一步发现问题。
+        d.GetVJDAxisExist.restype = wintypes.BOOL
+        d.GetVJDAxisExist.argtypes = [ctypes.c_uint, ctypes.c_uint]
+        d.GetVJDButtonNumber.restype = ctypes.c_uint
+        d.GetVJDButtonNumber.argtypes = [ctypes.c_uint]
 
     def check(self) -> None:
         if not self.dll.vJoyEnabled():
@@ -188,6 +196,31 @@ class VJoy:
         if st == 3:
             raise RuntimeError(f"Device {self.id} 不存在：{VJD_STAT.get(st)}")
         self.acquired = True
+
+    def audit(self, axis_names, min_buttons: int):
+        """在开始转发之前，把配置问一遍。
+
+        为什么值得单独做：vJoy 对没启用的轴**静默返回 False**，不报错。
+        现象是「某根轴永远不动」，而人在飞的时候根本不会去查这个。
+        提前问清楚，问题就在启动那一秒暴露。
+        """
+        problems = []
+        for name in axis_names:
+            try:
+                ok = bool(self.dll.GetVJDAxisExist(self.id, AXIS[name]))
+            except Exception:
+                ok = False
+            if not ok:
+                problems.append(name)
+                self.failed.add(name)
+        try:
+            n_btn = int(self.dll.GetVJDButtonNumber(self.id))
+        except Exception:
+            n_btn = 0
+        self.buttons = n_btn
+        if n_btn < min_buttons:
+            self.failed_btn = True
+        return problems
 
     def axis(self, name: str, value: int) -> None:
         """写一根轴。名字是 'x'..'rz' 这种。
@@ -269,6 +302,10 @@ class DryDevice:
         self.values.clear()
         self.buttons = 0
 
+    def audit(self, axis_names, min_buttons: int):
+        self.buttons = min_buttons
+        return []
+
     def release(self) -> None:
         pass
 
@@ -345,17 +382,27 @@ def run(args) -> int:
 
     mapping = dict(args.map)
 
+    # 配置审计：把「这个轴到底配了没有」在开始转发前问清楚
+    missing = dev.audit(list(mapping.values()), 3)
+
     print()
     print("═" * 66)
     print(f"  虚拟摇杆输出   Device {args.id}   {where}")
     print("═" * 66)
     for ch in ("x", "y", "r", "t", "vx", "vy"):
         if ch in mapping:
-            print(f"  {CH_CN[ch]:<5}  <-  {AXIS_CN[mapping[ch]]}")
-    print(f"  按钮        <-  Btn 1..{MAX_BTN}（襟翼/起落架…）")
+            ax = mapping[ch]
+            flag = f"  {RED}未启用{RESET}" if ax in missing else ""
+            print(f"  {CH_CN[ch]:<5}  <-  {AXIS_CN[ax]}{flag}")
+    btn_flag = f"  {RED}只有 {dev.buttons} 个，至少要 3 个{RESET}" if dev.failed_btn else ""
+    print(f"  按钮        <-  Btn 1..3{btn_flag}")
     print(f"  监听 UDP 127.0.0.1:{args.port}")
     print(f"  看门狗 {args.timeout} ms 无消息 → 回中（油门保持，按钮释放）")
     print(f"  {DIM}Ctrl+C 退出（会先回中）。救急：python tools/vjoy_out.py --reset{RESET}")
+    if missing or dev.failed_btn:
+        print()
+        print(f"  {YELLOW}[!]{RESET} 配置不全，标红的通道不会动。")
+        print(f"      打开 “Configure vJoy” → 勾上这些轴 + 按钮数量设成 3 以上 → Apply")
     print()
 
     # 退出路径必须比正常路径更可靠。Ctrl+C 用 signal，关窗口/注销用
