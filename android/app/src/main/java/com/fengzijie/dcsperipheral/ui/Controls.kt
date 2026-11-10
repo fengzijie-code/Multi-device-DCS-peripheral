@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.min
 
 /**
@@ -66,9 +67,8 @@ import kotlin.math.min
 fun StickPad(
     rollDeg: Float,
     pitchDeg: Float,
-    yawDeg: Float,
+    rudder: Float,
     rangeDeg: Float,
-    rudderRange: Float,
     armed: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -127,15 +127,14 @@ fun StickPad(
         drawLine(tick, Offset(left + w - 6f, cy - 3), Offset(left + w - 6f, cy + 3), 2f)
 
         // 脚舵刻度：画在盘**内**底部，避免看起来像一条飘在外面的杂线。
-        // 两件事都看得到：拧手机有没有生效，以及**滚转时有没有带出多余的
-        // 偏航**（握姿不对时这个耦合特别明显）。
+        // 显示的是**最终给飞机的偏航量**，不是原始拧动角度 —— 这样无论
+        // 来自拧手机还是滑块，看到的就是实际在起作用的那个值。
         val ry = top + h - 13f
         val rx0 = cx - min(w, h) * 0.32f
         val rx1 = cx + min(w, h) * 0.32f
         drawLine(Ink.Line, Offset(rx0, ry), Offset(rx1, ry), 3f)
         drawLine(Ink.Dim.copy(alpha = 0.7f), Offset(cx, ry - 4f), Offset(cx, ry + 4f), 1.5f)
-        val rSpan = rudderRange.coerceAtLeast(1f)
-        val rdx = (yawDeg / rSpan).coerceIn(-1f, 1f) * ((rx1 - rx0) / 2f)
+        val rdx = rudder.coerceIn(-1f, 1f) * ((rx1 - rx0) / 2f)
         drawRoundRect(
             color = if (armed) Ink.Amber else Ink.Dim,
             topLeft = Offset(cx + rdx - 4f, ry - 5f),
@@ -242,6 +241,120 @@ fun ThrottleStrip(
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 softWrap = false,
+            )
+        }
+    }
+}
+
+// ------------------------------------------------------------------ 脚舵
+
+/**
+ * 脚舵滑块：横向，按住往左/右压，松手回中。
+ *
+ * 为什么还要做一个滑块，明明已经能用「拧手机」控制脚舵：
+ *   拧手机是**看不见**的。屏幕上没有对应控件，用户根本不知道脚舵在哪，
+ *   而且横滚时手腕会带出多余偏航 —— 这是物理耦合，软件只能淡化。
+ *   滑块是显式的、可控的，两个通道可以并存：手指按在滑块上时以滑块为准，
+ *   松开就回到拧手机。想彻底不用拧动，把校准页的「拧手机」关掉即可。
+ *
+ * 用绝对定位（压哪里就是多少）而不是相对拖动：脚舵是需要**持续压住**的
+ * 轴，相对拖动意味着要一直划、一直累加，落地侧风时根本没法保持。
+ */
+@Composable
+fun RudderBar(
+    value: Float,
+    enabled: Boolean,
+    onSet: (Float) -> Unit,
+    onRelease: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var touching by remember { mutableStateOf(false) }
+    val accent = if (enabled) Ink.Amber else Ink.Dim
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(9.dp))
+            .background(Ink.Surface)
+            .border(
+                1.dp,
+                if (touching) Ink.Amber.copy(alpha = 0.55f) else Ink.Line,
+                RoundedCornerShape(9.dp),
+            )
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    val cx = size.width / 2f
+                    val half = (size.width / 2f) - 16f
+                    fun emit(p: Offset) {
+                        val v = ((p.x - cx) / half).coerceIn(-1f, 1f)
+                        // 中位一个很窄的死区：手指想「回到正中」时很难精确停在
+                        // 中线上，不给死区会一直残留一两度的偏航
+                        onSet(if (abs(v) < 0.06f) 0f else v)
+                    }
+                    touching = true
+                    emit(down.position)
+                    down.consume()
+                    while (true) {
+                        val ev = awaitPointerEvent()
+                        val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!ch.pressed) break
+                        emit(ch.position)
+                        ch.consume()
+                    }
+                    touching = false
+                    onRelease()
+                }
+            },
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val cy = size.height / 2f
+            val half = (size.width / 2f) - 16f
+            val th = size.height * 0.16f
+
+            // 轨道
+            drawRoundRect(
+                color = Ink.Bg,
+                topLeft = Offset(16f, cy - th / 2f),
+                size = Size(size.width - 32f, th),
+                cornerRadius = CornerRadius(th / 2f, th / 2f),
+            )
+            // 从中点向当前偏转方向填充：一眼就能看出偏了多少、偏哪边
+            val v = value.coerceIn(-1f, 1f)
+            if (abs(v) > 0.005f) {
+                val x0 = size.width / 2f
+                val x1 = x0 + v * half
+                drawRoundRect(
+                    color = accent.copy(alpha = 0.55f),
+                    topLeft = Offset(min(x0, x1), cy - th / 2f),
+                    size = Size(abs(x1 - x0), th),
+                    cornerRadius = CornerRadius(th / 2f, th / 2f),
+                )
+            }
+            // 中点凹口 + 两端刻度
+            drawLine(Ink.Dim, Offset(size.width / 2f, cy - size.height * 0.24f),
+                Offset(size.width / 2f, cy + size.height * 0.24f), 2f)
+            for (f in floatArrayOf(-1f, 1f)) {
+                val x = size.width / 2f + f * half
+                drawLine(Ink.Dim.copy(alpha = 0.5f), Offset(x, cy - size.height * 0.14f),
+                    Offset(x, cy + size.height * 0.14f), 1.5f)
+            }
+            // 滑块
+            val px = size.width / 2f + v * half
+            val tw = 16f
+            val thh = size.height * 0.56f
+            drawRoundRect(
+                color = accent,
+                topLeft = Offset(px - tw / 2f, cy - thh / 2f),
+                size = Size(tw, thh),
+                cornerRadius = CornerRadius(4f, 4f),
+            )
+            drawRoundRect(
+                color = Color.Black.copy(alpha = 0.35f),
+                topLeft = Offset(px - tw / 2f, cy - thh / 2f),
+                size = Size(tw, thh),
+                cornerRadius = CornerRadius(4f, 4f),
+                style = Stroke(1.5f),
             )
         }
     }

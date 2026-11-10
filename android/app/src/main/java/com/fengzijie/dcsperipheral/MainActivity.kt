@@ -211,6 +211,8 @@ private fun Root() {
                     st = yokeSt,
                     set = yset,
                     onThrottle = { ctl?.nudgeThrottle(it) },
+                    onRudder = { ctl?.setRudder(it) },
+                    onRudderRelease = { ctl?.releaseRudder() },
                     onView = { x, y -> ctl?.setView(x, y) },
                     onViewRelease = { ctl?.releaseView() },
                     onButtonDown = { ctl?.pressButton(it) },

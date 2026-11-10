@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -53,6 +55,8 @@ fun YokeScreen(
     st: YokeState,
     set: YokeSettings,
     onThrottle: (Float) -> Unit,
+    onRudder: (Float) -> Unit,
+    onRudderRelease: () -> Unit,
     onView: (Float, Float) -> Unit,
     onViewRelease: () -> Unit,
     onButtonDown: (Int) -> Unit,
@@ -72,18 +76,42 @@ fun YokeScreen(
             modifier = Modifier.width(62.dp).fillMaxHeight(),
         )
 
-        // ---------------- 中：杆位 + 动作按钮 ----------------
+        // ---------------- 中：杆位 + 脚舵 + 动作按钮 ----------------
         Column(Modifier.weight(1f).fillMaxHeight()) {
             StickPad(
                 rollDeg = st.rollDeg,
                 pitchDeg = st.pitchDeg,
-                yawDeg = st.yawDeg,
+                rudder = st.rudder,
                 rangeDeg = set.rangeDeg,
-                rudderRange = set.rudderRangeDeg,
                 armed = st.armed,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(5.dp))
+
+            // 脚舵单列一行，带文字标签。之前只靠「拧手机」，屏幕上没有
+            // 任何可见控件 —— 用户根本不知道脚舵在哪。可见性比优雅重要。
+            Row(
+                Modifier.fillMaxWidth().height(34.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "脚舵",
+                    color = if (st.armed) Ink.Amber else Ink.Dim,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.width(30.dp),
+                )
+                RudderBar(
+                    value = st.rudder,
+                    enabled = st.armed,
+                    onSet = onRudder,
+                    onRelease = onRudderRelease,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
+
+            Spacer(Modifier.height(5.dp))
             Row(
                 Modifier.fillMaxWidth().height(46.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -242,15 +270,19 @@ fun CalibScreen(
             StickPad(
                 rollDeg = st.rollDeg,
                 pitchDeg = st.pitchDeg,
-                yawDeg = st.yawDeg,
+                rudder = st.rudder,
                 rangeDeg = set.rangeDeg,
-                rudderRange = set.rudderRangeDeg,
                 armed = st.armed,
                 modifier = Modifier.fillMaxHeight().aspectRatio(1f),
             )
         }
         Column(
-            Modifier.width(392.dp).fillMaxHeight(),
+            Modifier
+                .width(392.dp)
+                .fillMaxHeight()
+                // 参数行加了一行就会顶到折叠线以下。滚动是廉价的保险，
+                // 免得以后再加参数时又要在小屏上排查「看不见的那一项」。
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -267,7 +299,9 @@ fun CalibScreen(
                     modifier = Modifier.weight(0.8f),
                 )
                 Chip(
-                    text = if (set.rudderOn) "脚舵 开" else "脚舵 关",
+                    // 只控制「拧手机」这个来源。滑块在飞行页上始终可用 ——
+                    // 关掉拧动的人不应该连脚舵一起失去。
+                    text = if (set.rudderOn) "拧手机 开" else "拧手机 关",
                     on = set.rudderOn,
                     onClick = { onSettings(set.copy(rudderOn = !set.rudderOn)) },
                     modifier = Modifier.weight(1f),
@@ -293,6 +327,17 @@ fun CalibScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
+            Stepper(
+                label = "拧舵行程",
+                value = "${set.rudderRangeDeg.toInt()}°",
+                hint = "拧手机多少度算满舵（滑块不受影响）",
+                onMinus = {
+                    onSettings(set.copy(rudderRangeDeg = (set.rudderRangeDeg - 2f).coerceAtLeast(8f)))
+                },
+                onPlus = {
+                    onSettings(set.copy(rudderRangeDeg = (set.rudderRangeDeg + 2f).coerceAtMost(60f)))
+                },
+            )
 
             Stepper(
                 label = "行程",
@@ -316,14 +361,14 @@ fun CalibScreen(
                 onPlus = { onSettings(set.copy(expo = (set.expo + 0.05f).coerceAtMost(1f))) },
             )
             Stepper(
-                label = "脚舵行程",
-                value = "${set.rudderRangeDeg.toInt()}°",
-                hint = "拧手机多少度算满舵",
+                label = "脚舵死区",
+                value = fmt1(set.rudderDeadbandDeg) + "°",
+                hint = "拧手机时中位附近算没动",
                 onMinus = {
-                    onSettings(set.copy(rudderRangeDeg = (set.rudderRangeDeg - 2f).coerceAtLeast(8f)))
+                    onSettings(set.copy(rudderDeadbandDeg = (set.rudderDeadbandDeg - 0.5f).coerceAtLeast(0f)))
                 },
                 onPlus = {
-                    onSettings(set.copy(rudderRangeDeg = (set.rudderRangeDeg + 2f).coerceAtMost(60f)))
+                    onSettings(set.copy(rudderDeadbandDeg = (set.rudderDeadbandDeg + 0.5f).coerceAtMost(15f)))
                 },
             )
             if (st.notice != null) {

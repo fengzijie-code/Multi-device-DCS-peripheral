@@ -52,6 +52,8 @@ data class YokeState(
     val x: Float = 0f,
     val y: Float = 0f,
     val r: Float = 0f,
+    /** 最终的偏航量（-1..1），已含滑块优先、拧动、反转。杆位盘底部显示这个。 */
+    val rudder: Float = 0f,
     val vx: Float = 0f,
     val vy: Float = 0f,
     /** 0..1；`throttleTaken` 为 false 时这个值不发给飞机 */
@@ -126,6 +128,14 @@ class YokeController(
     @Volatile private var viewY = 0f
     @Volatile private var lastThrottleSave = 0L
 
+    /**
+     * 脚舵滑块当前值（-1..1）。null 表示手指没按在滑块上。
+     *
+     * 和拧手机并存：按着滑块时以滑块为准，松开回到拧动。两者同时生效会
+     * 互相打架 —— 用户没法理解「为什么我明明没拧，脚舵还在偏」。
+     */
+    @Volatile private var rudderTouch: Float? = null
+
     // ---- 按钮 ----
     private val btnLock = Any()
     private var btnHeld = 0
@@ -143,6 +153,7 @@ class YokeController(
         // 看门狗才回中，白白多一段时间的满杆
         armed = false
         viewX = 0f; viewY = 0f
+        rudderTouch = null
         synchronized(btnLock) { btnHeld = 0; btnPulse = 0 }
         runCatching { post(0f, 0f, 0f, 0f, 0f, null, 0) }
         saveThrottle(force = true)
@@ -207,6 +218,16 @@ class YokeController(
 
     fun releaseView() {
         viewX = 0f; viewY = 0f
+    }
+
+    /** 手指按在脚舵滑块上：以滑块为准。 */
+    fun setRudder(v: Float) {
+        rudderTouch = v.coerceIn(-1f, 1f)
+    }
+
+    /** 松开脚舵滑块：回中，交还给「拧手机」。 */
+    fun releaseRudder() {
+        rudderTouch = null
     }
 
     /**
@@ -321,13 +342,20 @@ class YokeController(
 
             var x = curve(rollRaw, s.deadbandDeg, s.rangeDeg, s.expo)
             var y = curve(pitchRaw, s.deadbandDeg, s.rangeDeg, s.expo)
-            var r = if (s.rudderOn)
-                curve(yawRaw, s.rudderDeadbandDeg, s.rudderRangeDeg, s.expo) else 0f
+            // 脚舵有两个来源，优先级明确：手指按着滑块就以滑块为准，
+            // 松开才回到「拧手机」。叠加会让用户搞不清到底谁在起作用。
+            val rt = rudderTouch
+            var r = when {
+                rt != null -> rt
+                s.rudderOn -> curve(yawRaw, s.rudderDeadbandDeg, s.rudderRangeDeg, s.expo)
+                else -> 0f
+            }
             if (s.invertX) x = -x
             if (s.invertY) y = -y
             if (s.invertRudder) r = -r
             if (overLimit) {
-                x = 0f; y = 0f; r = 0f
+                x = 0f; y = 0f
+                if (rt == null) r = 0f      // 按着滑块时不因倾角归零
             }
 
             val btnNow = effectiveButtons(now)
@@ -384,6 +412,9 @@ class YokeController(
                     x = sendX,
                     y = sendY,
                     r = sendR,
+                    // 用 r 而不是 sendR：未解锁时也要能在校准页看到拧动/滑块的
+                    // 实时位置，否则调「脚舵行程」时眼前一片死数字
+                    rudder = r,
                     vx = sendVX,
                     vy = sendVY,
                     throttle = throttle,
