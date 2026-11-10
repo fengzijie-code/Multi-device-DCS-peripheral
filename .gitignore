@@ -30,8 +30,11 @@ certs/
 *.pfx
 *.p12
 
-# ---- 录制件（体积大，按需另行分发）----
-tests/fixtures/recording/*.jsonl
+# ---- 录制件 ----
+# 注意：tests/fixtures/recording/ 里的录制**要入库**，它们是回归基线。
+# 一段 60 秒录制约 500 KB，值得留。只排除临时自测产物。
+tests/fixtures/recording/_selftest*.jsonl
+tests/fixtures/recording/_tmp*.jsonl
 
 # ---- 本地配置与日志 ----
 *.log

@@ -33,6 +33,7 @@ import threading
 import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 try:
@@ -245,7 +246,8 @@ class TelemetryHub:
         self._last_rx = 0.0
         self._times: collections.deque = collections.deque(maxlen=window)
 
-    def feed(self, data: bytes) -> None:
+    def feed(self, data: bytes) -> dict | None:
+        """喂一帧。返回解析后的对象，解析失败返回 None。"""
         try:
             obj = json.loads(data.decode("utf-8"))
             if not isinstance(obj, dict):
@@ -253,7 +255,7 @@ class TelemetryHub:
         except Exception:
             with self._lock:
                 self._bad += 1
-            return
+            return None
 
         now = time.time()
         with self._lock:
@@ -262,6 +264,7 @@ class TelemetryHub:
             self._rx += 1
             self._last_rx = now
             self._times.append(now)
+        return obj
 
     def snapshot(self) -> dict:
         with self._lock:
@@ -291,19 +294,64 @@ class TelemetryHub:
 HUB = TelemetryHub()
 
 
-def udp_listener(port: int, hub: TelemetryHub, stop: threading.Event) -> None:
+class Recorder:
+    """把收到的每一帧落成 jsonl，用于回放和回归。
+
+    为什么记两份时间：
+        `d.t`  是 DCS 的模型时间，暂停/加载时会跳变甚至倒退；
+        `w`    是主机墙钟毫秒偏移，回放时按它控制节奏才能还原真实观感。
+    只记一种都会在某些场景下还原失真。
+    """
+
+    def __init__(self, path: str):
+        self.path = path
+        self._f = open(path, "w", encoding="utf-8")
+        # t0 在**第一帧**到达时才定，不是进程启动时。
+        # 否则「桥接先起、游戏后开」的常见顺序会让录制开头带一长段静默，
+        # 回放时这段空白也要等一遍。
+        self._t0: float | None = None
+        self._n = 0
+
+    def write(self, frame: dict) -> None:
+        now = time.time()
+        if self._t0 is None:
+            self._t0 = now
+        w = int((now - self._t0) * 1000)
+        self._f.write(
+            json.dumps({"w": w, "d": frame}, ensure_ascii=False, separators=(",", ":")) + "\n"
+        )
+        self._n += 1
+        if self._n % 30 == 0:       # 每 0.5 秒落一次盘：被强杀最多丢半秒
+            self._f.flush()
+
+    @property
+    def count(self) -> int:
+        return self._n
+
+    def close(self) -> None:
+        try:
+            self._f.flush()
+            self._f.close()
+        except Exception:
+            pass
+
+
+def udp_listener(port: int, hub: TelemetryHub, stop: threading.Event,
+                 recorder: Recorder | None = None) -> None:
     """只绑回环：mock 与 Export.lua 都发到本机，不该暴露到局域网。"""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(("127.0.0.1", port))
     except OSError as e:
-        print(f"  [x] UDP {port} 绑定失败：{e}（可能已被 mock_export 占用）")
+        print(f"  [x] UDP {port} 绑定失败：{e}（可能已被占用）")
         s.close()
         return
 
     s.settimeout(1.0)
     print(f"  UDP 监听 127.0.0.1:{port} —— 等待 mock 或 DCS 发数据")
+    if recorder:
+        print(f"  录制中 -> {recorder.path}")
     try:
         while not stop.is_set():
             try:
@@ -312,7 +360,9 @@ def udp_listener(port: int, hub: TelemetryHub, stop: threading.Event) -> None:
                 continue
             except OSError:
                 break
-            hub.feed(data)
+            frame = hub.feed(data)
+            if frame is not None and recorder is not None:
+                recorder.write(frame)
     finally:
         s.close()
 
@@ -436,9 +486,20 @@ def main() -> int:
     ap.add_argument("--ipv4-only", action="store_true", help="不监听 IPv6")
     ap.add_argument("--udp-in", type=int, default=5010,
                     help="遥测 UDP 端口，0 表示不接收遥测")
+    ap.add_argument("--record", metavar="PATH", default=None,
+                    help="把收到的每一帧录成 jsonl，用于回放与回归")
     args = ap.parse_args()
 
     stop = threading.Event()
+    recorder = None
+    if args.record:
+        p = Path(args.record)
+        # 给目录就按时间戳自动命名：同一条命令跑两次不会把上次的录制覆盖掉
+        if args.record.endswith(("/", "\\")) or p.is_dir():
+            p.mkdir(parents=True, exist_ok=True)
+            p = p / f"dcs-{datetime.now():%Y%m%d-%H%M%S}.jsonl"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        recorder = Recorder(str(p))
 
     print()
     print("═" * 62)
@@ -453,7 +514,7 @@ def main() -> int:
     if args.udp_in:
         threading.Thread(
             target=udp_listener,
-            args=(args.udp_in, HUB, stop),
+            args=(args.udp_in, HUB, stop, recorder),
             daemon=True,
         ).start()
 
@@ -479,6 +540,8 @@ def main() -> int:
     print("  4) 逐个地址试，哪个通用哪个 —— 不同地址走的是不同路径")
     if args.udp_in:
         print(f"  5) 遥测出口 http://<上面的IP>:{args.port}/state —— Android 客户端读这个")
+    if recorder:
+        print(f"  6) 正在录制到 {recorder.path} —— 关掉本窗口即结束")
     print()
     print(f"  服务端时间 {datetime.now().strftime('%H:%M:%S')}   Ctrl+C 退出")
     print("═" * 62)
@@ -496,6 +559,9 @@ def main() -> int:
                 s.shutdown()
             except Exception:
                 pass
+        if recorder:
+            recorder.close()
+            print(f"  录制结束：{recorder.count} 帧 -> {recorder.path}")
     return 0
 
 
