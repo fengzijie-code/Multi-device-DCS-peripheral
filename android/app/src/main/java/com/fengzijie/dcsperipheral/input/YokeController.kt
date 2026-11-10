@@ -47,9 +47,10 @@ data class YokeState(
     val hasNeutral: Boolean = false,
     val ready: Boolean = false,
     /**
-     * 杆位角度：已按握法解算、已含反转，但**没过曲线**。
-     * 给界面上的杆位盘用 —— 它表示「飞机往哪边动多少」，不是手机的物理倾角。
-     * 幅度保持线性，所以调死区和行程时看它仍然直观。
+     * 杆位：手的**控制位置**，不是发给飞机的值。
+     *
+     * 后仰 → 这里为负 → 盘上点向下 → 机头抬起。和真机拉杆一致：手柄朝自己
+     * （屏幕下方），机头向上。反转只改变发送值的符号，不改变这里。
      */
     val pitchDeg: Float = 0f,
     val rollDeg: Float = 0f,
@@ -346,23 +347,34 @@ class YokeController(
                 overSince = 0L
             }
 
-            var x = curve(rollRaw, s.deadbandDeg, s.rangeDeg, s.expo)
-            var y = curve(pitchRaw, s.deadbandDeg, s.rangeDeg, s.expo)
+            // 这里有两套值，必须分清：
+            //
+            //   **控制位置**（xPos/yPos/rPos）—— 手把杆推到了哪。杆位盘显示它。
+            //   **指令值**（x/y/r）—— 实际发给飞机的东西。开了反转就和位置相反。
+            //
+            // 为什么盘子显示位置而不是指令：人对「拉杆」的直觉是位置，不是舵量。
+            // 往后拉杆 = 手柄朝自己 = 屏幕上向下，同时机头抬起 —— 真机的驾驶杆
+            // 也是这个关系。显示指令值的话，后仰会让点朝上、飞机抬头，看着像
+            // 两件事各走各的。
+            var xPos = curve(rollRaw, s.deadbandDeg, s.rangeDeg, s.expo)
+            var yPos = curve(pitchRaw, s.deadbandDeg, s.rangeDeg, s.expo)
+            val rt = rudderTouch
             // 脚舵有两个来源，优先级明确：手指按着滑块就以滑块为准，
             // 松开才回到「拧手机」。叠加会让用户搞不清到底谁在起作用。
-            val rt = rudderTouch
-            var r = when {
+            var rPos = when {
                 rt != null -> rt
                 s.rudderOn -> curve(yawRaw, s.rudderDeadbandDeg, s.rudderRangeDeg, s.expo)
                 else -> 0f
             }
-            if (s.invertX) x = -x
-            if (s.invertY) y = -y
-            if (s.invertRudder) r = -r
             if (overLimit) {
-                x = 0f; y = 0f
-                if (rt == null) r = 0f      // 按着滑块时不因倾角归零
+                // 超限时输出零，但位置照常显示 —— 让人看得见自己把手机举到哪了
+                xPos = 0f; yPos = 0f
+                if (rt == null) rPos = 0f
             }
+
+            var x = if (s.invertX) -xPos else xPos
+            var y = if (s.invertY) -yPos else yPos
+            var r = if (s.invertRudder) -rPos else rPos
 
             val btnNow = effectiveButtons(now)
             val thrNow = if (s.throttleInvert) 1f - throttle else throttle
@@ -412,19 +424,18 @@ class YokeController(
                     sensorOk = tilt.available,
                     hasNeutral = hasNeutral,
                     ready = tilt.available && hasNeutral,
-                    // 杆位盘要显示**指令方向**，不是原始倾斜方向。
-                    // 开了反转以后，往后仰手机（原始角为正）实际是在让飞机
-                    // 低头；这时盘上的点应该往下走，否则看着和飞机的反应相反。
-                    // 幅度不受反转影响，所以调死区/行程时照样好用。
-                    pitchDeg = if (s.invertY) -pitchRaw else pitchRaw,
-                    rollDeg = if (s.invertX) -rollRaw else rollRaw,
+                    // 杆位盘显示**控制位置**（原始倾角），不是发给飞机的指令值。
+                    // 后仰 → 点向下 → 机头抬起，和真机「拉杆」一致。
+                    // 反转只影响 y 的符号，不影响这里的幅度，所以调死区/行程时
+                    // 看它照样直观。
+                    pitchDeg = pitchRaw,
+                    rollDeg = rollRaw,
                     yawDeg = yawRaw,
                     x = sendX,
                     y = sendY,
                     r = sendR,
-                    // 用 r 而不是 sendR：未解锁时也要能在校准页看到拧动/滑块的
-                    // 实时位置，否则调「脚舵行程」时眼前一片死数字
-                    rudder = r,
+                    // 同样用控制位置，不是发送值
+                    rudder = rPos,
                     vx = sendVX,
                     vy = sendVY,
                     throttle = throttle,
