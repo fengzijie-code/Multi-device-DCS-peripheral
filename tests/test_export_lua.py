@@ -31,6 +31,11 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 EXPORT_LUA = ROOT / "dcs" / "Export.lua"
 
+EXPECTED_SYS_FIELDS = [
+    "t", "fuel", "fuelx", "rpm_l", "rpm_r", "temp_l", "temp_r",
+    "hyd_l", "hyd_r", "canopy", "wbrake", "cs_a", "cs_e", "cs_r",
+]
+
 EXPECTED_FIELDS = [
     "t", "alt", "agl", "ias", "gs", "vs", "pitch", "bank", "hdg", "g", "mach",
     "aoa", "rpm_l", "rpm_r", "temp_l", "temp_r", "fuel", "fuelx",
@@ -119,7 +124,7 @@ function LoGetEngineInfo()
         RPM = { left = STATE.rpm, right = STATE.rpm },
         Temperature = { left = STATE.temp, right = STATE.temp },
         FuelConsumption = { left = 1.0, right = 1.0 },
-        HydraulicPressure = { left = 1.0, right = 1.0 },
+        HydraulicPressure = { left = 285.0, right = 280.0 },
         EngineStart = { left = true, right = true },
         fuel_internal = STATE.fuel,
         fuel_external = 0,
@@ -130,10 +135,12 @@ function LoGetMechInfo()
         gear = { value = STATE.gear, nose = 0, main = 0, status = 0 },
         flaps = { value = STATE.flaps, status = 0 },
         speedbrakes = { value = STATE.sbrake, status = 0 },
-        wheelbrakes = { value = 0, status = 0 },
-        canopy = { value = 0, status = 0 },
+        -- 故意一个用标量、一个用带 .value 的表：真机上这两种形态都见过，
+        -- 取值函数必须两种都认
+        wheelbrakes = 0.25,
+        canopy = { value = 1.0, status = 0 },
         parachute = { value = 0, status = 0 },
-        controlsurfaces = { eleron = 0, elevator = 0, rudder = 0 },
+        controlsurfaces = { eleron = 0.02, elevator = 0.012, rudder = -0.004 },
     }
 end
 function LoGetPayloadInfo()
@@ -165,6 +172,19 @@ def sent(lua) -> list[dict]:
 
 def reset(lua):
     lua.execute("SENT = {}")
+
+
+def main_frames(lua) -> list[dict]:
+    """只要 60Hz 主帧。慢变量包带 "sys" 键，单独统计。
+
+    分成两个统计口径是必要的：主帧和慢变量包的频率差 60 倍，
+    混在一起数，「60 帧应该发出 60 帧」这种断言就永远对不上。
+    """
+    return [p for p in sent(lua) if '"sys"' not in p["payload"]]
+
+
+def sys_packets(lua) -> list[dict]:
+    return [p for p in sent(lua) if '"sys"' in p["payload"]]
 
 
 # ---------------------------------------------------------------- 用例
@@ -200,7 +220,7 @@ def main() -> int:
     print("T-EXPORT-001 正常帧能发出合法 JSON")
     g.LuaExportStart()
     g.LuaExportAfterNextFrame()
-    frames = sent(lua)
+    frames = main_frames(lua)
     r.check("发出 1 帧", len(frames) == 1, f"实际 {len(frames)}")
     if frames:
         try:
@@ -228,11 +248,11 @@ def main() -> int:
     reset(lua)
     for _ in range(10):
         g.LuaExportAfterNextFrame()          # t 不变
-    first = len(sent(lua))
+    first = len(main_frames(lua))
     reset(lua)
     for _ in range(10):
         g.LuaExportAfterNextFrame()
-    second = len(sent(lua))
+    second = len(main_frames(lua))
     r.check("首轮最多补 1 帧（突发配额）", first <= 1, f"实际 {first}")
     r.check("配额用完后完全停发", second == 0, f"实际 {second}")
 
@@ -245,7 +265,7 @@ def main() -> int:
         t += 1 / 60
         g.set_state("t", t)
         g.LuaExportAfterNextFrame()
-    n = len(sent(lua))
+    n = len(main_frames(lua))
     r.check("60 帧间隔约发出 60 帧", 55 <= n <= 61, f"实际 {n}")
 
     # --- T-EXPORT-004 NaN ---
@@ -255,7 +275,7 @@ def main() -> int:
     g.set_state("nan_alt", True)
     g.set_state("t", t + 1.0)
     g.LuaExportAfterNextFrame()
-    frames = sent(lua)
+    frames = main_frames(lua)
     r.check("发出 1 帧", len(frames) == 1, f"实际 {len(frames)}")
     if frames:
         raw = frames[0]["payload"]
@@ -272,13 +292,39 @@ def main() -> int:
     g.set_state("nan_alt", False)
     g.set_state("t", t + 2.0)
     g.LuaExportAfterNextFrame()
-    frames = sent(lua)
+    frames = main_frames(lua)
     if frames:
         obj = json.loads(frames[0]["payload"])
         r.check("不再带 dirty", obj.get("dirty") is None, str(obj.get("dirty")))
         r.check("alt 恢复", abs(obj["alt"] - 1520.25) < 0.01, str(obj["alt"]))
     else:
         r.check("能恢复发送", False)
+
+    # --- T-EXPORT-008 慢变量包 ---
+    print()
+    print("T-EXPORT-008 慢变量包按 1Hz 单独发送，不混进主帧")
+    reset(lua)
+    g.set_state("t", t + 3.0)
+    g.LuaExportAfterNextFrame()
+    sp = sys_packets(lua)
+    r.check("发出了慢变量包", len(sp) == 1, f"实际 {len(sp)}")
+    if sp:
+        try:
+            obj = json.loads(sp[0]["payload"])
+            r.check("外层只有 sys 一个键", list(obj.keys()) == ["sys"], str(list(obj.keys())))
+            s_obj = obj["sys"]
+            r.check("sys 字段完整且顺序稳定", list(s_obj.keys()) == EXPECTED_SYS_FIELDS,
+                    f"实际 {list(s_obj.keys())}")
+            r.check("燃油取自 fuel_internal", abs(s_obj["fuel"] - 0.62) < 1e-3, str(s_obj["fuel"]))
+            r.check("液压取自 HydraulicPressure.left",
+                    abs(s_obj["hyd_l"] - 285.0) < 0.1, str(s_obj["hyd_l"]))
+            r.check("座舱盖认带 .value 的表", abs(s_obj["canopy"] - 1.0) < 1e-3, str(s_obj["canopy"]))
+            r.check("轮刹认裸标量", abs(s_obj["wbrake"] - 0.25) < 1e-3, str(s_obj["wbrake"]))
+            r.check("舵面取自 controlsurfaces.elevator",
+                    abs(s_obj["cs_e"] - 0.012) < 1e-4, str(s_obj["cs_e"]))
+            r.check("慢变量包里没有主帧字段", "alt" not in s_obj, "混进了 alt")
+        except json.JSONDecodeError as e:
+            r.check("可被 JSON 解析", False, str(e))
 
     # --- T-EXPORT-006 停发 ---
     print()

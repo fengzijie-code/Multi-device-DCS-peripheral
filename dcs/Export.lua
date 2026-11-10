@@ -42,6 +42,9 @@ local send_ok = false
 local err_count = 0
 local frame_no = 0
 local last_t = -1
+-- 慢变量包的上一次发送时间（模型时间）。-1e9 保证第一帧就发一次，
+-- 不用干等 1 秒才看到燃油读数。
+local last_sys_t = -1e9
 
 -- 令牌桶节流。
 --
@@ -96,6 +99,24 @@ end
 
 -- ============================ 取数 ============================
 
+-- LoGet* 返回的是嵌套表，各机型结构可能不同，取值一律带存在性检查。
+-- 提到文件级是因为主帧和慢变量包都要用。
+local function deepget(t, k1, k2)
+    if type(t) ~= "table" then return nil end
+    local a = t[k1]
+    if k2 == nil then return a end
+    if type(a) ~= "table" then return nil end
+    return a[k2]
+end
+
+-- 有些项在不同机型上是「一个数」也可能是「带 .value 的表」，两种都认
+local function val(t, k)
+    local a = deepget(t, k)
+    if type(a) == "number" then return a end
+    if type(a) == "table" then return a.value end
+    return nil
+end
+
 local function safe_call(fn, ...)
     local ok, a, b, c = pcall(fn, ...)
     if ok then return a, b, c end
@@ -124,13 +145,7 @@ local function collect()
     local mech = safe_call(LoGetMechInfo)    or {}
     local pay  = safe_call(LoGetPayloadInfo) or {}
 
-    local function deep(t, k1, k2)
-        if type(t) ~= "table" then return nil end
-        local a = t[k1]
-        if k2 == nil then return a end
-        if type(a) ~= "table" then return nil end
-        return a[k2]
-    end
+    local function deep(t, k1, k2) return deepget(t, k1, k2) end
 
     return {
         alt   = alt,
@@ -156,6 +171,54 @@ local function collect()
         sbrake   = deep(mech, "speedbrakes", "value"),
         shells   = deep(pay, "Cannon", "shells"),
     }
+end
+
+-- 慢变量：燃油、温度、液压、舵面…… 1Hz 单独发一包。
+--
+-- 为什么不塞进主帧：主帧是 60Hz 的实时仪表数据，字段越少解析越快；
+-- 这些量一秒变不了几次，混进去只是让每帧白白变大一倍。
+-- 包格式是 {"sys":{...}}，桥接端靠这个 key 认出来，不会当成一帧遥测。
+local function collect_sys()
+    local eng  = safe_call(LoGetEngineInfo) or {}
+    local mech = safe_call(LoGetMechInfo)   or {}
+    return {
+        fuel   = eng.fuel_internal,
+        fuelx  = eng.fuel_external,
+        rpm_l  = deepget(eng, "RPM", "left"),
+        rpm_r  = deepget(eng, "RPM", "right"),
+        temp_l = deepget(eng, "Temperature", "left"),
+        temp_r = deepget(eng, "Temperature", "right"),
+        hyd_l  = deepget(eng, "HydraulicPressure", "left"),
+        hyd_r  = deepget(eng, "HydraulicPressure", "right"),
+        canopy = val(mech, "canopy"),
+        wbrake = val(mech, "wheelbrakes"),
+        -- 舵面实际偏度。注意这是「配平 + 杆量」的合成，不是配平本身：
+        -- DCS 的 Export API 不提供配平位置（见 docs/PANEL.md）。
+        cs_a   = deepget(mech, "controlsurfaces", "eleron"),
+        cs_e   = deepget(mech, "controlsurfaces", "elevator"),
+        cs_r   = deepget(mech, "controlsurfaces", "rudder"),
+    }
+end
+
+local function encode_sys(d, t)
+    local p = {
+        '"t":'     .. num(t, "%.2f"),
+        -- 燃油用 2 位：单位是 kg，实际值上千，1 位在长时间飞行里会明显漂
+        '"fuel":'  .. num(d.fuel,   "%.2f"),
+        '"fuelx":' .. num(d.fuelx,  "%.2f"),
+        '"rpm_l":' .. num(d.rpm_l,  "%.1f"),
+        '"rpm_r":' .. num(d.rpm_r,  "%.1f"),
+        '"temp_l":'.. num(d.temp_l, "%.2f"),
+        '"temp_r":'.. num(d.temp_r, "%.2f"),
+        '"hyd_l":' .. num(d.hyd_l,  "%.1f"),
+        '"hyd_r":' .. num(d.hyd_r,  "%.1f"),
+        '"canopy":'.. num(d.canopy, "%.3f"),
+        '"wbrake":'.. num(d.wbrake, "%.3f"),
+        '"cs_a":'  .. num(d.cs_a,   "%.4f"),
+        '"cs_e":'  .. num(d.cs_e,   "%.4f"),
+        '"cs_r":'  .. num(d.cs_r,   "%.4f"),
+    }
+    return '{"sys":{' .. table.concat(p, ",") .. '}}'
 end
 
 local function encode(d, t)
@@ -297,6 +360,15 @@ local function send_frame()
 
     -- settimeout(0) 之后 sendto 不会阻塞；失败也不关心，UDP 本来就是尽力而为
     udp:sendto(payload, CFG.host, CFG.port)
+
+    -- 慢变量包：1 秒一次。用模型时间而不是墙钟，暂停时跟着一起停，
+    -- 免得暂停期间还在发「燃油没变」的重复包。
+    if t - last_sys_t >= 1.0 then
+        last_sys_t = t
+        -- 放在主帧之后：num() 会置 dirty，这里置脏不会影响已经发出去的主帧，
+        -- 而下一帧 collect() 开头会把它清掉。
+        udp:sendto(encode_sys(collect_sys(), t), CFG.host, CFG.port)
+    end
 end
 
 -- ============================ 生命周期 ============================
@@ -306,6 +378,7 @@ function LuaExportStart()
     err_count = 0
     dirty = false
     last_t = -1
+    last_sys_t = -1e9
     tokens = 1.0
 
     -- 先把环境记下来：万一加载还失败，这一行就能定位问题，不用再猜

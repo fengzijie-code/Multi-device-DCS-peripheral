@@ -18,6 +18,11 @@ mock_export.py — 多端 DCS 外设 · P0 遥测模拟源
     {"t": 12.345, "alt": 1520.3, "agl": 420.1, "ias": 245.1, "gs": 310.0,
      "vs": 2.1, "pitch": -0.02, "bank": 0.11, "hdg": 1.234, "g": 1.0, "mach": 0.42}
 
+另外每秒单独发一包**慢变量**（和 Export.lua 同格式），给 iPad 辅助面板用：
+    {"sys": {"t":.., "fuel":.., "fuelx":.., "rpm_l":.., "rpm_r":..,
+             "temp_l":.., "temp_r":.., "hyd_l":.., "hyd_r":..,
+             "canopy":.., "wbrake":.., "cs_a":.., "cs_e":.., "cs_r":..}}
+
 字段与 DCS 导出的对应关系：
     alt  ← LoGetAltitudeAboveSeaLevel()    米
     agl  ← LoGetAltitudeAboveGroundLevel() 米
@@ -26,6 +31,7 @@ mock_export.py — 多端 DCS 外设 · P0 遥测模拟源
     vs   ← LoGetVerticalVelocity()         米/秒
     pitch/bank/hdg ← LoGetSelfData()       弧度
     g    ← LoGetAccelerationUnits().y      G
+    fuel/fuelx ← LoGetEngineInfo()         公斤（**不是** 0–1 的比例）
 """
 
 from __future__ import annotations
@@ -92,12 +98,40 @@ class FlightModel:
             "rpm_r": round(84 + 6 * math.sin(t / 30 + 0.05) + j(-0.4, 0.4), 1),
             "temp_l": round(560 + 90 * abs(math.sin(t / 30)) + j(-3, 3), 1),
             "temp_r": round(560 + 90 * abs(math.sin(t / 30 + 0.05)) + j(-3, 3), 1),
-            "fuel": round(max(0.0, 0.82 - t * 0.0006), 4),
+            # 燃油单位必须是 kg（真实 DCS 的 fuel_internal 就是 kg，上千的量级）。
+            # 这里曾经写成 0–1 的比例，面板上油量条和消耗率就全是假数 ——
+            # 模拟源和真实导出对不上，脱离 DCS 做的一切验证都没有意义。
+            "fuel": round(max(0.0, 3200.0 - t * 1.15), 2),
             "fuelx": 0.0,
             "gear": 0.0 if alt > 50 else 1.0,
             "flaps": 0.0,
             "sbrk": 0.0,
             "shells": 510,
+        }
+
+    def sys_fields(self, t: float) -> dict:
+        """慢变量包的内容（1Hz，独立于 60Hz 主帧单独发）。
+
+        取值刻意保持在机坪/爬升都说得通的范围内，方便肉眼判断面板有没有
+        串行。`cs_e` 里那个 0.020 弧度是**配平偏置**：面板的配平估读就是
+        在杆回中时取这个值，源码里带一点偏置才验得出「采样/保持」逻辑。
+        """
+        return {
+            "t": round(t, 2),
+            "fuel": round(max(0.0, 3200.0 - t * 1.15), 2),
+            "fuelx": 0.0,
+            "rpm_l": round(84 + 6 * math.sin(t / 30), 1),
+            "rpm_r": round(84 + 6 * math.sin(t / 30 + 0.05), 1),
+            "temp_l": round(560 + 90 * abs(math.sin(t / 30)), 2),
+            "temp_r": round(560 + 90 * abs(math.sin(t / 30 + 0.05)), 2),
+            "hyd_l": 285.0,
+            "hyd_r": 280.0,
+            "canopy": 1.0,
+            "wbrake": 0.0,
+            # 舵面偏度，弧度。升降舵 = 配平偏置 0.020 + 慢波
+            "cs_a": round(0.004 * math.sin(t / 7), 5),
+            "cs_e": round(0.020 + 0.030 * math.sin(t / 9), 5),
+            "cs_r": round(-0.004 * math.sin(t / 11), 5),
         }
 
     def _core(self, t: float):
@@ -198,8 +232,9 @@ def main() -> int:
 
     t0 = time.perf_counter()
     next_tick = t0
-    sent = dropped = nan_injected = 0
+    sent = dropped = nan_injected = sys_sent = 0
     last_report = t0
+    last_sys = 0.0
 
     try:
         while True:
@@ -221,6 +256,18 @@ def main() -> int:
                 time.sleep(1.0)
 
             frame = model.sample(elapsed)
+
+            # 慢变量：1Hz 单独一包，线格式与 Export.lua 完全一致（{"sys":{...}}）。
+            # 放在丢包/脏值注入之前，让这两种故障只影响主帧 —— 慢变量卡住和
+            # 主帧丢包是两个不同的故障，模拟的时候不能混在一起。
+            if elapsed - last_sys >= 1.0:
+                last_sys = elapsed
+                sock.sendto(
+                    json.dumps({"sys": model.sys_fields(elapsed)},
+                               separators=(",", ":")).encode(),
+                    (host, port),
+                )
+                sys_sent += 1
 
             if args.nan and sent % 120 == 119:
                 key = ("alt", "ias", "pitch")[nan_injected % 3]
@@ -259,7 +306,8 @@ def main() -> int:
 
     print()
     print(f"  结束：共发送 {sent} 帧" + (f"，模拟丢弃 {dropped} 帧" if dropped else "")
-          + (f"，注入 {nan_injected} 个脏值" if nan_injected else ""))
+          + (f"，注入 {nan_injected} 个脏值" if nan_injected else "")
+          + (f"，慢变量 {sys_sent} 包" if sys_sent else ""))
     print(f"  实际频率 {sent / max(time.perf_counter() - t0, 1e-6):.1f} Hz")
     print()
     return 0

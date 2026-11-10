@@ -60,6 +60,36 @@ START_TIME = time.time()
 
 
 # ---------------------------------------------------------------- 页面
+#
+# 两块页面，定位完全不同：
+#   /        自检页 —— 回答「通不通」，里面全是探针和波形，跑在手机浏览器里。
+#   /panel   辅助仪表 —— 回答「现在飞机什么状态」，给 iPad 横屏当慢变量屏。
+# 仪表页单独放成 panel.html 而不是塞进 f-string：HTML 太长，塞进去要把每个
+# 花括号都转义成 {{ }}，改一次错一次。按 mtime 缓存，改完刷新即生效。
+
+PANEL_PATH = Path(__file__).resolve().parent / "panel.html"
+_panel_cache: tuple[float, bytes] = (-1.0, b"")
+
+_MISSING_PANEL = (
+    "<!doctype html><meta charset='utf-8'>"
+    "<body style='background:#0d1117;color:#e6edf3;font:16px system-ui;padding:24px'>"
+    "<h1 style='font-size:20px'>找不到 panel.html</h1>"
+    "<p style='color:#8b949e'>它应该和 beacon.py 放在同一个目录（tools/）。</p>"
+).encode("utf-8")
+
+
+def panel_body() -> bytes:
+    global _panel_cache
+    mtime, body = _panel_cache
+    try:
+        m = PANEL_PATH.stat().st_mtime
+    except OSError:
+        return _MISSING_PANEL
+    if m != mtime:
+        body = PANEL_PATH.read_bytes()
+        _panel_cache = (m, body)
+    return body
+
 
 def page_html(port: int) -> str:
     """极简但够用的自检页。深色主题，手机上一眼能读懂。返回 str（编码在发送时做）。"""
@@ -240,6 +270,12 @@ class TelemetryHub:
     def __init__(self, window: int = 120):
         self._lock = threading.Lock()
         self._latest: dict | None = None
+        self._sys: dict | None = None
+        self._sys_at = 0.0
+        # 燃油历史，用来算消耗率。不直接信 Export.lua 的 FuelConsumption ——
+        # 那个字段的单位在各机型/版本上并不统一（kg/s 还是 kg/h 说不准），
+        # 用相邻采样的差值算出来才和真实读数自洽。
+        self._fuel_hist: collections.deque = collections.deque(maxlen=30)
         self._seq = 0
         self._rx = 0
         self._bad = 0
@@ -247,7 +283,14 @@ class TelemetryHub:
         self._times: collections.deque = collections.deque(maxlen=window)
 
     def feed(self, data: bytes) -> dict | None:
-        """喂一帧。返回解析后的对象，解析失败返回 None。"""
+        """喂一帧。返回解析后的对象，解析失败返回 None。
+
+        两类报文走同一条 UDP：
+          主帧     {"t":..,"alt":.., ...}        60Hz，实时仪表
+          慢变量   {"sys":{...}}                 1Hz，燃油/温度/液压/舵面
+        靠顶层有没有 "sys" 区分。慢变量不参与 hz / age 的统计 —— 它一秒
+        才来一次，混进去会把「上游到底活没活」这个判断带偏。
+        """
         try:
             obj = json.loads(data.decode("utf-8"))
             if not isinstance(obj, dict):
@@ -255,6 +298,25 @@ class TelemetryHub:
         except Exception:
             with self._lock:
                 self._bad += 1
+            return None
+
+        sys_obj = obj.get("sys")
+        if isinstance(sys_obj, dict):
+            now = time.time()
+            with self._lock:
+                self._sys = sys_obj
+                self._sys_at = now
+                self._rx += 1
+                fuel = sys_obj.get("fuel")
+                fuelx = sys_obj.get("fuelx") or 0
+                if isinstance(fuel, (int, float)) and not isinstance(fuel, bool):
+                    total = float(fuel) + float(fuelx or 0)
+                    # 油量**上升**只可能是加油、重新开始任务、换飞机 —— 都不
+                    # 是「在燃烧」，旧历史留着会把斜率算成一个假的小数字，
+                    # 续航跟着乱报。遇到就清空重算，宁可前几秒没有读数。
+                    if self._fuel_hist and total > self._fuel_hist[-1][1] + 1.0:
+                        self._fuel_hist.clear()
+                    self._fuel_hist.append((now, total))
             return None
 
         now = time.time()
@@ -277,11 +339,24 @@ class TelemetryHub:
             age_ms = int((now - self._last_rx) * 1000) if self._last_rx else None
             # 超过 2 秒没收到，认为上游已停，别让客户端看着旧数据以为还活着
             fresh = age_ms is not None and age_ms < 2000
+
+            # 慢变量：同样有失效判定，但窗口放宽到 5 秒（它本来就 1Hz，
+            # 卡 2 秒会因为网络抖动频繁闪成「无数据」）
+            sys_age = int((now - self._sys_at) * 1000) if self._sys_at else None
+            sys_fresh = sys_age is not None and sys_age < 5000
+            sys_out = dict(self._sys) if (self._sys and sys_fresh) else None
+            if sys_out is not None:
+                ff, endurance = self._fuel_rate()
+                sys_out["ff"] = ff                  # kg/h，负值表示在减少
+                sys_out["endurance_s"] = endurance  # 按当前流量还能飞多久
+
             return {
                 "server_ms": int(now * 1000),
                 "seq": self._seq,
                 "has_data": self._latest is not None and fresh,
                 "frame": self._latest if fresh else None,
+                "sys": sys_out,
+                "sys_age_ms": sys_age,
                 "stats": {
                     "rx": self._rx,
                     "bad": self._bad,
@@ -289,6 +364,25 @@ class TelemetryHub:
                     "age_ms": age_ms,
                 },
             }
+
+    def _fuel_rate(self) -> tuple[float | None, int | None]:
+        """用总油量的斜率算消耗率（kg/h），顺带算续航秒数。
+
+        取窗口首尾而不是相邻两点：单点差值的噪声太大，而燃油这种量
+        一秒只变零点几公斤，相邻两点根本分辨不出来。要求首尾跨度至少
+        3 秒，否则不给结论 —— 给个假数字比不给更糟。
+        """
+        if len(self._fuel_hist) < 2:
+            return None, None
+        t0, f0 = self._fuel_hist[0]
+        t1, f1 = self._fuel_hist[-1]
+        span = t1 - t0
+        if span < 3.0:
+            return None, None
+        rate = (f1 - f0) / span * 3600.0     # kg/h，通常为负
+        cur = max(f1, 0.0)
+        endurance = int(cur / -rate * 3600.0) if rate < -0.01 else None
+        return round(rate, 1), endurance
 
 
 HUB = TelemetryHub()
@@ -316,6 +410,7 @@ class InputHub:
 
     MAX_ABS = 1.0
     VJOY_STALE_S = 2.5
+    INPUT_FRESH_S = 1.5
     SPRING = ("x", "y", "r", "vx", "vy")     # 松手回零的轴
     HOLD = ("t",)                            # 松手保持的轴
     MAX_BUTTONS = 16
@@ -427,6 +522,31 @@ class InputHub:
                 "forwarding": self._sink is not None,
                 "vjoy": self.vjoy_status(),
             }
+
+    def brief(self) -> dict:
+        """给辅助面板用的极小摘要，塞进 /state 一起发。
+
+        面板上是 1Hz 轮询，snapshot() 里那些 vjoy/forwarding 诊断信息对它
+        全是噪声。它真正需要知道的只有一件事：**杆现在是不是在中位**。
+
+        原因在「配平」这个值上：DCS 的 Export API 根本不提供配平位置，
+        唯一能反推的办法是「杆回中时读舵面偏度」。而要判断杆回没回中，
+        只有桥接同时握着操纵量和遥测，别的地方都拿不到。
+        """
+        with self._lock:
+            age = (time.time() - self._last_rx) if self._last_rx else None
+            axes = dict(self._axes)
+            seq = self._seq
+        t = axes.get("t")
+        return {
+            "live": age is not None and age <= self.INPUT_FRESH_S,
+            "age_ms": int(age * 1000) if age is not None else None,
+            "x": round(axes.get("x") or 0.0, 3),
+            "y": round(axes.get("y") or 0.0, 3),
+            "r": round(axes.get("r") or 0.0, 3),
+            "t": None if t is None else round(t, 3),
+            "seq": seq,
+        }
 
 
 INPUT = InputHub()
@@ -572,7 +692,11 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if u.path == "/state":
-            body = json.dumps(HUB.snapshot(), ensure_ascii=False).encode()
+            st = HUB.snapshot()
+            # 面板要靠操纵量判断「杆是否回中」才能反推配平，所以一并带上。
+            # 控制器没连时也无害，只是个 live=false 的小对象。
+            st["input"] = INPUT.brief()
+            body = json.dumps(st, ensure_ascii=False).encode()
             self._send(200, body, "application/json")
             return
 
@@ -596,6 +720,10 @@ class Handler(BaseHTTPRequestHandler):
                 "{server_ip}", str(local_ip)
             )
             self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+            return
+
+        if u.path in ("/panel", "/panel.html"):
+            self._send(200, panel_body(), "text/html; charset=utf-8")
             return
 
         self._send(404, b"not found", "text/plain; charset=utf-8")
