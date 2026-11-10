@@ -141,31 +141,56 @@ DCS 的飞行模型只从 DirectInput 设备读操纵轴。`Export.lua` 能读�
 
 1. `设置 → 操控 → 选中你的机型 → 轴命令`
 2. 逐个绑定，点它右侧 **vJoy Device** 那一列的格子，然后**动对应的手机操作**
-   （倾斜 / 拧 / 划油门条），DCS 会自己识别到轴：
+   （倾斜 / 拧 / 划油门条 / 按住视角区拖），DCS 会自己识别到轴：
 
-   | 轴命令 | 手机操作 |
-   |---|---|
-   | `Roll` | 左右倾斜 |
-   | `Pitch` | 前后倾斜 |
-   | `Rudder` | 拧手机 |
-   | `Throttle` | 左侧竖条上/下划 |
-   | `View Horizontal` | 视角区左右拖 |
-   | `View Vertical` | 视角区上下拖 |
+   | DCS 轴命令 | vJoy 轴（列名里的 JOY_xxx） | 手机操作 |
+   |---|---|---|
+   | `Roll` | **JOY_X** | 左右倾斜 |
+   | `Pitch` | **JOY_Y** | 前后倾斜 |
+   | `Rudder` | **JOY_RZ** | 压脚舵滑块（或拧手机） |
+   | `Throttle` | **JOY_Z** | 左侧竖条上/下划 |
+   | `Absolute Camera Horizontal View` | **JOY_RX** | 视角区左右拖 |
+   | `Absolute Camera Vertical View` | **JOY_RY** | 视角区上下拖 |
 
 3. 点 **轴调整**，把这些轴的 **死区设为 0、曲率设为 0**
 
 第 3 步很重要。死区和曲线已经在手机端做了（可以实时调），DCS 里再叠一层会让
 手感变成两个曲线的乘积，中间会非常钝，而且两边都调不出想要的效果。
 
-4. 襟翼和起落架是**按钮**，在 `操控 → 对应分类` 里找到命令（如 `Flaps Up`、
-   `Flaps Down`、`Landing gear`），点 `vJoy Device` 那一列，然后按手机上的对应按钮。
+4. 襟翼和起落架是**按钮**，在 `操控` 里找到命令（`Flaps Up` / `Flaps Down` /
+   `Landing Gear`），点 `vJoy Device` 那一列，然后按手机上的对应按钮：
 
-> 找不到 `View Horizontal` 这类轴：部分机型/版本把它们放在 `View` 分类下，
-> 也可能完全不提供。这种情况下改用「视角」的按键命令（View Left/Right/Up/Down），
-> 手指按住视角区时会触发 —— 但那需要额外把 rx/ry 映射成按钮，目前没做。
-> 先用鼠标视角也能飞。
+   | 手机按钮 | vJoy 按钮 | DCS 里长这样 |
+   |---|---|---|
+   | 襟翼↑ 收起 | **Btn 1** | `JOY_BTN1` |
+   | 襟翼↓ 放下 | **Btn 2** | `JOY_BTN2` |
+   | 起落架 收放 | **Btn 3** | `JOY_BTN3` |
 
-> 方向反了怎么办：先试手机端校准页的「左右 反转 / 前后 反转 / 脚舵 反转」，
+### 视角轴要认准「Absolute」
+
+DCS 里有两套视角轴，**名字很像但性质完全不同**：
+
+| 名字 | 性质 | 能不能绑摇杆 |
+|---|---|---|
+| `Camera Horizontal View`（带 mouse 后缀那组） | 鼠标**增量**轴 | **通常灰掉，绑不了** |
+| `Absolute Camera Horizontal View` | 绝对角度轴 | ✅ 就绑这个 |
+
+很多人卡在「视角轴是灰的、绑不上」，就是因为选错了那一项。
+我们发的是绝对位置（推多少偏多少、松手回中），正好对应 `Absolute` 这一组。
+
+> 如果你的机型在轴命令里**根本没有** `Absolute Camera ...` 两项：
+> 需要往机型的轴定义文件里补两行，例如
+> `Mods\aircraft\<机型>\Input\<机型>\joystick\default.lua`，在 `axisCommands` 末尾加：
+>
+> ```lua
+> {combos = {{key = ''}}, action = iCommandViewHorizontalAbs, name = _('Absolute Camera Horizontal View')},
+> {combos = {{key = ''}}, action = iCommandViewVerticalAbs, name = _('Absolute Camera Vertical View')},
+> ```
+>
+> 改完重启 DCS 就能绑了。注意游戏更新会覆盖，建议用 JSGME 之类的工具挂着。
+> 不想折腾的话，视角继续用鼠标也完全能飞 —— 摇杆和油门不依赖它。
+
+> 方向反了怎么办：先试手机端校准页的「左右 反转 / 前后 反转 / 脚舵 反转 / 油门 反转」，
 > 那是最快的一层。也可以在 DCS 的轴调整里勾 Invert，但建议只在一处翻转，
 > 否则以后排查会绕晕。
 
