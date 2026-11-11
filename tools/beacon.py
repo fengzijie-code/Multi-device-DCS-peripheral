@@ -713,9 +713,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         u = urlparse(self.path)
+        # 尾部斜杠归一化。iPad/iPhone 的地址栏经常把 `/panel` 自动补成
+        # `/panel/`，而路由是精确匹配 —— 手机上看到的就是一句「not found」，
+        # 看着像服务没起。这种细节不该让用户去记。
+        path = u.path.rstrip("/") or "/"
         local_ip = self.connection.getsockname()[0]
 
-        if u.path == "/ping":
+        if path == "/ping":
             body = json.dumps({
                 "now": time.time(),
                 "server_ms": int(time.time() * 1000),
@@ -725,7 +729,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, body, "application/json")
             return
 
-        if u.path == "/state":
+        if path == "/state":
             st = HUB.snapshot()
             # 面板要靠操纵量判断「杆是否回中」才能反推配平，所以一并带上。
             # 控制器没连时也无害，只是个 live=false 的小对象。
@@ -734,13 +738,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, body, "application/json")
             return
 
-        if u.path == "/input":
+        if path == "/input":
             # 只读快照，用来确认手机端的操纵量有没有真的到桥接、转发有没有开
             body = json.dumps(INPUT.snapshot(), ensure_ascii=False).encode()
             self._send(200, body, "application/json")
             return
 
-        if u.path == "/info":
+        if path == "/info":
             body = json.dumps({
                 "ipv4": enumerate_ipv4(),
                 "ipv6": global_ipv6_addresses(),
@@ -749,18 +753,19 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, body, "application/json")
             return
 
-        if u.path in ("/", "/index.html"):
+        if path in ("/", "/index.html"):
             html = page_html(self.server.server_address[1]).replace(
                 "{server_ip}", str(local_ip)
             )
             self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
-        if u.path in ("/panel", "/panel.html"):
+        if path in ("/panel", "/panel.html"):
             self._send(200, panel_body(), "text/html; charset=utf-8")
             return
 
-        self._send(404, b"not found", "text/plain; charset=utf-8")
+        # 404 也给人话：把可用入口列出来，拼错了能自己看出来
+        self._send(404, not_found_html(self.path), "text/html; charset=utf-8")
 
     # ------------------------------------------------------------ 控制入口
     #
