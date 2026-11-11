@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 for _s in (sys.stdout, sys.stderr):
@@ -63,9 +64,37 @@ def run(adb: str, *args: str, timeout: float = 90.0) -> tuple[int, str]:
     try:
         r = subprocess.run([adb, *args], capture_output=True, timeout=timeout)
     except subprocess.TimeoutExpired:
-        return -1, "超时（adb 没有响应，可能 server 卡住了：adb kill-server 再试）"
+        return -1, "超时"
     out = (r.stdout + r.stderr).decode("utf-8", "replace").strip()
     return r.returncode, out
+
+
+def device_list(adb: str) -> tuple[int, str]:
+    """拿设备列表；adb 服务僵死时自动重启它。
+
+    踩过的坑：adb server 会僵死 —— 进程还在、5037 还在监听，但客户端连上去
+    就永远不返回。表现是「双击后一点反应都没有」：没有报错、没有输出，因为
+    第一个 adb 调用就挂在那里等。这时候任何 adb 子命令都没用（包括
+    `adb kill-server`，它同样要先连上那个僵死的 server），只能从外部杀进程。
+
+    所以这里用 taskkill 而不是 adb kill-server，然后重试一次。
+    """
+    rc, out = run(adb, "devices", timeout=20)
+    if rc != -1:
+        return rc, out
+
+    print("[!] adb 没响应了（服务僵死），正在从外部重启它…")
+    try:
+        subprocess.run(["taskkill", "/F", "/IM", "adb.exe"], capture_output=True, timeout=20)
+    except Exception as e:
+        print(f"    taskkill 失败：{e}")
+    time.sleep(1.5)
+    rc, out = run(adb, "devices", timeout=60)
+    if rc == 0:
+        print("[✓] adb 服务已重启")
+    else:
+        print("[x] 重启后仍然不通。拔插一次数据线，或者重装 Android SDK 的 platform-tools。")
+    return rc, out
 
 
 def main() -> int:
@@ -76,7 +105,7 @@ def main() -> int:
     adb = find_adb()
     print(f"  adb    {adb}")
 
-    rc, out = run(adb, "devices")
+    rc, out = device_list(adb)
     if rc != 0:
         print(f"[x] adb devices 失败：{out}")
         return 2
@@ -119,6 +148,10 @@ def main() -> int:
     if rc == 0 and "Success" in out:
         print("[✓] 装好了。打开 App，摇杆页底部两个按钮现在是「长按·校零 / 长按·调参」。")
         return 0
+
+    if rc == -1:
+        print("[x] 安装卡住超时（adb 可能又僵死了）。重跑一次脚本，它会自己重启 adb。")
+        return 1
 
     # 把最常见的三种失败翻译成人话
     print(f"[x] 安装失败：{out}")
