@@ -97,6 +97,23 @@ local function num(v, fmt)
     return string.format(fmt, v)
 end
 
+-- 慢变量专用：缺失就如实发 null，不伪装成 0。
+--
+-- 为什么必须区分：「这个机型不提供这个字段」和「这个字段的值就是 0」
+-- 是两件事。TF-51D 没有液压、没有舵面偏度、没有座舱盖，如果一律发 0，
+-- 面板就会显示「液压 0」「温度 0°C」——看着像设备故障，其实是没这个字段。
+-- 慢变量包是给人看的，宁可显示「--」也不能给假数。
+--
+-- 不进 dirty 统计：缺字段是机型差异，是常态，不是坏帧。
+local function numo(v, fmt)
+    if v == nil then return "null" end
+    local t = type(v)
+    if t ~= "number" then return "null" end
+    if v ~= v then return "null" end                         -- NaN
+    if v == math.huge or v == -math.huge then return "null" end
+    return string.format(fmt, v)
+end
+
 -- ============================ 取数 ============================
 
 -- LoGet* 返回的是嵌套表，各机型结构可能不同，取值一律带存在性检查。
@@ -203,20 +220,23 @@ end
 local function encode_sys(d, t)
     local p = {
         '"t":'     .. num(t, "%.2f"),
-        -- 燃油用 2 位：单位是 kg，实际值上千，1 位在长时间飞行里会明显漂
-        '"fuel":'  .. num(d.fuel,   "%.2f"),
-        '"fuelx":' .. num(d.fuelx,  "%.2f"),
-        '"rpm_l":' .. num(d.rpm_l,  "%.1f"),
-        '"rpm_r":' .. num(d.rpm_r,  "%.1f"),
-        '"temp_l":'.. num(d.temp_l, "%.2f"),
-        '"temp_r":'.. num(d.temp_r, "%.2f"),
-        '"hyd_l":' .. num(d.hyd_l,  "%.1f"),
-        '"hyd_r":' .. num(d.hyd_r,  "%.1f"),
-        '"canopy":'.. num(d.canopy, "%.3f"),
-        '"wbrake":'.. num(d.wbrake, "%.3f"),
-        '"cs_a":'  .. num(d.cs_a,   "%.4f"),
-        '"cs_e":'  .. num(d.cs_e,   "%.4f"),
-        '"cs_r":'  .. num(d.cs_r,   "%.4f"),
+        -- 燃油用 4 位小数：单位有两种口径，得同时伺候。
+        --   公斤的机型（战斗机）：值上千，4 位是无害的余量；
+        --   比例的机型（TF-51D）：每秒只掉 0.0002，2 位小数直接把它量化没了，
+        --   斜率算出来会跳成 0 或翻倍，续航跟着乱报。
+        '"fuel":'  .. numo(d.fuel,   "%.4f"),
+        '"fuelx":' .. numo(d.fuelx,  "%.4f"),
+        '"rpm_l":' .. numo(d.rpm_l,  "%.1f"),
+        '"rpm_r":' .. numo(d.rpm_r,  "%.1f"),
+        '"temp_l":'.. numo(d.temp_l, "%.2f"),
+        '"temp_r":'.. numo(d.temp_r, "%.2f"),
+        '"hyd_l":' .. numo(d.hyd_l,  "%.1f"),
+        '"hyd_r":' .. numo(d.hyd_r,  "%.1f"),
+        '"canopy":'.. numo(d.canopy, "%.3f"),
+        '"wbrake":'.. numo(d.wbrake, "%.3f"),
+        '"cs_a":'  .. numo(d.cs_a,   "%.4f"),
+        '"cs_e":'  .. numo(d.cs_e,   "%.4f"),
+        '"cs_r":'  .. numo(d.cs_r,   "%.4f"),
     }
     return '{"sys":{' .. table.concat(p, ",") .. '}}'
 end

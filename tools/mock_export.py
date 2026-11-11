@@ -61,8 +61,9 @@ class FlightModel:
     能让 UI 的指针插值和刻度滚动被真实地考验到。
     """
 
-    def __init__(self, profile: str, seed: int | None = None):
+    def __init__(self, profile: str, seed: int | None = None, aircraft: str = "full"):
         self.profile = profile
+        self.aircraft = aircraft
         self.rng = random.Random(seed)
         self.t0 = time.perf_counter()
 
@@ -116,6 +117,26 @@ class FlightModel:
         串行。`cs_e` 里那个 0.020 弧度是**配平偏置**：面板的配平估读就是
         在杆回中时取这个值，源码里带一点偏置才验得出「采样/保持」逻辑。
         """
+        # TF-51D（实测的真实形态）：单发、没有温度/液压/座舱盖/舵面偏度，
+        # 燃油给的是 0–1 比例而不是公斤。这条分支存在的意义是：以后改面板
+        # 时能随时回归「字段缺失」这个场景，不用真去开一架野马。
+        if self.aircraft == "tf51":
+            return {
+                "t": round(t, 2),
+                "fuel": round(max(0.0, 0.986 - t * 0.0002), 4),
+                "fuelx": None,
+                "rpm_l": round(85.7 + 0.4 * math.sin(t / 20), 1),
+                "rpm_r": None,
+                "temp_l": None,
+                "temp_r": None,
+                "hyd_l": None,
+                "hyd_r": None,
+                "canopy": None,
+                "wbrake": None,
+                "cs_a": None,
+                "cs_e": None,
+                "cs_r": None,
+            }
         return {
             "t": round(t, 2),
             "fuel": round(max(0.0, 3200.0 - t * 1.15), 2),
@@ -195,6 +216,8 @@ def main() -> int:
     ap.add_argument("--rate", type=float, default=60.0, help="发送频率 Hz")
     ap.add_argument("--profile", default="climb",
                     choices=["climb", "cruise", "maneuver", "ground"])
+    ap.add_argument("--aircraft", default="full", choices=["full", "tf51"],
+                    help="慢变量字段集：full 全量 / tf51 单发且缺字段（燃油给比例）")
     ap.add_argument("--duration", type=float, default=0, help="运行秒数，0 为不限")
     ap.add_argument("--nan", action="store_true", help="每 120 帧混入一个 NaN/Inf")
     ap.add_argument("--drop", type=float, default=0.0, help="模拟丢包率 0–1")
@@ -212,7 +235,7 @@ def main() -> int:
         return 2
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    model = FlightModel(args.profile, args.seed)
+    model = FlightModel(args.profile, args.seed, args.aircraft)
     period = 1.0 / args.rate
 
     print()
@@ -220,6 +243,8 @@ def main() -> int:
     print("  遥测模拟源")
     print("═" * 62)
     print(f"  目标    {host}:{port}   频率 {args.rate:g} Hz   剖面 {args.profile}")
+    if args.aircraft != "full":
+        print(f"  机型    {args.aircraft}（缺字段 + 燃油比例）")
     if args.nan:
         print("  注入    NaN / Inf（用于验证桥接是否拒绝脏数据）")
     if args.drop:

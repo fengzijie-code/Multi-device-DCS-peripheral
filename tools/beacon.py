@@ -314,7 +314,12 @@ class TelemetryHub:
                     # 油量**上升**只可能是加油、重新开始任务、换飞机 —— 都不
                     # 是「在燃烧」，旧历史留着会把斜率算成一个假的小数字，
                     # 续航跟着乱报。遇到就清空重算，宁可前几秒没有读数。
-                    if self._fuel_hist and total > self._fuel_hist[-1][1] + 1.0:
+                    #
+                    # 阈值必须跟量级走，不能写死一个数：公斤机型加满油会跳几
+                    # 千，比例机型整个量程才 0–1，用一个固定阈值必然有一种机
+                    # 型永远判不出来。
+                    eps = 2e-4 if total <= 10 else 0.02
+                    if self._fuel_hist and total > self._fuel_hist[-1][1] + eps:
                         self._fuel_hist.clear()
                     self._fuel_hist.append((now, total))
             return None

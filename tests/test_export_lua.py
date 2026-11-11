@@ -124,7 +124,9 @@ function LoGetEngineInfo()
         RPM = { left = STATE.rpm, right = STATE.rpm },
         Temperature = { left = STATE.temp, right = STATE.temp },
         FuelConsumption = { left = 1.0, right = 1.0 },
-        HydraulicPressure = { left = 285.0, right = 280.0 },
+        -- STATE.no_hyd 用来模拟「这个机型压根没液压字段」（TF-51D 就是这样），
+        -- 验证缺失字段是发 null 还是被伪装成 0
+        HydraulicPressure = STATE.no_hyd and {} or { left = 285.0, right = 280.0 },
         EngineStart = { left = true, right = true },
         fuel_internal = STATE.fuel,
         fuel_external = 0,
@@ -325,6 +327,33 @@ def main() -> int:
             r.check("慢变量包里没有主帧字段", "alt" not in s_obj, "混进了 alt")
         except json.JSONDecodeError as e:
             r.check("可被 JSON 解析", False, str(e))
+
+    # --- T-EXPORT-009 缺失字段发 null ---
+    print()
+    print("T-EXPORT-009 机型不提供的字段发 null，不伪装成 0")
+    g.set_state("no_hyd", True)
+    reset(lua)
+    g.set_state("t", t + 6.0)
+    g.LuaExportAfterNextFrame()
+    sp = sys_packets(lua)
+    if sp:
+        try:
+            sb = json.loads(sp[-1]["payload"])["sys"]
+            # TF-51D 没有液压字段。发 0 的话面板会显示「液压 0」，看着像
+            # 设备故障；发 null 面板才知道该显示「--」。
+            r.check("缺失的液压是 null 而不是 0", sb["hyd_l"] is None, str(sb["hyd_l"]))
+            r.check("另一侧同样为 null", sb["hyd_r"] is None, str(sb["hyd_r"]))
+            r.check("有值的字段照常给数", sb["rpm_l"] is not None, str(sb["rpm_l"]))
+            # 精度只能查原始报文：JSON 解析成 float 后尾随零就丢了，看不出是
+            # 编码成 0.6200 还是 0.62。比例机型的燃油每秒只掉 0.0002，
+            # 2 位小数会把变化量化没，斜率算出来是 0 或翻倍。
+            raw = sp[-1]["payload"]
+            r.check("燃油按 4 位小数编码", '"fuel":0.6200' in raw, raw[:90])
+        except json.JSONDecodeError as e:
+            r.check("可被 JSON 解析", False, str(e))
+    else:
+        r.check("发出了慢变量包", False, "0 包")
+    g.set_state("no_hyd", False)
 
     # --- T-EXPORT-006 停发 ---
     print()
