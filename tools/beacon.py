@@ -91,6 +91,35 @@ def panel_body() -> bytes:
     return body
 
 
+def not_found_html(path: str) -> bytes:
+    """404 时给一份人话，别只丢一句 not found。
+
+    踩过的坑：iPad 地址栏会把 `/panel` 自动补成 `/panel/`，而路由只认
+    精确匹配，于是手机上看到的就是一句「not found」，看着像服务没起。
+    现在路径做尾部斜杠归一化，404 也把可用入口列出来 —— 拼错了能自己看出来。
+    """
+    import html as _html
+    return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>没有这个页面</title>
+<style>
+ body{{background:#0d1117;color:#e6edf3;font:16px/1.5 system-ui,-apple-system,sans-serif;
+       padding:28px}}
+ code{{background:#161b22;padding:2px 6px;border-radius:4px;color:#d29922}}
+ a{{color:#58a6ff;text-decoration:none}}
+ li{{margin:8px 0}}
+</style></head><body>
+<h1 style="font-size:22px;margin:0 0 4px">没有这个页面</h1>
+<p style="color:#8b949e;margin:0 0 18px">你请求的是 <code>{_html.escape(path)}</code></p>
+<p>可用的入口：</p>
+<ul>
+  <li><a href="/panel">/panel</a> —— 辅助仪表盘（iPad 用这个）</li>
+  <li><a href="/">/</a> —— 链路自检页</li>
+  <li><a href="/state">/state</a> —— 遥测原始 JSON</li>
+</ul>
+</body></html>""".encode("utf-8")
+
+
 def page_html(port: int) -> str:
     """极简但够用的自检页。深色主题，手机上一眼能读懂。返回 str（编码在发送时做）。"""
     return f"""<!doctype html>

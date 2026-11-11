@@ -1,5 +1,8 @@
 package com.fengzijie.dcsperipheral.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,10 +40,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
@@ -482,6 +489,98 @@ fun Chip(
             text = text,
             color = if (on) Ink.Teal else Ink.Dim,
             fontSize = 11.sp,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+/**
+ * 长按才生效的按钮（校零 / 调参）。**防误触专用。**
+ *
+ * 为什么需要它：这两个按钮紧贴在视角 pad 下面，手指在 pad 上滑动很容易划出
+ * 边界、落在按钮上，抬起就成了一次点击。后果不是「多点了一下」，而是：
+ *   - 误触「校零」→ 把当前倾斜姿态当成中位存进去，之后杆的中立点全错；
+ *   - 误触「调参」→ 直接跳走页面，摇杆停发，飞行中突然失去操纵。
+ * 这两种都不能靠「小心一点」避免，只能靠交互门槛。
+ *
+ * 为什么选长按而不是「点两次」或「先点锁再点按钮」：
+ *   误触的手指是**划过**，不会在同一点停留 700ms；真要校零时按住不放，也
+ *   符合「这是个危险动作」的直觉。而且长按不需要维护锁状态，不会出现
+ *   「以为锁着其实解锁了」的第二种错误。
+ *
+ * 视觉反馈三层：按住时文字变「按住…」、边框变琥珀色、底部进度条填满。
+ * 填满的瞬间给一次震动 —— 手指挡住按钮时，触觉是唯一还看得见的反馈。
+ */
+@Composable
+fun LockChip(
+    text: String,
+    on: Boolean,
+    onRun: () -> Unit,
+    modifier: Modifier = Modifier,
+    holdMs: Int = 700,
+) {
+    val haptic = LocalHapticFeedback.current
+    var holding by remember { mutableStateOf(false) }
+    val prog = remember { Animatable(0f) }
+
+    // 进度条和计时用同一个时长常量，视觉填满 == 恰好触发。
+    // 两者是独立计时，理论上会差几毫秒，但都是 700ms，人眼看不出。
+    LaunchedEffect(holding) {
+        if (holding) {
+            prog.animateTo(1f, tween(durationMillis = holdMs, easing = LinearEasing))
+        } else {
+            prog.snapTo(0f)
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (on) Ink.Teal.copy(alpha = 0.18f) else Ink.Surface)
+            .border(
+                1.dp,
+                when {
+                    holding -> Ink.Amber
+                    on -> Ink.Teal.copy(alpha = 0.7f)
+                    else -> Ink.Line
+                },
+                RoundedCornerShape(8.dp),
+            )
+            .pointerInput(holdMs) {
+                detectTapGestures(
+                    onPress = {
+                        holding = true
+                        // 超时返回 null = 按够了；提前松手（或滑出边界）返回 true。
+                        // tryAwaitRelease 自己会区分「正常抬起」和「手势被取消」，
+                        // 但两种情况都不该触发，所以这里只认超时。
+                        val released = withTimeoutOrNull(holdMs.toLong()) {
+                            tryAwaitRelease()
+                            true
+                        }
+                        holding = false
+                        if (released == null) {
+                            prog.snapTo(0f)
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onRun()
+                        }
+                    },
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        // 进度填充画在文字下面，不挡字
+        Box(
+            Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(prog.value.coerceIn(0f, 1f))
+                .background(if (on) Ink.Teal.copy(alpha = 0.30f) else Ink.Amber.copy(alpha = 0.22f)),
+        )
+        Text(
+            text = if (holding) "按住…" else text,
+            color = if (holding) Ink.Amber else if (on) Ink.Teal else Ink.Dim,
+            fontSize = 10.sp,
             maxLines = 1,
             softWrap = false,
         )

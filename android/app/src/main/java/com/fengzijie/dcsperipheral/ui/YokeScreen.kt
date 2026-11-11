@@ -178,15 +178,22 @@ fun YokeScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
 
-            Spacer(Modifier.height(4.dp))
-            Row(Modifier.fillMaxWidth().height(30.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Chip(
-                    text = if (st.hasNeutral) "重新校零" else "校零",
+            // 间距从 4dp 拉到 10dp：光靠长按还不够，手指从 pad 滑出来时先
+            // 撞到空白区域，比直接压在按钮上更容易「反应过来就松手」。
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth().height(36.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LockChip(
+                    text = if (st.hasNeutral) "长按·重新校零" else "长按·校零",
                     on = !st.hasNeutral,
-                    onClick = onCalibrate,
+                    onRun = onCalibrate,
                     modifier = Modifier.weight(1f),
                 )
-                Chip(text = "调参", on = false, onClick = onSettings, modifier = Modifier.weight(1f))
+                LockChip(
+                    text = "长按·调参",
+                    on = false,
+                    onRun = onSettings,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
