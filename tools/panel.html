@@ -115,19 +115,32 @@
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
     padding:10px;text-align:center;
   }
-  #mfdlast{font-size:26px;font-weight:500;color:var(--fg);letter-spacing:.02em}
+  #mfdlast{font-size:13px;font-weight:500;color:var(--fg);letter-spacing:.02em}
+  #mfdpage{font-size:22px;font-weight:600;color:var(--fg);letter-spacing:.02em}
+  #mfddesc{font-size:10.5px;color:#8b949e;line-height:1.45;max-width:96%}
   #mfdack{font-size:11px;color:var(--dim)}
   .screen .snote{font-size:10px;color:#4d5560;line-height:1.4}
 
+  #mfdbar{display:flex;align-items:center;gap:8px;margin:0 2px 8px}
+  #mfdbar label{font-size:11px;color:var(--dim);flex:0 0 auto}
+  #mfdsel{
+    flex:1;min-width:0;background:#0d1117;border:1px solid var(--line);color:var(--fg);
+    border-radius:8px;padding:7px 8px;font:inherit;font-size:12.5px;
+    -webkit-appearance:none;appearance:none;
+  }
+
   /* MFD 键：全部用同一个样式，位置靠容器决定 */
   .mk{
-    display:flex;align-items:center;justify-content:center;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
     background:#141a22;border:1px solid #232b35;color:var(--fg);border-radius:7px;
-    font:inherit;font-size:12px;cursor:pointer;
+    font:inherit;font-size:12px;cursor:pointer;line-height:1.05;
     -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
     touch-action:manipulation;position:relative;overflow:hidden;
     min-height:0;padding:0;
   }
+  .mk i{font-style:normal;font-size:9.5px;color:#6b7480}
+  .mk b{font-weight:500;font-size:11.5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mk.blank b{color:#333a44}
   .mk:active{background:#1f2a36;border-color:var(--amber)}
   .mk.done{border-color:var(--teal);color:var(--teal)}
   .mk.holding{border-color:var(--amber);background:#1f2a36}
@@ -276,16 +289,22 @@
       <button data-mfd="center" class="on">中 MFD</button>
       <button data-mfd="right">右 MFD</button>
     </div>
-    <p id="mfdhint">D3 = 回上半区菜单（撤销键）· D2 左 CMBT / 中 雷达 / 右 HSD · D4 左 SMS / 右 CLINK · U5 = 雷达控制菜单 · 屏幕内容 DCS 不导出，其余键功能随画面变化</p>
+    <p id="mfdhint">键上写的字，就是这个键**此刻**在屏幕上写的字（来自 DCS 的 MFD 绘制脚本）。页面会跟着你按的键自动走；如果在座舱里用手按过，用下拉框改回来。D3 随时回主菜单，R8 进出下半区。</p>
+
+    <div id="mfdbar">
+      <label for="mfdsel">当前画面</label>
+      <select id="mfdsel"></select>
+    </div>
 
     <div class="bezel">
       <div class="brow" id="mfdU"></div>
       <div class="bmid">
         <div class="bcol" id="mfdL"></div>
         <div class="screen">
-          <div id="mfdlast">--</div>
-          <div id="mfdack">还没有按过键</div>
-          <div class="snote">屏幕内容读不到<br>只能靠位置记键</div>
+          <div id="mfdpage">--</div>
+          <div id="mfddesc"></div>
+          <div id="mfdlast">还没按过键</div>
+          <div id="mfdack"></div>
         </div>
         <div class="bcol" id="mfdR"></div>
       </div>
@@ -545,21 +564,128 @@ const MFD_DEFS = [
   { key: "right",  base: 800, d0: 24, c0: 29 },
 ];
 
-function mkKey(label, el, opt) {
+// MFDPAGES:BEGIN —— 由 tools/gen-mfd-pages.py 生成，别手改
+const MFD_PAGES = {
+  "UP_MainMenu":{"t":"主菜单","k":{"U1":"RDR","U2":"INS","U3":"TACAN","U4":"APR","U5":"POD","R1":"SMS","R2":"CMBT","R3":"BIT","R4":"CHKLS","R5":"PFL","L1":"HSD","L2":"EFIS","L3":"CLNK","L4":"DATA"},"d":"所有画面都从这里进。D3 随时回这一页。","n":{"U1":"UP_U1_RDR_AA","U2":"UP_U2_INS","U3":"UP_U3_TACAN","U4":"UP_U4_APR","U5":"UP_U5_POD","L1":"UP_L1_HSD","L2":"UP_L2_EFIS","L3":"UP_L3_CLINK","L4":"UP_L4_DATA","R1":"UP_R1_SMS_AA","R2":"UP_R2_CMBT","R3":"UP_R3_BIT","R4":"UP_R4_CHKLS","R5":"UP_R5_PFL"}},
+  "DOWN_AFINFO":{"t":"下半区·机场信息","k":{"R6":"NEXT","R7":"BACK","R8":"RTN"}},
+  "DOWN_CLINK":{"t":"下半区·数据链","k":{"R8":"RTN"}},
+  "DOWN_EPI1":{"t":"下半区·应急程序 1","k":{"L6":"NORM","R6":"EPI1","R8":"RTN"}},
+  "DOWN_EPI2":{"t":"下半区·应急程序 2","k":{"L6":"NORM","R6":"EPI2","R8":"RTN"}},
+  "DOWN_MainMenu":{"t":"下半区·菜单","k":{"R6":"EPI1","R7":"EPI2","R8":"RTN","L6":"AFD","L7":"SMS"}},
+  "DOWN_SMS":{"t":"下半区·外挂","k":{"R8":"RTN"}},
+  "UP_DATA_AS":{"t":"DATA·大气","k":{"U1":"AS DATA"}},
+  "UP_DATA_DEdit":{"t":"DATA·数字输入","k":{"L1":"1","L2":"2","L3":"3","L4":"4","L5":"5","R1":"6","R2":"7","R3":"8","R4":"9","R5":"0"}},
+  "UP_DATA_DST":{"t":"DATA·目的地","k":{"U1":"DST","U2":"FP-A","U4":"CPY","U5":"CLR","L2":"STEP","L3":"BACK"}},
+  "UP_DATA_DTC":{"t":"DATA·数据卡","k":{"U1":"DATA","U5":"ALL","R1":"EWS","R5":"ENT","L1":"NAV","L2":"SMS","L3":"CNI","L4":"APR","L5":"OAP"}},
+  "UP_DATA_ENG":{"t":"DATA·发动机","k":{"U1":"ENG"}},
+  "UP_DATA_FCS":{"t":"DATA·飞控","k":{"U1":"FCS","U5":"SPCHK"},"n":{"U5":"UP_DATA_SPCHK"}},
+  "UP_DATA_FUEL":{"t":"DATA·燃油","k":{"U1":"FUEL"}},
+  "UP_DATA_NAV":{"t":"DATA·导航","k":{"U1":"NAV DATA"}},
+  "UP_DATA_RLS":{"t":"DATA·挂点","k":{"U1":"RLS","U5":"RTN","L1":"RLS1","L2":"RLS2","L3":"RLS3","L4":"RLS4","L5":"RLS5","R1":"RLS6","R2":"RLS7","R3":"RLS8","R4":"RLS9","R5":"RLS10"}},
+  "UP_DATA_SPCHK":{"t":"DATA·飞控自检","k":{"U1":"SPCHK","U5":"FCS"},"n":{"U5":"UP_DATA_FCS"}},
+  "UP_EDIT":{"t":"数字键盘","k":{"L1":"1","L2":"2","L3":"3","L4":"4","L5":"5","R1":"6","R2":"7","R3":"8","R4":"9","R5":"0","D1":"CLR"}},
+  "UP_L1_HSD":{"t":"水平状态 HSD","k":{"U5":"TRU"},"n":{}},
+  "UP_L2_EFIS":{"t":"电子仪表 EFIS","k":{"L5":"NORM","R5":"ILS"},"n":{}},
+  "UP_L3_CLINK":{"t":"数据链 CLINK","k":{"U1":"CLINK"},"n":{}},
+  "UP_L3_CLINK_List":{"t":"数据链·列表","k":{"U1":"RTN"}},
+  "UP_L4_DATA":{"t":"数据 DATA","k":{"U1":"DATA","L1":"RLS","L2":"NAV","L3":"AS","L4":"FUEL","R1":"DST","R2":"FCS","R3":"ENG","R4":"DTC"},"d":"DATA 主页。左列 挂点/导航/大气/燃油，右列 目的地/飞控/发动机/数据卡。","n":{"L1":"UP_DATA_RLS","L2":"UP_DATA_NAV","L3":"UP_DATA_AS","L4":"UP_DATA_FUEL","R1":"UP_DATA_DST","R2":"UP_DATA_FCS","R3":"UP_DATA_ENG","R4":"UP_DATA_DTC"}},
+  "UP_R1_SMS_AA":{"t":"外挂·空对空","k":{"U1":"A/A1","U5":"LOAD","U2":"FEED","L2":"GUN","D1":"CLR","D2":"CMBT","D4":"JET","U3":"NORM","R2":"MSL STATE"},"d":"空对空外挂。L3 机炮准心、L4 限数、U5 进挂载页。","n":{"U5":"UP_R1_SMS_Load","R2":"UP_R1_SMS_AA_Wpn"}},
+  "UP_R1_SMS_AA_Gunsight":{"t":"外挂·空对空·准心","k":{"L3":"LCOS","L4":"SSLC","L5":"SS"}},
+  "UP_R1_SMS_AA_Limiter":{"t":"外挂·空对空·机炮限数","k":{"L3":"OFF","L4":"0.2","L5":"0.5"}},
+  "UP_R1_SMS_AA_Wpn":{"t":"外挂·空对空·选弹","k":{"L3":"AA 1","L4":"AA 2","L5":"AA 3","R3":"AA 4","R4":"AA 5","R5":"AA 6"}},
+  "UP_R1_SMS_AG":{"t":"外挂·空对地","k":{"U1":"A/S1","U2":"FEED","U5":"LOAD","L2":"GUN","L1":"CNTL","D1":"CLR","D2":"CMBT","D4":"JET","R2":"MSL STATE"},"n":{"U5":"UP_R1_SMS_Load","L1":"UP_R1_SMS_AG_Mode"}},
+  "UP_R1_SMS_AG_Fuze":{"t":"外挂·对地·引信","k":{"L3":"SAFE","L4":"NOSE","L5":"TAIL","R3":"N+T"}},
+  "UP_R1_SMS_AG_Intv":{"t":"外挂·对地·间隔","k":{"L3":"0","L4":"0.1","L5":"0.2","R2":"0.4","R3":"0.8","R4":"1.2","R5":"1.6"}},
+  "UP_R1_SMS_AG_Mode":{"t":"外挂·对地·投放模式","k":{"L3":"AUTO","L4":"CCIP","L5":"DTOS","R1":"VIP","R2":"DIR"}},
+  "UP_R1_SMS_AG_Profile":{"t":"外挂·对地·程序","k":{"D1":"CLR","L1":"CNTL"}},
+  "UP_R1_SMS_AG_Qty":{"t":"外挂·对地·数量","k":{"L3":"1/OFF","L4":"2/0.2","L5":"4/0.5","R5":"6/0.5"}},
+  "UP_R1_SMS_AG_Wpn":{"t":"外挂·对地·选弹","k":{"L3":"AG 1","L4":"AG 2","L5":"AG 3","R3":"AG 4","R4":"AG 5","R5":"AG 6"}},
+  "UP_R1_SMS_Jet":{"t":"外挂·投放","k":{"U1":"2","U2":"3","U3":"4","U4":"5","U5":"6"}},
+  "UP_R1_SMS_Load":{"t":"外挂·挂载","k":{"D1":"CLR","D2":"COPY","D4":"SMS","U1":"2","U2":"3","U3":"4","U4":"5","U5":"6"},"n":{"L2":"UP_R1_SMS_Load_Type"}},
+  "UP_R1_SMS_Load_Type":{"t":"挂载·类型","k":{"L2":"BOMB","L3":"CLST","L4":"ROCK","R2":"MILS","R3":"FUEL","R4":"POD"}},
+  "UP_R1_SMS_Load_Wpn":{"t":"挂载·选弹","k":{"L1":"PL-5E","L2":"SD-10","L3":"C-802K","L4":"CM-802AKG","L5":"RKT-1","R1":"MK-82","R2":"MK-83","R3":"WMD7","R4":"STEP","R5":"BACK"}},
+  "UP_R1_SMS_Prog":{"t":"外挂·程序","k":{"L2":"AA 1","L3":"AA 2","L4":"AG 1","L5":"AG 2","R2":"AG 3","R3":"AG 4","R4":"AG 5","R5":"AG 6"}},
+  "UP_R2_CMBT":{"t":"战斗 CMBT","k":{"U1":"CMBT","U5":"LOAD","U2":"FEED","L2":"GUN","L3":"AUTO","L4":"CH","L5":"PRG02","R3":"STBY","R4":"TYPE1","R5":"F+B"},"d":"战斗页：干扰弹与投放程序。"},
+  "UP_R3_BIT":{"t":"自检 BIT","k":{"U1":"LMFCD","U2":"RMFCD","U3":"CMFCD","U4":"HUD","U5":"EMMC","R1":"RDR","R2":"INS","R3":"SMS","R4":"RWR","R5":"OESP","L1":"WMMC1M","L2":"WMMC2","L3":"CNI","L5":"1"}},
+  "UP_R4_CHKLS":{"t":"检查单 CHKLS","k":{"U1":"CHLST","U3":"COLD"}},
+  "UP_R5_PFL":{"t":"PFL","k":{"U1":"PFL","R4":"STEP","R5":"BACK","L1":"FCS","L2":"FIRE","L3":"ENG","L4":"INS","L5":"SMS","U5":"1/1"}},
+  "UP_U1_RDR_AA":{"t":"雷达·空对空","k":{"U5":"CNTL","U3":"STBY","U4":"SIL","L1":"B\\nI\\nN\\nD","L2":"E\\nX\\nP","L3":"60","L4":"N\\nO\\nR","L5":"4\\nB\\nR","U1":"模式","R5":"PRF"},"d":"左列是搜索参数：方位角 60 / 天线稳定 NOR / 扫描行数 4BR。U1 进模式菜单，U5 进控制菜单。","n":{"U1":"UP_U1_RDR_Mode","U5":"UP_U1_RDR_AA_CNTL","U2":"UP_U1_RDR_AA_CNTL"}},
+  "UP_U1_RDR_AA_CNTL":{"t":"雷达·控制菜单","k":{"U5":"CNTL"},"d":"雷达控制菜单。U5 再按一次退回雷达页。","n":{"U5":"UP_U1_RDR_AA"}},
+  "UP_U1_RDR_AG":{"t":"雷达·空对地","k":{"U5":"CNTL","U3":"STBY","U4":"SIL","L3":"60","U1":"模式","R5":"PRF"},"n":{"U1":"UP_U1_RDR_Mode","U5":"UP_U1_RDR_AG_CNTL","U2":"UP_U1_RDR_AG_CNTL"}},
+  "UP_U1_RDR_AG_CNTL":{"t":"雷达·对地控制菜单","k":{"U5":"CNTL","R4":"BCN\\n00"},"n":{"U5":"UP_U1_RDR_AG"}},
+  "UP_U1_RDR_Mode":{"t":"雷达·模式选择","k":{"U5":"CNTL","L1":"1","L2":"2","L3":"3","L4":"4","L5":"5","R1":"6","R2":"7","R3":"8","R4":"9","R5":"10"},"d":"雷达模式列表：左 1–5、右 6–10。选完自动回雷达页。","n":{"L1":"UP_U1_RDR_AA","L2":"UP_U1_RDR_AA","L3":"UP_U1_RDR_AA","L4":"UP_U1_RDR_AA","L5":"UP_U1_RDR_AA","R1":"UP_U1_RDR_AA","R2":"UP_U1_RDR_AA","R3":"UP_U1_RDR_AA","R4":"UP_U1_RDR_AA","R5":"UP_U1_RDR_AA"}},
+  "UP_U2_INS":{"t":"惯导 INS","k":{"U1":"INS"},"n":{}},
+  "UP_U3_TACAN":{"t":"塔康 TACAN","k":{"U1":"TACAN"},"n":{}},
+  "UP_U3_TACAN_Prog":{"t":"塔康·程序","k":{"U1":"TACAN","L1":"TCN01","L2":"TCN02","L3":"TCN03","L4":"TCN04","L5":"TCN05","R1":"TCN06","R2":"TCN07","R3":"TCN08","R4":"TCN09","R5":"TCN10"}},
+  "UP_U4_APR":{"t":"应答机 APR","k":{"U1":"APR","U4":" ","U5":" "}},
+  "UP_U5_POD":{"t":"吊舱 POD","k":{"U1":"POD","R1":"W\\nM\\nD\\n7","R4":"M\\nI\\nL","L1":"T\\nV\\nI\\nR"}},
+  "FULL_BASE":{"t":"FULL_BASE","k":{"D2":"D2","D3":"SOI","D4":"D4"}},
+  "UP_POD_MIL":{"t":"UP_POD_MIL","k":{"U1":"DLPOD","U2":"NAR","U3":"AUTO","U4":"MODE","R1":"M1","R2":"M2","L3":"CRUS"}},
+  "UP_POD_TVIR":{"t":"UP_POD_TVIR","k":{"R1":"BHOT","R5":"5 M","L5":"RE\\nFOCUS"}},
+  "UP_POD_WMD7":{"t":"UP_POD_WMD7","k":{"U1":"WMD7","U2":"MODE","U4":"WHOT","R1":"NAR","R2":"L\\nS\\nS","R3":"C\\nO\\nD\\nE","R4":"L\\nS\\nR","L1":"C\\nA\\nG\\nE","R5":"RE\\nFOCUS"}}
+};
+// MFDPAGES:END
+
+// ---- 页面状态机 ----
+//
+// 为什么不用读屏幕：页面之所以会变，只有两种原因 —— 要么我们发了键，
+// 要么飞行员在座舱里按了。DCS 不给读画面（LoGet* 里没有 MFD 接口，
+// 页面状态在编译过的设备 DLL 里），但「我们发的键」自己知道，
+// 所以按 gen-mfd-pages.py 里的跳转表往下推就行。
+// 推错的可能性只有一个：座舱里有人手按过。下拉框一键改回来。
+const mfdPage = { left: "UP_MainMenu", center: "UP_U1_RDR_AA", right: "UP_L1_HSD" };
+let mfdCur = "center";
+let mfdBack = null;        // 进下半区之前的页面，R8 再按一次回去
+
+const pageOf = id => MFD_PAGES[id] || { t: id, k: {} };
+
+function paintPage() {
+  const p = pageOf(mfdPage[mfdCur]);
+  $("mfdpage").textContent = p.t;
+  $("mfddesc").textContent = p.d || "";
+  $("mfdsel").value = mfdPage[mfdCur];
+}
+
+function setPage(id, opts) {
+  mfdPage[mfdCur] = id;
+  if (!opts || !opts.keepLast) $("mfdlast").textContent = "还没按过键";
+  paintPage();
+  renderBezel();
+}
+
+// 按一个键之后，页面会跳到哪
+function nextPage(keyName) {
+  const cur = mfdPage[mfdCur];
+  const p = pageOf(cur);
+  if (keyName === "D3") return "UP_MainMenu";
+  if (keyName === "R8") {
+    if (cur.startsWith("DOWN_")) { const b = mfdBack; mfdBack = null; return b || "UP_MainMenu"; }
+    mfdBack = cur;
+    return "DOWN_MainMenu";
+  }
+  // 手册 p53 的快速切换键：D2 左 CMBT / 中 雷达 / 右 HSD，D4 左 SMS / 中 无 / 右 CLINK
+  if (keyName === "D2") return { left: "UP_R2_CMBT", center: "UP_U1_RDR_AA", right: "UP_L1_HSD" }[mfdCur];
+  if (keyName === "D4") return { left: "UP_R1_SMS_AA", center: null, right: "UP_L3_CLINK" }[mfdCur];
+  const t = p.n && p.n[keyName];
+  return t || null;
+}
+
+function mkKey(name, label, el, opt) {
   opt = opt || {};
   const val = opt.val == null ? 1 : opt.val;
   const hold = opt.hold || 0;
   const b = document.createElement("button");
-  b.className = "mk" + (opt.cls ? " " + opt.cls : "");
-  b.textContent = label;
+  b.className = "mk" + (opt.cls ? " " + opt.cls : "") + (label ? "" : " blank");
+  b.innerHTML = `<i>${name}</i><b>${label || "·"}</b>`;
   b.dataset.el = el;
+  b.title = label ? `${name} = ${label}` : `${name}（这一页这个键没定义）`;
   let timer = null;
 
   const fire = async () => {
     b.classList.remove("holding");
     b.classList.add("done");
     setTimeout(() => b.classList.remove("done"), 350);
-    $("mfdlast").textContent = label;
+    $("mfdlast").textContent = label ? `${name} · ${label}` : name;
     $("mfdack").textContent = "已发送 · 等回执…";
     $("mfdack").style.color = "var(--dim)";
     // 1.2 秒还没等来回执就别让人干等 —— 多半是 DCS 不在任务里或 Export.lua 没加载
@@ -569,7 +695,10 @@ function mkKey(label, el, opt) {
         $("mfdack").style.color = "var(--amber)";
       }
     }, 1200);
+
+    const nx = nextPage(name);
     await sendCmd(MFCD_DEV, el + CMD_OFFSET, val);
+    if (nx && nx !== mfdPage[mfdCur]) setPage(nx, { keepLast: true });
   };
 
   b.addEventListener("pointerdown", e => {
@@ -588,43 +717,62 @@ function mkKey(label, el, opt) {
   return b;
 }
 
-function buildMFD(key) {
-  const d = MFD_DEFS.find(x => x.key === key);
-  [["mfdU", 5, i => d.base + 2 + i], ["mfdL", 8, i => d.base + 8 + i],
-   ["mfdR", 8, i => d.base + 16 + i], ["mfdD", 5, i => d.base + d.d0 + i]]
-    .forEach(([id, n, fn]) => {
+function renderBezel() {
+  const d = MFD_DEFS.find(x => x.key === mfdCur);
+  const K = pageOf(mfdPage[mfdCur]).k || {};
+  // Lua 里的 \n 是「竖排文字」（C\A\G\E），iPad 上挤成一列没法看，拼成一行
+  const txt = s => s ? String(s).replace(/\\n/g, "") : s;
+  // D3 / R8 的语义是全局固定的，页面没定义也给个提示
+  const fallback = n => n === "D3" ? "MENU" : n === "R8" ? "小菜单" : "";
+  [["mfdU", 5, "U", i => d.base + 2 + i], ["mfdL", 8, "L", i => d.base + 8 + i],
+   ["mfdR", 8, "R", i => d.base + 16 + i], ["mfdD", 5, "D", i => d.base + d.d0 + i]]
+    .forEach(([id, n, pre, fn]) => {
       const box = $(id);
       box.innerHTML = "";
-      const pre = id === "mfdU" ? "U" : id === "mfdL" ? "L" : id === "mfdR" ? "R" : "D";
       for (let i = 0; i < n; i++) {
+        const name = pre + (i + 1);
         // D3 是固定的「回上半区菜单」，也就是撤销键，给个暗色边框好找
-        const undo = (pre === "D" && i === 2) ? "undo" : "";
-        box.appendChild(mkKey(pre + (i + 1), fn(i), { cls: undo }));
+        const undo = name === "D3" ? "undo" : "";
+        box.appendChild(mkKey(name, txt(K[name]) || fallback(name), fn(i), { cls: undo }));
       }
     });
 
   const aux = $("mfdaux");
   aux.innerHTML = "";
-  aux.appendChild(mkKey("SYM −", d.base + 1));
-  aux.appendChild(mkKey("SYM +", d.base + 0));
-  aux.appendChild(mkKey("CONT −", d.base + d.c0 + 1));
-  aux.appendChild(mkKey("CONT +", d.base + d.c0));
-  aux.appendChild(mkKey("BRT −", d.base + 32));
-  aux.appendChild(mkKey("BRT +", d.base + 31));
+  aux.appendChild(mkKey("SYM−", "", d.base + 1));
+  aux.appendChild(mkKey("SYM+", "", d.base + 0));
+  aux.appendChild(mkKey("CON−", "", d.base + d.c0 + 1));
+  aux.appendChild(mkKey("CON+", "", d.base + d.c0));
+  aux.appendChild(mkKey("BRT−", "", d.base + 32));
+  aux.appendChild(mkKey("BRT+", "", d.base + 31));
   // 电源是两档开关（arg_value 1 / -1），不是瞬动按钮，而且按错画面就黑了 —— 要长按
-  aux.appendChild(mkKey("PWR 开", d.base + 7, { val: 1,  hold: 600, cls: "pwr" }));
-  aux.appendChild(mkKey("PWR 关", d.base + 7, { val: -1, hold: 600, cls: "pwr" }));
+  aux.appendChild(mkKey("PWR开", "", d.base + 7, { val: 1,  hold: 600, cls: "pwr" }));
+  aux.appendChild(mkKey("PWR关", "", d.base + 7, { val: -1, hold: 600, cls: "pwr" }));
 }
+
+// 画面下拉：换屏或手动纠正页面都用它
+(function initSelect() {
+  const sel = $("mfdsel");
+  sel.innerHTML = Object.keys(MFD_PAGES)
+    .map(id => `<option value="${id}">${MFD_PAGES[id].t}</option>`).join("");
+  sel.addEventListener("change", () => setPage(sel.value));
+})();
 
 document.querySelectorAll("#mfds button").forEach(b => {
   b.addEventListener("click", () => {
     document.querySelectorAll("#mfds button").forEach(x => x.classList.toggle("on", x === b));
-    buildMFD(b.dataset.mfd);
-    $("mfdlast").textContent = "--";
+    mfdCur = b.dataset.mfd;
+    mfdBack = null;
+    $("mfdlast").textContent = "还没按过键";
+    $("mfdack").textContent = "";
+    paintPage();
+    renderBezel();
   });
 });
 
-buildMFD("center");
+paintPage();
+renderBezel();
+
 </script>
 </body>
 </html>
