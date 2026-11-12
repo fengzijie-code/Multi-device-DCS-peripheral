@@ -146,7 +146,7 @@ def main() -> int:
     rc, out = run(adb, *cmd, timeout=180)
 
     if rc == 0 and "Success" in out:
-        print("[✓] 装好了。打开 App，摇杆页底部两个按钮现在是「长按·校零 / 长按·调参」。")
+        print("[✓] 装好了。打开 App，顶部应该能看到「仪表 / 起降 / 战斗 / 校准」四个标签。")
         return 0
 
     if rc == -1:
