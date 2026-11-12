@@ -103,9 +103,45 @@ def list_devices(adb: str) -> list[tuple[str, str]]:
     return res
 
 
+def ensure_adb_alive(adb: str) -> str:
+    """确认 adb 守护进程能正常应答，卡死时从外部杀掉重启。
+
+    返回 "" 表示正常，否则返回给人看的原因。
+
+    为什么要单独做这一步：adb server 会僵死 —— 进程还在、5037 还在监听，
+    但客户端连上去永远不返回。这种情况下 `adb devices` 会卡到超时再返回
+    空列表，后面的 wait_device 就把它当成「没检测到设备」，于是启动器报
+    「确认是数据线不是充电线」—— 把人往完全错误的方向带，白折腾数据线。
+
+    `adb kill-server` 没用（它同样要先连上那个僵死的 server），只能从外部杀进程。
+    """
+    rc, _ = adb_run(adb, "devices", timeout=8)
+    if rc != -1:
+        return ""
+
+    print("  [!] adb 无响应（服务僵死），正在从外部重启它 …")
+    try:
+        subprocess.run(["taskkill", "/F", "/IM", "adb.exe"],
+                       capture_output=True, timeout=15)
+    except Exception as e:
+        print(f"      taskkill 失败：{e}")
+    time.sleep(1.5)
+
+    adb_run(adb, "start-server", timeout=20)
+    rc, _ = adb_run(adb, "devices", timeout=10)
+    if rc == -1:
+        return "adb 服务无响应（已尝试重启仍然卡住）。重装 platform-tools，或重启电脑。"
+    print("  [✓] adb 已恢复")
+    return ""
+
+
 def wait_device(adb: str, seconds: float = 20.0) -> tuple[str | None, str]:
     """等一台授权好的设备。返回 (序列号, 状态)；没等到就是 (None, 原因)。"""
-    adb_run(adb, "start-server")
+    why = ensure_adb_alive(adb)
+    if why:
+        return None, "adb-hung"
+
+    adb_run(adb, "start-server", timeout=15)
     deadline = time.monotonic() + seconds
     last = "none"
     while time.monotonic() < deadline:
@@ -284,14 +320,32 @@ def main() -> int:
             return 2
         serial, state = wait_device(adb)
         if not serial:
-            why = {
-                "unauthorized": "手机没授权 —— 在手机上点「允许 USB 调试」",
-                "offline": "设备离线 —— 换根数据线或重插一次",
-                "none": "没检测到设备 —— 确认是数据线不是充电线，且 USB 调试已开",
-            }.get(state, f"设备状态 {state}")
-            print(f"  {RED}[x]{RESET} 20 秒内没等到可用设备：{why}")
-            for s, st in list_devices(adb):
-                print(f"      {s}  {st}")
+            if state == "adb-hung":
+                print(f"  {RED}[x]{RESET} adb 服务卡死，重启也没救回来。")
+                print(f"      {DIM}这不是数据线的问题。重装 platform-tools，或重启电脑。{RESET}")
+                return 2
+            if state == "unauthorized":
+                print(f"  {RED}[x]{RESET} 手机没授权。")
+                print(f"      {DIM}解锁手机，屏幕上应该有个「允许 USB 调试」弹窗，勾上「一律允许」再点确定。{RESET}")
+                print(f"      {DIM}没看到弹窗就拔插一次数据线。{RESET}")
+                return 2
+            if state == "offline":
+                print(f"  {RED}[x]{RESET} 设备处于 offline。")
+                print(f"      {DIM}换一根数据线，或者换一个 USB 口（避开前置面板和 hub）。{RESET}")
+                return 2
+
+            # 走到这里是「adb 正常、但一台设备都没有」。这不是 DCS 侧的配置问题：
+            # Windows 压根没认出这台手机。
+            print(f"  {RED}[x]{RESET} 没检测到任何安卓设备。")
+            print()
+            print(f"      {DIM}这不是本项目的配置问题 —— Windows 现在看不到这台手机。{RESET}")
+            print(f"      {DIM}按顺序试：{RESET}")
+            print(f"        1. 拔掉重插，换一个 USB 口（优先用主板后面直出的，别用前面板/hub）")
+            print(f"        2. 插上时听 Windows 有没有「叮」一声。没有 = 线只供电，换线")
+            print(f"        3. 手机下拉通知栏，点「USB 正在充电」那条，改成「传输文件 / MTP」")
+            print(f"        4. 手机解锁状态下再试一次（锁屏时部分机型不枚举 USB）")
+            print()
+            print(f"      {DIM}只想先跑桥接（不接手机）？加 --no-usb{RESET}")
             print(f"      {DIM}adb = {adb}{RESET}")
             return 2
         print(f"        {GREEN}✓{RESET} 设备 {serial}")
