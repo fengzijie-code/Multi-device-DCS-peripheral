@@ -447,7 +447,7 @@ class InputHub:
     INPUT_FRESH_S = 1.5
     SPRING = ("x", "y", "r", "vx", "vy")     # 松手回零的轴
     HOLD = ("t",)                            # 松手保持的轴
-    MAX_BUTTONS = 16
+    MAX_BUTTONS = 20
 
     def __init__(self):
         self._lock = threading.Lock()

@@ -38,6 +38,18 @@ object YokeBtn {
     const val FLAPS_UP = 0
     const val FLAPS_DOWN = 1
     const val GEAR = 2
+
+    // 战斗页。编号必须和 vJoy 里配的按钮号对齐（1 起算），DCS 里绑的也是这个。
+    // 3..6 是当前用到的，7..9 先占位给以后的目标选择 / 雷达模式，避免到时候
+    // 重排编号 —— 一重排，DCS 里绑好的键全要重绑。
+    const val WEAPON_PREV = 3          // 上一个武器
+    const val WEAPON_NEXT = 4          // 下一个武器
+    const val LOCK = 5                 // 锁定目标
+    const val FIRE = 6                 // 发射
+
+    const val RESERVED_TWS = 7
+    const val RESERVED_TARGET_PREV = 8
+    const val RESERVED_TARGET_NEXT = 9
 }
 
 /**
@@ -232,7 +244,7 @@ private fun VjoyLine(state: Int) {
 }
 
 @Composable
-private fun ArmButton(armed: Boolean, ready: Boolean, onClick: () -> Unit) {
+fun ArmButton(armed: Boolean, ready: Boolean, onClick: () -> Unit) {
     val bg = when {
         armed -> Ink.Red.copy(alpha = 0.18f)
         ready -> Ink.Teal.copy(alpha = 0.14f)

@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -492,6 +493,108 @@ fun Chip(
             maxLines = 1,
             softWrap = false,
         )
+    }
+}
+
+/**
+ * 带保护的按住按钮（战斗页的发射 / 锁定 / 切武器）。
+ *
+ * 和 [HoldButton] 的区别：手指按下后先等 [guardMs]，这期间抬手就什么都不发。
+ * 只有按够时间才真正把「按下」发出去，之后松手再发「松开」。
+ *
+ * 为什么需要这道门槛：触摸屏没有物理边界，手指从按钮上划过（按下和抬起
+ * 都在按钮内，总时长几十毫秒）就是一次完整点击。用来开火的话，一次划过
+ * 就是一枚导弹出去了 —— 不可逆，也不能靠「小心一点」避免。
+ *
+ * 200ms 这个量级是有讲究的：短到不影响机炮连射的手感（按住就开始打），
+ * 又长到足以滤掉所有「划过」。代价是任何操作都慢 200ms，所以只给真正
+ * 不可逆的动作加，切武器这种能反悔的就不用。
+ */
+@Composable
+fun GuardButton(
+    text: String,
+    sub: String? = null,
+    enabled: Boolean,
+    onDown: () -> Unit,
+    onUp: () -> Unit,
+    modifier: Modifier = Modifier,
+    guardMs: Int = 200,
+    danger: Boolean = false,
+) {
+    var holding by remember { mutableStateOf(false) }
+    val prog = remember { Animatable(0f) }
+    val accent = if (danger) Ink.Red else Ink.Amber
+
+    LaunchedEffect(holding) {
+        if (holding) {
+            prog.animateTo(1f, tween(durationMillis = guardMs, easing = LinearEasing))
+        } else {
+            prog.snapTo(0f)
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (danger) Ink.Red.copy(alpha = 0.13f) else Ink.Surface)
+            .border(
+                1.dp,
+                when {
+                    holding -> accent
+                    danger -> Ink.Red.copy(alpha = 0.55f)
+                    else -> Ink.Line
+                },
+                RoundedCornerShape(10.dp),
+            )
+            .pointerInput(enabled, guardMs) {
+                if (!enabled) return@pointerInput
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    holding = true
+                    // 超时返回 null = 手指还按着（够格了）；提前抬手返回非 null。
+                    // 用 withTimeoutOrNull 包住等待而不是自己起计时协程：
+                    // 这样手势状态不会被破坏，后面还能再等一次真正的抬起。
+                    val upEarly = withTimeoutOrNull(guardMs.toLong()) { waitForUpOrCancellation() }
+                    if (upEarly == null) {
+                        onDown()
+                        waitForUpOrCancellation()
+                        onUp()
+                    }
+                    holding = false
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(prog.value.coerceIn(0f, 1f))
+                .background(accent.copy(alpha = 0.16f)),
+        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = text,
+                color = when {
+                    holding -> accent
+                    danger -> Ink.Red
+                    enabled -> Ink.Fg
+                    else -> Ink.Dim
+                },
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+            )
+            if (sub != null) {
+                Text(
+                    text = sub,
+                    color = Ink.Dim,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+        }
     }
 }
 

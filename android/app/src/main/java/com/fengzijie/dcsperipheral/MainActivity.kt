@@ -60,6 +60,7 @@ import com.fengzijie.dcsperipheral.net.BridgePoller
 import com.fengzijie.dcsperipheral.net.LinkEvent
 import com.fengzijie.dcsperipheral.ui.AttitudeIndicator
 import com.fengzijie.dcsperipheral.ui.CalibScreen
+import com.fengzijie.dcsperipheral.ui.CombatScreen
 import com.fengzijie.dcsperipheral.ui.DcsTheme
 import com.fengzijie.dcsperipheral.ui.HeadingTape
 import com.fengzijie.dcsperipheral.ui.Ink
@@ -157,14 +158,14 @@ private fun Root() {
     // 换了服务器地址会造出一个新的 controller，这时必须把「解锁」状态丢掉 ——
     // 不能让新链路上电就是满杆
     LaunchedEffect(mode, ctl) {
-        val live = mode == "yoke" || mode == "calib"
+        val live = mode == "yoke" || mode == "calib" || mode == "combat"
         if (live && ctl != null) ctl.start() else ctl?.stop()
     }
 
-    // 摇杆/校准页要一直亮屏：手握着手机看杆位，屏幕灭掉等于失控
+    // 摇杆/校准/战斗页要一直亮屏：手握着手机看杆位，屏幕灭掉等于失控
     val view = LocalView.current
     DisposableEffect(view, mode) {
-        view.keepScreenOn = (mode == "yoke" || mode == "calib")
+        view.keepScreenOn = (mode == "yoke" || mode == "calib" || mode == "combat")
         onDispose { view.keepScreenOn = false }
     }
 
@@ -200,11 +201,21 @@ private fun Root() {
 
         Spacer(Modifier.height(6.dp))
 
-        if (mode == "yoke" || mode == "calib") {
+        if (mode == "yoke" || mode == "calib" || mode == "combat") {
             if (server.isBlank()) {
                 EmptyHint(
                     "先设置服务器地址，摇杆才有地方发数据",
                     Modifier.fillMaxWidth().weight(1f),
+                )
+            } else if (mode == "combat") {
+                CombatScreen(
+                    st = yokeSt,
+                    rangeDeg = yset.rangeDeg,
+                    onThrottle = { ctl?.nudgeThrottle(it) },
+                    onButtonDown = { ctl?.pressButton(it) },
+                    onButtonUp = { ctl?.releaseButton(it) },
+                    onToggleArm = { ctl?.toggleArmed() },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                 )
             } else if (mode == "yoke") {
                 YokeScreen(
@@ -482,12 +493,11 @@ private fun Header(
         }
         ModeTab("仪表", on = mode == "pfd", onClick = { onMode("pfd") })
         Spacer(Modifier.width(4.dp))
-        ModeTab(
-            text = if (yokeArmed) "摇杆 ●" else "摇杆",
-            on = mode == "yoke",
-            armed = yokeArmed,
-            onClick = { onMode("yoke") },
-        )
+        // 起降和战斗共用同一套控制器和同一个 ARM 状态，只是版面不同：
+        // 起降要脚舵/襟翼/起落架/视角，战斗只要武器和发射。
+        ModeTab("起降", on = mode == "yoke", armed = yokeArmed, onClick = { onMode("yoke") })
+        Spacer(Modifier.width(4.dp))
+        ModeTab("战斗", on = mode == "combat", armed = yokeArmed, onClick = { onMode("combat") })
         Spacer(Modifier.width(4.dp))
         ModeTab("校准", on = mode == "calib", onClick = { onMode("calib") })
         Spacer(Modifier.width(6.dp))
