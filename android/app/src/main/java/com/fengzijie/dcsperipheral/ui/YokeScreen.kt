@@ -102,21 +102,6 @@ fun YokeScreen(
             )
             Spacer(Modifier.height(5.dp))
 
-            // 配平紧贴杆位盘：它是「把杆锁在这儿」的动作，离杆越近越直觉。
-            // 只在配置页打开时才出现 —— 固定翼不需要它，藏掉能把这 37dp
-            // 还给杆位盘，也不会被误按成一个莫名其妙的杆量。
-            if (set.trimOn) {
-                Spacer(Modifier.height(5.dp))
-                TrimButton(
-                    trim = st.trimY,
-                    enabled = st.armed,
-                    onCapture = onTrimCapture,
-                    onClear = onTrimClear,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            Spacer(Modifier.height(5.dp))
-
             // 脚舵单列一行，带文字标签。之前只靠「拧手机」，屏幕上没有
             // 任何可见控件 —— 用户根本不知道脚舵在哪。可见性比优雅重要。
             Row(
@@ -144,6 +129,7 @@ fun YokeScreen(
             Row(
                 Modifier.fillMaxWidth().height(46.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 HoldButton(
                     text = "襟翼↑",
@@ -161,6 +147,19 @@ fun YokeScreen(
                     onUp = { onButtonUp(YokeBtn.FLAPS_DOWN) },
                     modifier = Modifier.weight(1f),
                 )
+                // 配平夹在襟翼和起落架中间：这一行本来就是「起降构型」操作，
+                // 配平（尤其直升机的周期变距配平）在语义上也属于这一组，
+                // 而且手指扫过这一行就够得到，不用再往上够杆位盘。
+                // 配置页关掉时不占位，剩下三个按钮自己均分宽度。
+                if (set.trimOn) {
+                    TrimButton(
+                        trim = st.trimY,
+                        enabled = st.armed,
+                        onCapture = onTrimCapture,
+                        onClear = onTrimClear,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 HoldButton(
                     text = "起落架",
                     sub = "收放",

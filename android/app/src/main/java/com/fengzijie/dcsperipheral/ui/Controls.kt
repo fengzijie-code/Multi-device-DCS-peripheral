@@ -622,7 +622,9 @@ fun TrimButton(
     val active = trim != 0f
     Box(
         modifier = modifier
-            .height(32.dp)
+            // 高度跟着所在的那一行走（现在是襟翼/起落架那一行，46dp）。
+            // 内部不再写死高度，否则会盖掉调用方的 fillMaxHeight。
+            .fillMaxHeight()
             .clip(RoundedCornerShape(8.dp))
             .background(if (active) Ink.Amber.copy(alpha = 0.16f) else Ink.Surface)
             .border(
@@ -639,13 +641,25 @@ fun TrimButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = if (active) "配平 ${if (trim > 0) "+" else ""}${(trim * 100).toInt()}%" else "配平",
-            color = if (active) Ink.Amber else Ink.Dim,
-            fontSize = 10.sp,
-            maxLines = 1,
-            softWrap = false,
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                // 有配平时直接把数字摆在主行 —— 飞行中最想知道的是「现在偏了多少」，
+                // 而不是「有没有配平」。
+                text = if (active) "${if (trim > 0) "+" else ""}${(trim * 100).toInt()}%" else "配平",
+                color = if (active) Ink.Amber else if (enabled) Ink.Fg else Ink.Dim,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+            )
+            Text(
+                text = if (active) "长按清零" else "单击生效",
+                color = Ink.Dim,
+                fontSize = 10.sp,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
     }
 }
 
