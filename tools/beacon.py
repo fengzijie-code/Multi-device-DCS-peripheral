@@ -45,6 +45,10 @@ except ImportError:  # 允许从别处直接跑
     def global_ipv6_addresses():
         return []
 
+# 反向通道端口：bridge 把座舱操作转发到这个 UDP 端口，由 Export.lua 接收执行。
+# 必须和 dcs/Export.lua 里的 CMD_PORT 一致。
+CMD_UDP_PORT = 5020
+
 for _s in (sys.stdout, sys.stderr):
     try:
         _s.reconfigure(encoding="utf-8", errors="replace")
@@ -779,7 +783,7 @@ class Handler(BaseHTTPRequestHandler):
     #   50Hz × 每字节都是白扔的带宽。序号够手机判断「对端还活着」。
     def do_POST(self):
         u = urlparse(self.path)
-        if u.path not in ("/input", "/vjoy"):
+        if u.path not in ("/input", "/vjoy", "/cmd"):
             self._send(404, b"not found", "text/plain; charset=utf-8")
             return
 
@@ -803,6 +807,32 @@ class Handler(BaseHTTPRequestHandler):
 
         if u.path == "/vjoy":
             INPUT.mark_vjoy(obj)
+            self._send(200, b'{"ok":1}', "application/json")
+            return
+
+        if u.path == "/cmd":
+            # 座舱操作转发：{dev, cmd, val} → UDP 127.0.0.1:5020（Export.lua 收）
+            #
+            # 为什么这里不校验范围：dev/cmd 是 DCS 内部的设备号和命令号，
+            # 我们只是搬运工，具体含义由飞机决定。乱发最多是点了不存在的
+            # 控件（DCS 自己会忽略），不会崩。
+            #
+            # 但也正因为它能直接操作飞机，这条路由只监听回环 —— 见启动参数。
+            try:
+                dev = int(obj.get("dev"))
+                cmd = int(obj.get("cmd"))
+                val = float(obj.get("val", 1))
+            except (TypeError, ValueError):
+                self._send(400, b'{"ok":0,"err":"bad fields"}', "application/json")
+                return
+            line = f"{dev}:{cmd}:{val:g}".encode()
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                    s.sendto(line, ("127.0.0.1", CMD_UDP_PORT))
+            except OSError as e:
+                self._send(500, json.dumps({"ok": 0, "err": str(e)}).encode(),
+                           "application/json")
+                return
             self._send(200, b'{"ok":1}', "application/json")
             return
 

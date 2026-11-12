@@ -516,6 +516,66 @@ local function send_frame()
     end
 end
 
+-- ============================ 反向通道 ============================
+--
+-- 座舱操作回传：iPad/手机 → beacon → UDP 127.0.0.1:5020 → 这里执行。
+--
+-- 为什么用 UDP 不用 TCP：这个文件每帧都被调用一次，顺手非阻塞收一下最自然；
+-- TCP 要维护连接、处理粘包和重连，在 Lua 沙盒里做这些很容易埋雷。丢一条
+-- 命令的代价是「再点一次」，完全可以接受。
+--
+-- 命令格式： device:command:value
+--   例如  32:505:0     （设备 32 = GEAR，命令 505 = 起落架手柄，值 0）
+-- 注意 device 是 devices.lua 里的编号，不是 elements 的 ID。两者数值接近
+-- 但含义完全不同，混了会点错东西。
+--
+-- 值语义（和 clickabledata.lua 里的 default_* 对应）：
+--   按钮  1 = 按下、0 = 松开（有些要成对发才有效）
+--   两档  0 / 1
+--   三档  0 / 0.5 / 1
+
+local CMD_PORT = 5020
+local cmd_sock = nil
+
+local function open_cmd_socket(socket)
+    local ok, s = pcall(socket.udp)
+    if not ok or not s then return nil end
+    -- 单元测试里 socket 是 mock，没有 receive。没有就别开通道 ——
+    -- 宁可反向控制不可用，也不能让主帧发送每帧抛异常。
+    if type(s.receive) ~= "function" then return nil end
+    local ok2 = pcall(function()
+        -- 只绑回环，绝不暴露到局域网 —— 这条通道能直接操作飞机
+        s:setsockname("127.0.0.1", CMD_PORT)
+        s:settimeout(0)
+    end)
+    if not ok2 then
+        pcall(function() s:close() end)
+        return nil
+    end
+    return s
+end
+
+local function apply_command(line)
+    local dev, cmd, val = line:match("^(%d+):(%d+):(%-?[%d%.]+)$")
+    if not dev then return false end
+    local dnum, cnum, vnum = tonumber(dev), tonumber(cmd), tonumber(val)
+
+    -- 先按元素所属设备点，不行再退回 0 号（有些机型只认主设备）
+    local ok1 = pcall(function()
+        local d = GetDevice(dnum)
+        if d and d.performClickableAction then
+            d:performClickableAction(cnum, vnum)
+        end
+    end)
+    if ok1 then return true end
+    return pcall(function()
+        local d = GetDevice(0)
+        if d and d.performClickableAction then
+            d:performClickableAction(cnum, vnum)
+        end
+    end)
+end
+
 -- ============================ 结构探针 ============================
 --
 -- 目的：把 DCS **实际能给**的每一样东西真实抓一次，而不是照着文档猜。
@@ -684,6 +744,14 @@ function LuaExportStart()
     udp = sock
     send_ok = true
 
+    -- 反向通道：绑定回环 UDP，等 PC 那边转发座舱操作过来
+    cmd_sock = open_cmd_socket(socket)
+    if cmd_sock then
+        log_info("反向通道已开启：UDP 127.0.0.1:" .. CMD_PORT)
+    else
+        log_error("反向通道开启失败（端口 " .. CMD_PORT .. " 占用？）")
+    end
+
     -- 探针：把后续要用的表结构打一次，供后续扩展字段时对照
     describe_table("LoGetEngineInfo",   LoGetEngineInfo,   16)
     describe_table("LoGetMechInfo",     LoGetMechInfo,     16)
@@ -711,6 +779,27 @@ function LuaExportAfterNextFrame()
     local ok, err = pcall(send_frame)
     if not ok then
         log_error("发送帧异常：" .. tostring(err))
+    end
+
+    -- 收座舱操作。每帧最多处理 4 条：点得再快也够用，又不至于让一批
+    -- 积压的命令在同一帧里砸下来（那会让飞机瞬移一样地切换状态）。
+    --
+    -- 整段 pcall 兜底：反向通道出任何问题都不能影响遥测，遥测才是主链路。
+    if cmd_sock then
+        local okr = pcall(function()
+            for _ = 1, 4 do
+                local line = cmd_sock:receive()
+                if not line then break end
+                local okc = pcall(apply_command, line)
+                if not okc then
+                    log_error("执行座舱命令失败：" .. tostring(line))
+                end
+            end
+        end)
+        if not okr then
+            cmd_sock = nil      -- 收不了就彻底停掉，别每帧刷错误日志
+            log_error("反向通道已关闭（接收异常）")
+        end
     end
 end
 
