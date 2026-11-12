@@ -44,6 +44,18 @@ data class YokeSettings(
     val swapViewAxes: Boolean = false,
     val invertViewX: Boolean = false,
     val invertViewY: Boolean = false,
+
+    // ---- 配平（直升机） ----
+    /**
+     * 关掉时摇杆页**完全不出现**配平按钮，配平量同时强制清零。
+     *
+     * 默认关：飞固定翼是主场景，杆中位本来就是平飞点，配平按钮纯属占地方，
+     * 还容易被误按成一个莫名其妙的杆量。只有在飞直升机时才需要在配置页打开。
+     *
+     * 注意「关掉」不只是藏按钮，还要把 trim 清零 —— 否则切回固定翼时那个
+     * 偏移还留着，一起飞就带着一个杆量，而屏幕上已经看不到任何提示了。
+     */
+    val trimOn: Boolean = false,
 )
 
 /**
@@ -214,6 +226,13 @@ class YokeController(
     }
 
     fun updateSettings(s: YokeSettings) {
+        // 关掉配平 = 藏按钮 + 清零。只藏不清是最坏的一种：切回固定翼时偏移
+        // 还在，而屏幕上已经没有任何东西显示它了。
+        if (!s.trimOn && (trimX != 0f || trimY != 0f)) {
+            trimX = 0f
+            trimY = 0f
+            notice = "配平已关闭并清零"
+        }
         settings = s
     }
 
@@ -245,6 +264,8 @@ class YokeController(
      * 直接取 lastOut（已含旧偏移），所以连按两次不会翻倍，效果是「再微调一点」。
      */
     fun captureTrim() {
+        // 配平关掉时按钮根本不存在，这里再守一道：某些机型的分支可能绕过 UI
+        if (!settings.trimOn) return
         trimX = lastOutX.coerceIn(-TRIM_MAX, TRIM_MAX)
         trimY = lastOutY.coerceIn(-TRIM_MAX, TRIM_MAX)
         notice = if (trimX == 0f && trimY == 0f) "配平已清零" else "已配平，松手保持"

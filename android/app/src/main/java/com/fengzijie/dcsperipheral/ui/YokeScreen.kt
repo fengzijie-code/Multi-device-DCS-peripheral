@@ -91,14 +91,18 @@ fun YokeScreen(
             Spacer(Modifier.height(5.dp))
 
             // 配平紧贴杆位盘：它是「把杆锁在这儿」的动作，离杆越近越直觉。
-            // 直升机专用 —— 固定翼上它保持中性（不按就一直是 0），不影响。
-            TrimButton(
-                trim = st.trimY,
-                enabled = st.armed,
-                onCapture = onTrimCapture,
-                onClear = onTrimClear,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // 只在配置页打开时才出现 —— 固定翼不需要它，藏掉能把这 37dp
+            // 还给杆位盘，也不会被误按成一个莫名其妙的杆量。
+            if (set.trimOn) {
+                Spacer(Modifier.height(5.dp))
+                TrimButton(
+                    trim = st.trimY,
+                    enabled = st.armed,
+                    onCapture = onTrimCapture,
+                    onClear = onTrimClear,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             Spacer(Modifier.height(5.dp))
 
             // 脚舵单列一行，带文字标签。之前只靠「拧手机」，屏幕上没有
@@ -325,6 +329,15 @@ fun CalibScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
+            // 配平开关单独占一行：这是「飞直升机还是固定翼」的机型级选择，
+            // 和左右/前后那些手感微调不是一回事，混在一行里容易被看漏。
+            // 关掉时飞行页上连按钮都不出现，同时把配平量清零。
+            Chip(
+                text = if (set.trimOn) "配平 开（直升机）" else "配平 关（固定翼）",
+                on = set.trimOn,
+                onClick = { onSettings(set.copy(trimOn = !set.trimOn)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
             // 四个方向开关分两行两列，比挤成一行四个窄条好点
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Chip(

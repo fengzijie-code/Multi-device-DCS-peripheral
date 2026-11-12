@@ -408,6 +408,8 @@ private fun loadYokeSettings(p: android.content.SharedPreferences): YokeSettings
         swapViewAxes = p.getBoolean("yk_view_swap", false),
         invertViewX = p.getBoolean("yk_view_invx", false),
         invertViewY = p.getBoolean("yk_view_invy", false),
+        // 默认关：飞固定翼是主场景，配平按钮在那里没用还占地方
+        trimOn = p.getBoolean("yk_trim_on", false),
     )
 }
 
@@ -427,6 +429,7 @@ private fun saveYokeSettings(p: android.content.SharedPreferences, s: YokeSettin
         .putBoolean("yk_view_swap", s.swapViewAxes)
         .putBoolean("yk_view_invx", s.invertViewX)
         .putBoolean("yk_view_invy", s.invertViewY)
+        .putBoolean("yk_trim_on", s.trimOn)
         .apply()
 }
 
