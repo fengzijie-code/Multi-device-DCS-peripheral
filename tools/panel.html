@@ -223,7 +223,9 @@ function paint(st) {
       ? "该机型只给油量比例，不给绝对容量 —— 读数是百分比"
       : "油量条以「本次见过的最大油量为满刻度」，刷新页面会重置";
 
-    setText("fuel", total.toFixed(0));
+    // 比例机型给 1 位小数：JF-17 每秒只掉万分之几，取整会看着像「永远 100%」，
+    // 用户会以为油量数据坏了。公斤机型不需要小数（上千的量）。
+    setText("fuel", total.toFixed(isRatio ? 1 : 0));
     setText("fuelin", num(fuelIn == null ? null : fuelIn * scale, 0));
     setText("fuelx", num(fuelEx == null ? null : fuelEx * scale, 0));
 
@@ -260,11 +262,24 @@ function paint(st) {
     else if (sys.radar)   { rad.textContent = "开"; rad.className = "v teal"; }
     else                  { rad.textContent = "关"; rad.className = "v dim"; }
 
-    // ---- 起落架：用 rod 做进度 ----
+    // ---- 起落架：优先用 rod 做进度 ----
     const gr = sys.gr;
     if (gr == null) {
-      setText("gear", sys.gear == null ? "--" : sys.gear);
-      $("gearbar").firstElementChild.style.width = "0%";
+      // 慢变量里没有 rod —— 起落架收到位之后 DCS 就不再给 rod 了。
+      // 退回主帧的 gear（0 = 收起，1 = 放下）。之前这里查的是 sys.gear，
+      // 那个字段压根不存在，所以永远显示 --。
+      const g = f && f.gear;
+      const bar = $("gearbar").firstElementChild;
+      if (g == null) {
+        setText("gear", "--"); $("gear").className = "v dim"; bar.style.width = "0%";
+      } else if (g >= 0.99) {
+        setText("gear", "放下"); $("gear").className = "v teal"; bar.style.width = "100%";
+      } else if (g <= 0.01) {
+        setText("gear", "收起"); $("gear").className = "v dim"; bar.style.width = "0%";
+      } else {
+        setText("gear", "运动中"); $("gear").className = "v amber";
+        bar.style.width = (g * 100).toFixed(0) + "%";
+      }
     } else if (gr >= 0.98) {
       setText("gear", "放下"); $("gearbar").firstElementChild.style.width = "100%";
       $("gear").className = "v teal";

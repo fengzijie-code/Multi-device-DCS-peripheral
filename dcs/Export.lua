@@ -238,6 +238,34 @@ local function short_clsid(s)
     return s
 end
 
+-- 雷达开关。
+--
+-- 这里绝对不能写成 `cond and sd.Flags.RadarActive or nil` —— 当它返回
+-- false（雷达关着）时，表达式会得到 nil，于是「雷达关着」被误报成
+-- 「这机型没这个字段」，面板显示 -- 而不是「关」。Lua 的 and/or 只能
+-- 安全传递 truthy 值，false 会被后面的 or 吞掉。
+local function radar_state(sd)
+    local fl = sd and sd.Flags
+    if type(fl) ~= "table" then return nil end
+    if type(fl.RadarActive) ~= "boolean" then return nil end
+    return fl.RadarActive
+end
+
+-- 当前挂点。索引口径不确定：可能 1 起也可能 0 起，没选中时可能是 0 或 nil。
+local function current_station(pay)
+    local cur = scalar(pay.CurrentStation)
+    if type(cur) ~= "number" then return nil end
+    if cur == 0 then return nil end          -- 0 通常是「没选」
+    local stations = pay.Stations
+    if type(stations) ~= "table" then return nil end
+    -- 两种索引都试一遍：1 起用 stations[cur]，0 起用 stations[cur+1]。
+    -- 宁可多试一次，也不要因为差一位就整块空白（这个字段是最重要的反馈）。
+    local st = stations[cur]
+    if type(st) ~= "table" then st = stations[cur + 1] end
+    if type(st) ~= "table" then return nil end
+    return cur, short_clsid(st.CLSID), tonumber(st.count)
+end
+
 local function collect_sys()
     local eng  = safe_call(LoGetEngineInfo) or {}
     local mech = safe_call(LoGetMechInfo)   or {}
@@ -245,17 +273,8 @@ local function collect_sys()
     local pay  = safe_call(LoGetPayloadInfo) or {}
 
     -- 当前选中的挂点：按下「武器切换」之后这里会变，是唯一能反映
-    -- 「现在挂了什么弹」的反馈。注意索引可能是 1 起也可能是裸数字，
-    -- 取到 nil 就整块置空，别让面板显示上一发的弹种。
-    local cur = scalar(pay.CurrentStation)
-    local cur_clsid, cur_count = nil, nil
-    if type(cur) == "number" and type(pay.Stations) == "table" then
-        local st = pay.Stations[cur]
-        if type(st) == "table" then
-            cur_clsid = short_clsid(st.CLSID)
-            cur_count = tonumber(st.count)
-        end
-    end
+    -- 「现在挂了什么弹」的反馈。
+    local cur, cur_clsid, cur_count = current_station(pay)
 
     return {
         fuel   = eng.fuel_internal,
@@ -278,7 +297,7 @@ local function collect_sys()
         -- 「有这个字段」和「值是 0」的区别，不同机型差别很大。
         ac     = type(sd.Name) == "string" and sd.Name or nil,
         -- 雷达开关。只在 SelfData.Flags 里有，实测 JF-17 可用。
-        radar  = (type(sd.Flags) == "table") and sd.Flags.RadarActive or nil,
+        radar  = radar_state(sd),
         -- 当前挂点 / 弹种 / 余量
         st     = cur_clsid and cur or nil,
         wn     = cur_clsid,
