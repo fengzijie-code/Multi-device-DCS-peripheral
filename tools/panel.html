@@ -84,13 +84,13 @@
 
     <section class="card">
       <h3>武器</h3>
-      <div class="row"><span class="k">当前挂点</span>
-        <span class="v dim" id="wst">--</span></div>
-      <div class="row"><span class="k">弹种</span>
+      <div class="row"><span class="k">当前</span>
         <span class="v mid amber" id="wpn">--</span></div>
       <div class="row"><span class="k">剩余</span>
         <span class="v"><span id="wcnt">--</span><small>枚</small></span></div>
-      <div class="note">按下「武器切换」后这里会变。DCS 不提供锁定距离和目标数量。</div>
+      <div class="row"><span class="k">机炮</span>
+        <span class="v"><span id="cn">--</span><small>发</small></span></div>
+      <div class="note" id="wlist">挂载清单加载中…</div>
     </section>
 
     <section class="card">
@@ -252,9 +252,12 @@ function paint(st) {
     $("wbrake").className = sys.wbrake > 0.05 ? "v red" : "v";
 
     // ---- 武器（战斗区）----
+    // 「当前」要按过武器切换键才有值；挂载清单是任务加载时就有的，
+    // 所以两者都要：一个告诉你现在用哪个，一个告诉你总共带了什么。
     setText("wpn", sys.wn || "--");
     setText("wcnt", num(sys.wc, 0));
-    setText("wst", sys.st == null ? "--" : "第 " + sys.st.toFixed(0) + " 站");
+    setText("cn", num(sys.cn, 0));
+    $("wlist").textContent = sys.wl ? "挂载：" + sys.wl : "没有挂载数据";
 
     // ---- 雷达 ----
     const rad = $("radar");

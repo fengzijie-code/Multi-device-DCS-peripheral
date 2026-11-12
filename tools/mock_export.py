@@ -141,6 +141,8 @@ class FlightModel:
                 "st": None,
                 "wn": None,
                 "wc": None,
+                "wl": None,
+                "cn": None,
                 "gr": None,
             }
         return {
@@ -166,6 +168,8 @@ class FlightModel:
             "st": 2,
             "wn": "SD-10",
             "wc": 2,
+            "wl": "PL-5EIIx1 SD-10x2 SPJx1",
+            "cn": 180,
             "gr": 1.0,
         }
 

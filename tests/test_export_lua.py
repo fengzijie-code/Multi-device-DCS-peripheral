@@ -37,7 +37,7 @@ EXPECTED_SYS_FIELDS = [
     # 2026-11-13 起为战斗区新增：机型名、雷达开关、当前挂点/弹种/余量、
     # 起落架收放进度。顺序必须稳定 —— 面板虽然按名字取值，但顺序固定
     # 能让报文肉眼可比对。
-    "ac", "radar", "st", "wn", "wc", "gr",
+    "ac", "radar", "st", "wn", "wc", "wl", "cn", "gr",
 ]
 
 EXPECTED_FIELDS = [

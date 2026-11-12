@@ -24,7 +24,7 @@ VIEWPORTS = [
     ("phone", 412, 915, 2),
 ]
 
-FIELDS = ["wst", "wpn", "wcnt", "radar", "endur2", "ff2",
+FIELDS = ["wpn", "wcnt", "cn", "wlist", "radar", "endur2", "ff2",
           "fuel", "fuelin", "fuelx", "ff", "endur", "fuelnote",
           "rpml", "templ", "hydl", "ias", "alt", "mach", "hdg", "g",
           "agl", "ias2", "vs", "gear", "flaps", "sbrk", "wbrake", "canopy",

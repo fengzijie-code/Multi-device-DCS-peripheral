@@ -266,6 +266,29 @@ local function current_station(pay)
     return cur, short_clsid(st.CLSID), tonumber(st.count)
 end
 
+-- 挂载清单：把 7 个挂点里所有有弹的拼成一行，如 "PL-5EIIx1 SD-10x2 SPJx1"。
+--
+-- 为什么不能只读 CurrentStation：它是「当前选中哪个站」，实测进任务后
+-- 一直是 0（没选），要按过武器切换键才会变。而 Stations 是任务加载时就
+-- 定死的挂载清单，一进座舱就有 —— 这才是「我这架飞机带了什么」的答案。
+local function payload_summary(pay)
+    local stations = pay and pay.Stations
+    if type(stations) ~= "table" then return nil end
+    local out = {}
+    for i = 1, #stations do
+        local st = stations[i]
+        if type(st) == "table" then
+            local cls = short_clsid(st.CLSID)
+            local n = tonumber(st.count) or 0
+            if cls and n > 0 then
+                out[#out + 1] = cls .. "x" .. n
+            end
+        end
+    end
+    if #out == 0 then return nil end
+    return table.concat(out, " ")
+end
+
 local function collect_sys()
     local eng  = safe_call(LoGetEngineInfo) or {}
     local mech = safe_call(LoGetMechInfo)   or {}
@@ -298,10 +321,13 @@ local function collect_sys()
         ac     = type(sd.Name) == "string" and sd.Name or nil,
         -- 雷达开关。只在 SelfData.Flags 里有，实测 JF-17 可用。
         radar  = radar_state(sd),
-        -- 当前挂点 / 弹种 / 余量
+        -- 当前挂点 / 弹种 / 余量（要按过武器切换键才有值）
         st     = cur_clsid and cur or nil,
         wn     = cur_clsid,
         wc     = cur_count,
+        -- 挂载清单（一进任务就有）与机炮余弹
+        wl     = payload_summary(pay),
+        cn     = tonumber(deepget(pay, "Cannon", "shells")),
         -- 起落架收放进度 0–1，做「正在收起」用
         gr     = deepget(mech, "gear", "nose", "rod"),
     }
@@ -333,6 +359,8 @@ local function encode_sys(d, t)
         '"st":'    .. numo(d.st, "%.0f"),
         '"wn":'    .. stro(d.wn),
         '"wc":'    .. numo(d.wc, "%.0f"),
+        '"wl":'    .. stro(d.wl),
+        '"cn":'    .. numo(d.cn, "%.0f"),
         '"gr":'    .. numo(d.gr, "%.3f"),
     }
     return '{"sys":{' .. table.concat(p, ",") .. '}}'
