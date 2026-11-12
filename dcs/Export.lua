@@ -289,6 +289,20 @@ local function payload_summary(pay)
     return table.concat(out, " ")
 end
 
+-- 反向通道回执。**必须在 collect_sys 之前定义** —— Lua 的 local 作用域
+-- 从声明处开始，collect_sys 在文件里出现得比 apply_command 早，如果这些
+-- 变量定义在后面的「反向通道」节里，collect_sys 读到的是全局 nil，
+-- 于是回执永远是 null（踩过这个坑，白排查了一轮）。
+--
+-- dbg 格式  "dev:cmd:标志"
+--   D  设备拿到、方法调用了
+--   N  GetDevice 返回空（设备号不对）
+--   M  设备有但没有 performClickableAction
+--   X  调用抛异常（连退回 0 号设备也失败）
+local last_ack = nil
+local ack_count = 0
+local last_dbg = nil
+
 local function collect_sys()
     local eng  = safe_call(LoGetEngineInfo) or {}
     local mech = safe_call(LoGetMechInfo)   or {}
@@ -556,19 +570,6 @@ local cmd_sock = nil
 local CMD_FILE = (os.getenv("USERPROFILE") or "C:/Users/lenovo")
                  .. "/Saved Games/DCS/Logs/dcs_cmd.txt"
 
--- 回执：最近一次命令的处理结果，随慢变量包回传。
---
--- 为什么需要它：performClickableAction 是「有则执行、无则静默」——命令号
--- 写错、设备不存在、方法不支持，全都是无声失败。没有回执只能靠肉眼看
--- 飞机有没有反应，排查极其被动（已经为此浪费了一轮重启）。
---
--- dbg 格式： "dev:cmd:D" / "dev:cmd:N" / "dev:cmd:M"
---   D = 设备拿到了，方法调用了
---   N = GetDevice 返回空（设备号不对）
---   M = 设备有，但没有 performClickableAction 方法
-local last_ack = nil
-local ack_count = 0
-local last_dbg = nil
 
 local function open_cmd_socket(socket)
     local ok, s = pcall(socket.udp)
