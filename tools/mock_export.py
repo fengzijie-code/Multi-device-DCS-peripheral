@@ -136,6 +136,12 @@ class FlightModel:
                 "cs_a": None,
                 "cs_e": None,
                 "cs_r": None,
+                "ac": "TF-51D",
+                "radar": None,
+                "st": None,
+                "wn": None,
+                "wc": None,
+                "gr": None,
             }
         return {
             "t": round(t, 2),
@@ -153,6 +159,14 @@ class FlightModel:
             "cs_a": round(0.004 * math.sin(t / 7), 5),
             "cs_e": round(0.020 + 0.030 * math.sin(t / 9), 5),
             "cs_r": round(-0.004 * math.sin(t / 11), 5),
+            # 战斗区字段（2026-11-13 新增）。模拟 JF-17 的形态：
+            # 机型名、雷达开、第 2 挂点上的 SD-10 ×2、起落架已放下。
+            "ac": "JF-17",
+            "radar": True,
+            "st": 2,
+            "wn": "SD-10",
+            "wc": 2,
+            "gr": 1.0,
         }
 
     def _core(self, t: float):

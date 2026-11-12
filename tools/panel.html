@@ -1,5 +1,5 @@
-<!DOCTYPE html>
-<html lang="zh">
+<!doctype html>
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -9,146 +9,177 @@
 <title>DCS 辅助面板</title>
 <style>
   :root{
-    --bg:#0d1117; --card:#161b22; --line:#242c37;
-    --fg:#e6edf3; --dim:#8b949e; --teal:#3fb950; --amber:#d29922; --red:#f85149;
+    --bg:#0d1117; --card:#161b22; --line:#2a3038;
+    --fg:#e6edf3; --dim:#8b949e;
+    --teal:#3fb950; --amber:#d29922; --red:#f85149;
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  *{box-sizing:border-box}
   html,body{margin:0;height:100%}
   body{
     background:var(--bg); color:var(--fg);
-    font:400 15px/1.3 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
-    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-    -webkit-user-select:none; user-select:none;
+    font:15px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-variant-numeric:tabular-nums;
+    padding:calc(10px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right))
+            calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));
   }
-  header{
-    display:flex; align-items:center; gap:8px;
-    padding:0 2px 8px; font-size:13px; color:var(--dim);
+  body.sys{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:normal}
+
+  header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  #dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:0 0 auto}
+  #status{font-size:13px;color:var(--dim)}
+  #aircraft{margin-left:auto;font-size:12px;color:var(--dim)}
+
+  #frozen{
+    display:none;background:rgba(248,81,73,.14);border:1px solid rgba(248,81,73,.45);
+    color:var(--red);border-radius:8px;padding:6px 10px;font-size:12px;margin-bottom:10px;
   }
-  #dot{width:9px;height:9px;border-radius:50%;background:var(--amber);flex:none}
-  #status{flex:1}
-  #clock{font-variant-numeric:tabular-nums}
-  main{
-    display:grid; gap:12px;
-    grid-template-columns:repeat(auto-fit,minmax(235px,1fr));
-    align-content:start;
+
+  /* 三个区并排。窄屏自动落成一列，手机上也能用。 */
+  #zones{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
+  @media (max-width:860px){ #zones{grid-template-columns:1fr} }
+
+  .zone{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .zone>h2{
+    margin:0 0 1px 2px;font-size:11px;font-weight:500;letter-spacing:.1em;
+    color:var(--dim);text-transform:uppercase;
   }
-  .card{
-    background:var(--card); border:1px solid var(--line); border-radius:12px;
-    padding:13px 15px 14px;
-  }
-  .card h2{
-    margin:0 0 10px; font-size:12px; font-weight:500; letter-spacing:.06em;
-    color:var(--dim); text-transform:uppercase;
-  }
-  .row{display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:4px 0}
-  .row .k{color:var(--dim); font-size:13.5px; white-space:nowrap}
-  .row .v{
-    font:500 21px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;
-    font-variant-numeric:tabular-nums; white-space:nowrap;
-  }
-  .row .v small{font-size:11px; font-weight:400; color:var(--dim); margin-left:2px}
-  /* 必须写成 .row .v.big：光写 .big 会被上面的 .row .v 按优先级压掉，
-     字号根本不生效（而且不报错，只能靠肉眼或计算样式发现）。 */
-  .row .v.big{font-size:31px}
+  .zone.z1>h2{color:var(--red)}
+  .zone.z2>h2{color:var(--teal)}
+  .zone.z3>h2{color:var(--amber)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px 10px}
+  .card h3{margin:0 0 6px;font-size:11px;font-weight:500;letter-spacing:.06em;color:var(--dim)}
+
+  .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:3px 0}
+  .row .k{color:var(--dim);font-size:12.5px;white-space:nowrap}
+  .row .v{font-size:17px;font-weight:500;white-space:nowrap}
+  .row .v small{font-size:10.5px;font-weight:400;color:var(--dim);margin-left:2px}
+  .big{font-size:27px}
+  .mid{font-size:21px}
   .teal{color:var(--teal)} .amber{color:var(--amber)} .red{color:var(--red)} .dim{color:var(--dim)}
 
-  .bar{height:6px; border-radius:3px; background:#0b0f14; overflow:hidden; margin-top:6px}
-  .bar i{display:block; height:100%; width:0; background:var(--teal); transition:width .4s ease}
-  .bar.low i{background:var(--amber)}
-  .bar.crit i{background:var(--red)}
+  .bar{height:5px;border-radius:3px;background:#21262d;overflow:hidden;margin:2px 0 6px}
+  .bar i{display:block;height:100%;width:0;background:var(--teal);transition:width .3s}
+  .bar.low i{background:var(--amber)} .bar.crit i{background:var(--red)}
 
-  .note{font-size:11px; color:var(--dim); margin-top:6px; line-height:1.35}
-  .stale{opacity:.3; filter:grayscale(.7)}
-  #frozen{display:none; margin:6px 0 10px; padding:8px 10px; border-radius:10px;
-          background:#3a1d1d; border:1px solid #6b2b2b; color:var(--red); font-size:13px}
+  .note{font-size:10.5px;color:var(--dim);line-height:1.35;margin-top:5px}
+
+  body.frozen .card{opacity:.45}
 </style>
 </head>
-<body>
+<body class="sys">
 
 <header>
   <span id="dot"></span>
   <span id="status">连接中…</span>
-  <span id="clock"></span>
+  <span id="aircraft"></span>
 </header>
-<div id="frozen">数据已冻结 —— 上游（DCS / Export.lua）没有在发</div>
+<div id="frozen">数据已冻结 —— DCS 那边没有在发（不在任务里？）</div>
 
-<main id="grid">
+<main id="zones">
 
-  <section class="card">
-    <h2>燃油</h2>
-    <div class="row"><span class="k">总油量</span>
-      <span class="v big teal" id="fuelwrap"><span id="fuel">--</span><small id="fuelunit">kg</small></span></div>
-    <div class="bar" id="fuelbar"><i></i></div>
-    <div class="row"><span class="k">内 / 外</span>
-      <span class="v dim"><span id="fuelin">--</span> / <span id="fuelx">--</span></span></div>
-    <div class="row"><span class="k">消耗率</span>
-      <span class="v"><span id="ff">--</span><small id="ffunit">kg/h</small></span></div>
-    <div class="row"><span class="k">续航</span>
-      <span class="v teal" id="endur">--</span></div>
-    <div class="note" id="fuelnote">油量条以「本次见过的最大油量为满刻度」（导出接口不提供油箱容量），刷新页面会重置</div>
-  </section>
+  <!-- ============ 战斗 ============ -->
+  <div class="zone z1">
+    <h2>战斗</h2>
 
-  <section class="card">
-    <h2>发动机</h2>
-    <div class="row"><span class="k">转速 左 / 右</span>
-      <span class="v"><span id="rpml">--</span><small>%</small> <span id="rpmr" class="dim">--</span></span></div>
-    <div class="row"><span class="k">温度 左 / 右</span>
-      <span class="v"><span id="templ">--</span><small>°C</small> <span id="tempr" class="dim">--</span></span></div>
-    <div class="row"><span class="k">液压 左 / 右</span>
-      <span class="v"><span id="hydl">--</span> <span id="hydr" class="dim">--</span></span></div>
-  </section>
+    <section class="card">
+      <h3>武器</h3>
+      <div class="row"><span class="k">当前挂点</span>
+        <span class="v dim" id="wst">--</span></div>
+      <div class="row"><span class="k">弹种</span>
+        <span class="v mid amber" id="wpn">--</span></div>
+      <div class="row"><span class="k">剩余</span>
+        <span class="v"><span id="wcnt">--</span><small>枚</small></span></div>
+      <div class="note">按下「武器切换」后这里会变。DCS 不提供锁定距离和目标数量。</div>
+    </section>
 
-  <section class="card">
-    <h2>构型</h2>
-    <div class="row"><span class="k">起落架</span><span class="v" id="gear">--</span></div>
-    <div class="row"><span class="k">襟翼</span><span class="v"><span id="flaps">--</span><small>%</small></span></div>
-    <div class="row"><span class="k">减速板</span><span class="v"><span id="sbrk">--</span><small>%</small></span></div>
-    <div class="row"><span class="k">座舱盖</span><span class="v" id="canopy">--</span></div>
-    <div class="row"><span class="k">轮刹</span><span class="v" id="wbrake">--</span></div>
-  </section>
+    <section class="card">
+      <h3>传感器</h3>
+      <div class="row"><span class="k">雷达</span><span class="v" id="radar">--</span></div>
+      <div class="note">只有开 / 关，没有模式和扫描范围 —— <code>LoGetRadarInfo</code> 这个接口在 DCS 里不存在。</div>
+    </section>
 
-  <section class="card">
-    <h2>配平 / 舵面</h2>
-    <div class="row"><span class="k">升降配平</span>
-      <span class="v"><span id="trim_e">--</span><small>°</small></span></div>
-    <div class="row"><span class="k">滚装配平</span>
-      <span class="v"><span id="trim_a">--</span><small>°</small></span></div>
-    <div class="row"><span class="k">偏航配平</span>
-      <span class="v"><span id="trim_r">--</span><small>°</small></span></div>
-    <div class="row"><span class="k">舵面 升/副/方</span>
-      <span class="v dim" style="font-size:15px"><span id="cs">--</span></span></div>
-    <div class="note" id="trimnote">配平值由「杆回中瞬间的舵面偏度」估读</div>
-  </section>
+    <section class="card">
+      <h3>还能打多久</h3>
+      <div class="row"><span class="k">续航</span><span class="v mid teal" id="endur2">--</span></div>
+      <div class="row"><span class="k">消耗率</span>
+        <span class="v"><span id="ff2">--</span><small id="ffunit2">kg/h</small></span></div>
+    </section>
+  </div>
 
-  <section class="card">
-    <h2>飞行</h2>
-    <div class="row"><span class="k">空速</span><span class="v"><span id="ias">--</span><small>kt</small></span></div>
-    <div class="row"><span class="k">高度</span><span class="v"><span id="alt">--</span><small>ft</small></span></div>
-    <div class="row"><span class="k">升降率</span><span class="v"><span id="vs">--</span><small>fpm</small></span></div>
-    <div class="row"><span class="k">航向</span><span class="v"><span id="hdg">--</span><small>°</small></span></div>
-    <div class="row"><span class="k">过载</span><span class="v"><span id="g">--</span><small>g</small></span></div>
-  </section>
+  <!-- ============ 巡航 ============ -->
+  <div class="zone z2">
+    <h2>巡航</h2>
+
+    <section class="card">
+      <h3>燃油</h3>
+      <div class="row"><span class="k">总油量</span>
+        <span class="v mid teal" id="fuelwrap"><span id="fuel">--</span><small id="fuelunit">kg</small></span></div>
+      <div class="bar" id="fuelbar"><i></i></div>
+      <div class="row"><span class="k">内 / 外</span>
+        <span class="v dim" style="font-size:14px"><span id="fuelin">--</span> / <span id="fuelx">--</span></span></div>
+      <div class="row"><span class="k">消耗率</span>
+        <span class="v"><span id="ff">--</span><small id="ffunit">kg/h</small></span></div>
+      <div class="row"><span class="k">续航</span><span class="v teal" id="endur">--</span></div>
+      <div class="note" id="fuelnote">油量条以「本次见过的最大油量为满刻度」</div>
+    </section>
+
+    <section class="card">
+      <h3>发动机</h3>
+      <div class="row"><span class="k">转速</span>
+        <span class="v"><span id="rpml">--</span><small>%</small></span></div>
+      <div class="row"><span class="k">温度</span>
+        <span class="v"><span id="templ">--</span><small>°C</small></span></div>
+      <div class="row"><span class="k">液压</span><span class="v" id="hydl">--</span></div>
+    </section>
+
+    <section class="card">
+      <h3>飞行</h3>
+      <div class="row"><span class="k">空速</span><span class="v"><span id="ias">--</span><small>kt</small></span></div>
+      <div class="row"><span class="k">海拔</span><span class="v"><span id="alt">--</span><small>ft</small></span></div>
+      <div class="row"><span class="k">马赫</span><span class="v"><span id="mach">--</span></span></div>
+      <div class="row"><span class="k">航向</span><span class="v"><span id="hdg">--</span><small>°</small></span></div>
+      <div class="row"><span class="k">过载</span><span class="v"><span id="g">--</span><small>g</small></span></div>
+    </section>
+  </div>
+
+  <!-- ============ 降落 ============ -->
+  <div class="zone z3">
+    <h2>降落</h2>
+
+    <section class="card">
+      <h3>进近</h3>
+      <div class="row"><span class="k">离地高度</span>
+        <span class="v big amber"><span id="agl">--</span><small>ft</small></span></div>
+      <div class="row"><span class="k">升降率</span><span class="v"><span id="vs">--</span><small>fpm</small></span></div>
+      <div class="row"><span class="k">空速</span><span class="v"><span id="ias2">--</span><small>kt</small></span></div>
+      <div class="note">进近看的是离地高度，不是海拔 —— 高原机场两者差很多。</div>
+    </section>
+
+    <section class="card">
+      <h3>构型</h3>
+      <div class="row"><span class="k">起落架</span><span class="v" id="gear">--</span></div>
+      <div class="bar" id="gearbar"><i></i></div>
+      <div class="row"><span class="k">襟翼</span><span class="v"><span id="flaps">--</span><small>%</small></span></div>
+      <div class="row"><span class="k">减速板</span><span class="v"><span id="sbrk">--</span><small>%</small></span></div>
+      <div class="row"><span class="k">轮刹</span><span class="v" id="wbrake">--</span></div>
+      <div class="row"><span class="k">座舱盖</span><span class="v" id="canopy">--</span></div>
+    </section>
+  </div>
 
 </main>
 
 <script>
-"use strict";
-// 允许直接从磁盘打开（file://）调试，这时指向本机桥接
-const API = location.protocol.startsWith("http") ? "" : "http://127.0.0.1:8080";
-
-const $ = (id) => document.getElementById(id);
-const setText = (id, v) => { const e = $(id); if (e) e.textContent = v; };
-
-// 本页见过的最大油量。导出接口不提供油箱容量，只能用「本次最大」当满刻度，
-// 至少能一眼看出还剩多少比例。刷新页面会重置 —— 这是已知误差，卡片里写明了。
-let fuelMax = 0;
-let fuelMode = "";           // "pct" | "kg"，模式变了要把满刻度重置
-
-// 配平估读：DCS 的导出接口没有配平位置，只能靠「杆回中读舵面偏度」反推。
-// 杆一回中就采样，离开中位就保持上次的值 —— 否则一压杆数字就跳，没法看。
-const TRIM_GATE = 0.15;      // 杆量在这以内算回中
+const $ = id => document.getElementById(id);
 const R2D = 180 / Math.PI;
-const trim = { e: null, a: null, r: null };
+let fuelMax = 0, fuelMode = "";
+
+function setText(id, v) { const e = $(id); if (e) e.textContent = v; }
+
+// null / NaN 一律显示 "--"：这是「这个机型不提供」，和值本身是 0 不是一回事
+function num(v, d) {
+  return (v == null || !isFinite(v)) ? "--" : v.toFixed(d);
+}
 
 function fmtHMS(sec) {
   if (sec == null || !isFinite(sec)) return "--";
@@ -156,81 +187,29 @@ function fmtHMS(sec) {
   return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
 }
 
-// null / 非数一律显示 "--"：这是「这个机型不提供」，和值本身是 0 不是一回事
-function num(v, d) {
-  return (v == null || !isFinite(v)) ? "--" : v.toFixed(d);
-}
-
-function updateTrim(sys, inp) {
-  // 该机型根本不提供舵面偏度时，整套估读都没意义，直接说清楚
-  const hasSurf = sys.cs_e != null || sys.cs_a != null || sys.cs_r != null;
-  if (!hasSurf) {
-    ["trim_e", "trim_a", "trim_r"].forEach(id => setText(id, "--"));
-    setText("cs", "--");
-    $("trimnote").textContent =
-      "这个机型不提供舵面偏度数据 —— 配平读不出来（DCS 导出接口本身就不给配平位置）";
-    return;
-  }
-
-  const centered = !!(inp && inp.live &&
-                      Math.abs(inp.x) < TRIM_GATE && Math.abs(inp.y) < TRIM_GATE);
-  if (centered) {
-    trim.e = sys.cs_e == null ? null : sys.cs_e * R2D;
-    trim.a = sys.cs_a == null ? null : sys.cs_a * R2D;
-    trim.r = sys.cs_r == null ? null : sys.cs_r * R2D;
-  }
-  setText("trim_e", num(trim.e, 1));
-  setText("trim_a", num(trim.a, 1));
-  setText("trim_r", num(trim.r, 1));
-
-  // 舵面实时偏度（配平 + 杆量的合成），永远给，读数不受杆位影响
-  setText("cs", [num(sys.cs_e == null ? null : sys.cs_e * R2D, 1),
-                 num(sys.cs_a == null ? null : sys.cs_a * R2D, 1),
-                 num(sys.cs_r == null ? null : sys.cs_r * R2D, 1)].join(" / "));
-
-  const note = $("trimnote");
-  if (!inp || !inp.live) {
-    note.textContent = "摇杆没连上 —— 判断不了杆是否回中，配平读数暂停更新";
-  } else if (centered) {
-    note.textContent = "采样中（杆已回中）· 下方是舵面实时偏度";
-  } else if (trim.e == null) {
-    note.textContent = "等杆回中……配平只在杆回到中位的那一刻取样";
-  } else {
-    note.textContent = "保持：上次杆回中时的读数 · 下方是舵面实时偏度";
-  }
-  ["trim_e", "trim_a", "trim_r"].forEach(id => {
-    $(id).parentElement.parentElement.classList.toggle("dim", !centered);
-  });
-}
-
 function paint(st) {
-  const live = st.has_data;
-  const sys = st.sys;
-  const f = st.frame;
-  const inp = st.input;
+  const f = st.frame, sys = st.sys, inp = st.input || {};
+  const live = !!st.has_data;
 
-  // 主帧冻结时整页压暗（和 PFD 一样的规矩：旧数字不能冒充实时数据）
-  document.querySelectorAll(".card").forEach(c => c.classList.toggle("stale", !live));
   $("frozen").style.display = live ? "none" : "block";
+  document.body.classList.toggle("frozen", !live);
 
-  const dot = $("dot");
-  dot.style.background = live ? "var(--teal)" : "var(--red)";
+  $("dot").style.background = live ? "var(--teal)" : "var(--red)";
   if (live && sys) {
     setText("status", `在线 · 遥测 ${st.stats.hz} Hz · 慢变量 ${Math.round(st.sys_age_ms)} ms 前`);
   } else if (live) {
-    setText("status", `遥测在线（${st.stats.hz} Hz），但没有慢变量 —— Export.lua 是不是旧版本？`);
+    setText("status", `遥测在线（${st.stats.hz} Hz），但没有慢变量 —— Export.lua 是旧版？`);
   } else {
     setText("status", "没有数据");
   }
 
   if (sys) {
-    // ---- 燃油：单位自适应 ------------------------------------------------
-    // 各机型 fuel_internal 的单位不统一：给公斤的（战斗机，上千）和给 0–1
-    // 比例的（TF-51D 这类）都有。不知道油箱容量，比例就只能当百分比报；
-    // 硬乘一个猜的容量换算成 kg，那就是假数据。
+    setText("aircraft", sys.ac || "");
+
+    // ---- 燃油：单位自适应 ----
     const fuelIn = sys.fuel, fuelEx = sys.fuelx;
     const isRatio = fuelIn != null && fuelIn <= 1.5 && (fuelEx ?? 0) <= 1.5;
-    const scale = isRatio ? 100 : 1;          // 比例 → 百分数
+    const scale = isRatio ? 100 : 1;
     const total = ((fuelIn ?? 0) + (fuelEx ?? 0)) * scale;
 
     const mode = isRatio ? "pct" : "kg";
@@ -239,73 +218,95 @@ function paint(st) {
 
     setText("fuelunit", isRatio ? "%" : "kg");
     setText("ffunit", isRatio ? "%/h" : "kg/h");
+    setText("ffunit2", isRatio ? "%/h" : "kg/h");
     $("fuelnote").textContent = isRatio
-      ? "该机型只给油量比例、不给绝对容量 —— 读数是百分比，不是升也不是公斤"
-      : "油量条以「本次见过的最大油量为满刻度」（导出接口不提供油箱容量），刷新页面会重置";
+      ? "该机型只给油量比例，不给绝对容量 —— 读数是百分比"
+      : "油量条以「本次见过的最大油量为满刻度」，刷新页面会重置";
+
     setText("fuel", total.toFixed(0));
     setText("fuelin", num(fuelIn == null ? null : fuelIn * scale, 0));
     setText("fuelx", num(fuelEx == null ? null : fuelEx * scale, 0));
 
-    const bar = $("fuelbar");
     const pct = fuelMax > 0 ? Math.max(0, Math.min(1, total / fuelMax)) : 0;
+    const bar = $("fuelbar");
     bar.firstElementChild.style.width = (pct * 100).toFixed(0) + "%";
     bar.classList.toggle("low", pct < 0.25 && pct >= 0.1);
     bar.classList.toggle("crit", pct < 0.1);
-    $("fuelwrap").className = "v big " + (pct < 0.1 ? "red" : pct < 0.25 ? "amber" : "teal");
+    $("fuelwrap").className = "v mid " + (pct < 0.1 ? "red" : pct < 0.25 ? "amber" : "teal");
 
-    // ff 是油量斜率，消耗时是负的；面板上按「消耗多少」报，报正数。
-    // 续航直接用桥接算的：它的分子分母同单位，比例和公斤都自洽。
-    setText("ff", sys.ff == null ? "--" : Math.abs(sys.ff * scale).toFixed(isRatio ? 1 : 0));
+    const ffVal = sys.ff == null ? null : Math.abs(sys.ff * scale);
+    setText("ff", num(ffVal, isRatio ? 1 : 0));
+    setText("ff2", num(ffVal, isRatio ? 1 : 0));
     setText("endur", fmtHMS(sys.endurance_s));
+    setText("endur2", fmtHMS(sys.endurance_s));
 
+    // ---- 发动机 + 飞行 ----
     setText("rpml", num(sys.rpm_l, 0));
-    setText("rpmr", num(sys.rpm_r, 0));
     setText("templ", num(sys.temp_l, 0));
-    setText("tempr", num(sys.temp_r, 0));
     setText("hydl", num(sys.hyd_l, 0));
-    setText("hydr", num(sys.hyd_r, 0));
-
-    const cp = sys.canopy;
-    // DCS 的 canopy 0 = 关闭，1 = 打开（越小越「关」，和直觉相反）。
-    // 这条是拿 Su-25T 实测对的：飞行中读到 0.0，座舱盖当然是关着的。
-    setText("canopy", cp == null ? "--" : cp <= 0.1 ? "关闭" : cp >= 0.9 ? "打开" :
-                     `${(cp * 100).toFixed(0)}% 开`);
+    setText("canopy", sys.canopy == null ? "--"
+             : sys.canopy <= 0.1 ? "关闭" : sys.canopy >= 0.9 ? "打开" : "半开");
     setText("wbrake", sys.wbrake == null ? "--" : sys.wbrake > 0.05 ? "刹车" : "松开");
     $("wbrake").className = sys.wbrake > 0.05 ? "v red" : "v";
 
-    updateTrim(sys, inp);
+    // ---- 武器（战斗区）----
+    setText("wpn", sys.wn || "--");
+    setText("wcnt", num(sys.wc, 0));
+    setText("wst", sys.st == null ? "--" : "第 " + sys.st.toFixed(0) + " 站");
+
+    // ---- 雷达 ----
+    const rad = $("radar");
+    if (sys.radar == null) { rad.textContent = "--"; rad.className = "v dim"; }
+    else if (sys.radar)   { rad.textContent = "开"; rad.className = "v teal"; }
+    else                  { rad.textContent = "关"; rad.className = "v dim"; }
+
+    // ---- 起落架：用 rod 做进度 ----
+    const gr = sys.gr;
+    if (gr == null) {
+      setText("gear", sys.gear == null ? "--" : sys.gear);
+      $("gearbar").firstElementChild.style.width = "0%";
+    } else if (gr >= 0.98) {
+      setText("gear", "放下"); $("gearbar").firstElementChild.style.width = "100%";
+      $("gear").className = "v teal";
+    } else if (gr <= 0.02) {
+      setText("gear", "收起"); $("gearbar").firstElementChild.style.width = "0%";
+      $("gear").className = "v dim";
+    } else {
+      setText("gear", `运动中 ${(gr * 100).toFixed(0)}%`);
+      $("gearbar").firstElementChild.style.width = (gr * 100).toFixed(0) + "%";
+      $("gear").className = "v amber";
+    }
   }
 
   if (f) {
-    setText("gear", f.gear >= 0.99 ? "放下" : f.gear <= 0.01 ? "收起" : "运动中");
-    $("gear").className = f.gear >= 0.99 ? "v teal" : f.gear <= 0.01 ? "v dim" : "v amber";
-    setText("flaps", ((f.flaps ?? 0) * 100).toFixed(0));
-    setText("sbrk", ((f.sbrk ?? 0) * 100).toFixed(0));
-
-    setText("ias", (f.ias * 1.94384).toFixed(0));
-    setText("alt", (f.alt * 3.28084).toFixed(0));
-    setText("vs", (f.vs * 196.85).toFixed(0));
-    setText("hdg", Math.round((((f.hdg * R2D) % 360) + 360) % 360) % 360 + "");
-    setText("g", (f.g ?? 0).toFixed(1));
+    const kn = v => v == null ? "--" : (v * 1.94384).toFixed(0);
+    const ft = v => v == null ? "--" : (v * 3.28084).toFixed(0);
+    setText("ias", kn(f.ias));
+    setText("ias2", kn(f.ias));
+    setText("alt", ft(f.alt));
+    setText("agl", ft(f.agl));
+    setText("vs", f.vs == null ? "--" : (f.vs * 196.85).toFixed(0));
+    setText("hdg", f.hdg == null ? "--" : ((f.hdg * R2D + 360) % 360).toFixed(0));
+    setText("g", num(f.g, 1));
+    setText("mach", num(f.mach, 2));
+    setText("flaps", num(f.flaps == null ? null : f.flaps * 100, 0));
+    setText("sbrk", num(f.sbrk == null ? null : f.sbrk * 100, 0));
   }
-
-  $("clock").textContent = new Date().toLocaleTimeString("zh-CN", { hour12: false });
 }
 
 async function tick() {
   try {
-    const r = await fetch(API + "/state", { cache: "no-store" });
+    const r = await fetch("/state", { cache: "no-store" });
     paint(await r.json());
   } catch (e) {
-    setText("status", "连不上桥接：" + e.message);
     $("dot").style.background = "var(--red)";
-    document.querySelectorAll(".card").forEach(c => c.classList.add("stale"));
+    setText("status", "连不上桥接：" + e.message);
+    document.body.classList.add("frozen");
   }
 }
 
 tick();
-setInterval(tick, 1000);   // 慢变量本身就是 1Hz，轮询比它快没意义
-document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
+setInterval(tick, 1000);
 </script>
 </body>
 </html>

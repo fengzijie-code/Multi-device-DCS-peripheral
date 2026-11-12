@@ -24,10 +24,11 @@ VIEWPORTS = [
     ("phone", 412, 915, 2),
 ]
 
-FIELDS = ["fuel", "fuelin", "fuelx", "ff", "endur", "rpml", "rpmr",
-          "templ", "tempr", "hydl", "hydr", "gear", "flaps", "sbrk",
-          "canopy", "wbrake", "trim_e", "trim_a", "trim_r", "cs",
-          "ias", "alt", "vs", "hdg", "g", "status"]
+FIELDS = ["wst", "wpn", "wcnt", "radar", "endur2", "ff2",
+          "fuel", "fuelin", "fuelx", "ff", "endur", "fuelnote",
+          "rpml", "templ", "hydl", "ias", "alt", "mach", "hdg", "g",
+          "agl", "ias2", "vs", "gear", "flaps", "sbrk", "wbrake", "canopy",
+          "status", "aircraft"]
 
 with sync_playwright() as p:
     # 本机 playwright 的 chromium 版本和已下载的对不上（1248 vs 1243），

@@ -114,6 +114,23 @@ local function numo(v, fmt)
     return string.format(fmt, v)
 end
 
+-- 布尔字段（比如雷达开关）：nil 也要如实发 null，
+-- 否则面板会把「这机型没有这个字段」显示成「雷达是关的」。
+local function boolo(v)
+    if v == nil then return "null" end
+    if type(v) ~= "boolean" then return "null" end
+    return v and "true" or "false"
+end
+
+-- 字符串字段（机型名、弹种）。只保留字母数字和少量符号，
+-- 免得 CLSID 里的引号把整包 JSON 打断。
+local function stro(v)
+    if type(v) ~= "string" or v == "" then return "null" end
+    local s = v:gsub('[^%w%-%._/ ]', '')
+    if s == "" then return "null" end
+    return '"' .. s .. '"'
+end
+
 -- ============================ 取数 ============================
 
 -- LoGet* 返回的是嵌套表，各机型结构可能不同，取值一律带存在性检查。
@@ -195,16 +212,58 @@ end
 -- 为什么不塞进主帧：主帧是 60Hz 的实时仪表数据，字段越少解析越快；
 -- 这些量一秒变不了几次，混进去只是让每帧白白变大一倍。
 -- 包格式是 {"sys":{...}}，桥接端靠这个 key 认出来，不会当成一帧遥测。
+-- 温度有两种口径，实测都存在：
+--   摄氏度（Su-25T 664.07）  0–1 比例（JF-17 0.72334）
+-- 比例口径无法换算成温度 —— 不知道额定值，猜一个就是编数据。
+-- 所以小于 5 的一律发 null，面板显示「--」，比显示「1 °C」诚实。
+local function temp_or_nil(v)
+    if type(v) ~= "number" then return nil end
+    if v < 5 then return nil end
+    return v
+end
+
+-- 有些字段是 {value=0.5} 这种包了一层的表，有些是裸标量，两种都认
+local function scalar(v)
+    if type(v) == "table" then return v.value end
+    return v
+end
+
+-- 弹种标识瘦身：DIS_SD-10_DUAL_L → SD-10
+local function short_clsid(s)
+    if type(s) ~= "string" or s == "" then return nil end
+    s = s:gsub("^DIS_", "")
+    s = s:gsub("_DUAL_[LR]$", "")
+    s = s:gsub("_DUAL$", "")
+    s = s:gsub("_POD$", "")
+    return s
+end
+
 local function collect_sys()
     local eng  = safe_call(LoGetEngineInfo) or {}
     local mech = safe_call(LoGetMechInfo)   or {}
+    local sd   = safe_call(LoGetSelfData)   or {}
+    local pay  = safe_call(LoGetPayloadInfo) or {}
+
+    -- 当前选中的挂点：按下「武器切换」之后这里会变，是唯一能反映
+    -- 「现在挂了什么弹」的反馈。注意索引可能是 1 起也可能是裸数字，
+    -- 取到 nil 就整块置空，别让面板显示上一发的弹种。
+    local cur = scalar(pay.CurrentStation)
+    local cur_clsid, cur_count = nil, nil
+    if type(cur) == "number" and type(pay.Stations) == "table" then
+        local st = pay.Stations[cur]
+        if type(st) == "table" then
+            cur_clsid = short_clsid(st.CLSID)
+            cur_count = tonumber(st.count)
+        end
+    end
+
     return {
         fuel   = eng.fuel_internal,
         fuelx  = eng.fuel_external,
         rpm_l  = deepget(eng, "RPM", "left"),
         rpm_r  = deepget(eng, "RPM", "right"),
-        temp_l = deepget(eng, "Temperature", "left"),
-        temp_r = deepget(eng, "Temperature", "right"),
+        temp_l = temp_or_nil(deepget(eng, "Temperature", "left")),
+        temp_r = temp_or_nil(deepget(eng, "Temperature", "right")),
         hyd_l  = deepget(eng, "HydraulicPressure", "left"),
         hyd_r  = deepget(eng, "HydraulicPressure", "right"),
         canopy = val(mech, "canopy"),
@@ -214,6 +273,18 @@ local function collect_sys()
         cs_a   = deepget(mech, "controlsurfaces", "eleron"),
         cs_e   = deepget(mech, "controlsurfaces", "elevator"),
         cs_r   = deepget(mech, "controlsurfaces", "rudder"),
+
+        -- 机型名（如 "JF-17"）。面板靠它做机型自适应 —— 同样是
+        -- 「有这个字段」和「值是 0」的区别，不同机型差别很大。
+        ac     = type(sd.Name) == "string" and sd.Name or nil,
+        -- 雷达开关。只在 SelfData.Flags 里有，实测 JF-17 可用。
+        radar  = (type(sd.Flags) == "table") and sd.Flags.RadarActive or nil,
+        -- 当前挂点 / 弹种 / 余量
+        st     = cur_clsid and cur or nil,
+        wn     = cur_clsid,
+        wc     = cur_count,
+        -- 起落架收放进度 0–1，做「正在收起」用
+        gr     = deepget(mech, "gear", "nose", "rod"),
     }
 end
 
@@ -237,6 +308,13 @@ local function encode_sys(d, t)
         '"cs_a":'  .. numo(d.cs_a,   "%.4f"),
         '"cs_e":'  .. numo(d.cs_e,   "%.4f"),
         '"cs_r":'  .. numo(d.cs_r,   "%.4f"),
+        -- 机型与战斗区状态（2026-11-13 新增，实测 JF-17 可用）
+        '"ac":'    .. stro(d.ac),
+        '"radar":' .. boolo(d.radar),
+        '"st":'    .. numo(d.st, "%.0f"),
+        '"wn":'    .. stro(d.wn),
+        '"wc":'    .. numo(d.wc, "%.0f"),
+        '"gr":'    .. numo(d.gr, "%.3f"),
     }
     return '{"sys":{' .. table.concat(p, ",") .. '}}'
 end

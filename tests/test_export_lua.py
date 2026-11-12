@@ -34,6 +34,10 @@ EXPORT_LUA = ROOT / "dcs" / "Export.lua"
 EXPECTED_SYS_FIELDS = [
     "t", "fuel", "fuelx", "rpm_l", "rpm_r", "temp_l", "temp_r",
     "hyd_l", "hyd_r", "canopy", "wbrake", "cs_a", "cs_e", "cs_r",
+    # 2026-11-13 起为战斗区新增：机型名、雷达开关、当前挂点/弹种/余量、
+    # 起落架收放进度。顺序必须稳定 —— 面板虽然按名字取值，但顺序固定
+    # 能让报文肉眼可比对。
+    "ac", "radar", "st", "wn", "wc", "gr",
 ]
 
 EXPECTED_FIELDS = [
@@ -360,6 +364,29 @@ def main() -> int:
     else:
         r.check("发出了慢变量包", False, "0 包")
     g.set_state("no_hyd", False)
+
+    # --- T-EXPORT-010 温度口径 ---
+    print()
+    print("T-EXPORT-010 温度是比例口径时发 null，不显示成「1 °C」")
+    g.set_state("temp", 0.72)
+    reset(lua)
+    g.set_state("t", t + 9.0)
+    g.LuaExportAfterNextFrame()
+    sp = sys_packets(lua)
+    if sp:
+        sb = json.loads(sp[-1]["payload"])["sys"]
+        # JF-17 实测 Temperature.left = 0.72334，是比例不是摄氏度。
+        # 之前会原样发出去，面板显示「1 °C」—— 假数据比没数据更糟。
+        r.check("比例口径的温度是 null", sb["temp_l"] is None, str(sb["temp_l"]))
+    g.set_state("temp", 640.0)
+    reset(lua)
+    g.set_state("t", t + 12.0)
+    g.LuaExportAfterNextFrame()
+    sp = sys_packets(lua)
+    if sp:
+        sb = json.loads(sp[-1]["payload"])["sys"]
+        r.check("摄氏度口径照常给数", sb["temp_l"] is not None and sb["temp_l"] > 100,
+                str(sb["temp_l"]))
 
     # --- T-EXPORT-006 停发 ---
     print()
