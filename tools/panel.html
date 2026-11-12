@@ -64,6 +64,19 @@
 
   .note{font-size:10.5px;color:var(--dim);line-height:1.35;margin-top:5px}
 
+  /* 座舱操作按钮：按住 0.5 秒才发，防止手指划过就收起落架 */
+  .cbtns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .cbtn{
+    position:relative;overflow:hidden;background:#0d1117;border:1px solid var(--line);
+    color:var(--fg);border-radius:8px;padding:9px 6px;font:inherit;font-size:12px;
+    cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+  }
+  .cbtn i{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--amber);display:block}
+  .cbtn.holding{border-color:var(--amber)}
+  .cbtn.holding i{width:100%;transition:width .5s linear}
+  .cbtn.done{border-color:var(--teal);color:var(--teal)}
+
   body.frozen .card{opacity:.45}
 </style>
 </head>
@@ -164,6 +177,22 @@
       <div class="row"><span class="k">减速板</span><span class="v"><span id="sbrk">--</span><small>%</small></span></div>
       <div class="row"><span class="k">轮刹</span><span class="v" id="wbrake">--</span></div>
       <div class="row"><span class="k">座舱盖</span><span class="v" id="canopy">--</span></div>
+    </section>
+
+    <!-- 座舱操作：走 performClickableAction，和鼠标点座舱开关等价，
+         不经过 DCS 的按键绑定。data-el 是 elements 的 ID，
+         实际命令号 = ID + 2502（JF-17 的 click_cmds 从 3001 起递增）。 -->
+    <section class="card">
+      <h3>座舱操作</h3>
+      <div class="cbtns">
+        <button class="cbtn" data-dev="32" data-el="505" data-val="-1">起落架 放<i></i></button>
+        <button class="cbtn" data-dev="32" data-el="505" data-val="1">起落架 收<i></i></button>
+        <button class="cbtn" data-dev="35" data-el="513" data-val="1">襟翼 放下<i></i></button>
+        <button class="cbtn" data-dev="35" data-el="513" data-val="0">襟翼 收起<i></i></button>
+        <button class="cbtn" data-dev="35" data-el="733" data-val="1">减速伞<i></i></button>
+        <button class="cbtn" data-dev="4" data-el="512" data-val="1">着陆灯<i></i></button>
+      </div>
+      <div class="note">按住 0.5 秒才生效 —— 手指划过不会触发。右下角按住时间不够时只亮边框、不执行。</div>
     </section>
   </div>
 
@@ -325,6 +354,56 @@ async function tick() {
 
 tick();
 setInterval(tick, 1000);
+
+// ---- 座舱操作按钮 ----
+//
+// 命令号 = 元素 ID + 2502。这个偏移来自 JF-17 的 command_defs.lua：
+//   start_command = 3001
+//   for i=500,999 do click_cmds['PNT_'..i] = dcounter() end   -- 先加后返回
+// 所以 PNT_505 → 3007。写死偏移而不是写死每个命令号，是为了让 data-el
+// 和 clickabledata.lua 里的元素 ID 一一对应，查起来方便。
+const CMD_OFFSET = 2502;
+const HOLD_MS = 500;
+
+document.querySelectorAll(".cbtn").forEach(btn => {
+  let timer = null;
+  let fired = false;
+
+  const cancel = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    btn.classList.remove("holding");
+  };
+
+  btn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    if (fired) return;
+    btn.classList.add("holding");
+    timer = setTimeout(async () => {
+      timer = null;
+      fired = true;
+      btn.classList.remove("holding");
+      btn.classList.add("done");
+      setTimeout(() => btn.classList.remove("done"), 500);
+      try {
+        await fetch("/cmd", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dev: +btn.dataset.dev,
+            cmd: +btn.dataset.el + CMD_OFFSET,
+            val: +btn.dataset.val,
+          }),
+        });
+      } catch (err) {
+        btn.classList.add("done");
+      }
+      fired = false;
+    }, HOLD_MS);
+  });
+
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev =>
+    btn.addEventListener(ev, cancel));
+});
 </script>
 </body>
 </html>
