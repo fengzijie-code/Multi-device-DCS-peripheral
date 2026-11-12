@@ -78,6 +78,66 @@
   .cbtn.done{border-color:var(--teal);color:var(--teal)}
 
   body.frozen .card{opacity:.45}
+
+  /* ---------- 标签页 ---------- */
+  #tabs{display:flex;gap:6px;margin:0 0 10px}
+  .tab{
+    background:#0d1117;border:1px solid var(--line);color:var(--dim);border-radius:8px;
+    padding:6px 16px;font:inherit;font-size:12.5px;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  }
+  .tab.on{color:var(--fg);border-color:#3d444d;background:#161b22}
+  #mfdview{display:none}
+  body.tab-mfd #zones{display:none}
+  body.tab-mfd #mfdview{display:block}
+
+  /* ---------- MFD ---------- */
+  #mfdwrap{max-width:780px;margin:0 auto}
+  #mfds{display:flex;gap:6px;margin-bottom:8px}
+  #mfds button{
+    flex:1;background:#0d1117;border:1px solid var(--line);color:var(--dim);border-radius:8px;
+    padding:8px 4px;font:inherit;font-size:13px;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  }
+  #mfds button.on{color:var(--amber);border-color:rgba(210,153,34,.55);background:rgba(210,153,34,.08)}
+  #mfdhint{font-size:10.5px;color:var(--dim);line-height:1.4;margin:0 2px 8px}
+
+  .bezel{
+    display:flex;flex-direction:column;gap:6px;padding:10px;
+    background:#0a0d12;border:1px solid var(--line);border-radius:14px;
+    height:clamp(340px,calc(100vh - 300px),520px);
+  }
+  .brow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;height:2.6rem}
+  .bmid{flex:1;display:grid;grid-template-columns:3.2rem minmax(0,1fr) 3.2rem;gap:6px;min-height:0}
+  .bcol{display:grid;grid-template-rows:repeat(8,minmax(0,1fr));gap:6px}
+  .screen{
+    min-height:0;background:#05080c;border:1px solid #1d242e;border-radius:8px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    padding:10px;text-align:center;
+  }
+  #mfdlast{font-size:26px;font-weight:500;color:var(--fg);letter-spacing:.02em}
+  #mfdack{font-size:11px;color:var(--dim)}
+  .screen .snote{font-size:10px;color:#4d5560;line-height:1.4}
+
+  /* MFD 键：全部用同一个样式，位置靠容器决定 */
+  .mk{
+    display:flex;align-items:center;justify-content:center;
+    background:#141a22;border:1px solid #232b35;color:var(--fg);border-radius:7px;
+    font:inherit;font-size:12px;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
+    touch-action:manipulation;position:relative;overflow:hidden;
+    min-height:0;padding:0;
+  }
+  .mk:active{background:#1f2a36;border-color:var(--amber)}
+  .mk.done{border-color:var(--teal);color:var(--teal)}
+  .mk.holding{border-color:var(--amber);background:#1f2a36}
+  .mk.undo{border-color:rgba(210,153,34,.42)}
+  .mk.pwr{border-color:rgba(248,81,73,.35)}
+
+  #mfdaux{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;margin-top:8px}
+  @media (max-width:520px){ #mfdaux{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  #mfdaux .mk{height:2.4rem;font-size:11px}
+  #mfdaux .mk small{display:block;font-size:9px;color:var(--dim);margin-top:1px}
 </style>
 </head>
 <body class="sys">
@@ -88,6 +148,11 @@
   <span id="aircraft"></span>
 </header>
 <div id="frozen">数据已冻结 —— DCS 那边没有在发（不在任务里？）</div>
+
+<nav id="tabs">
+  <button class="tab on" data-view="panel">仪表</button>
+  <button class="tab" data-view="mfd">MFD</button>
+</nav>
 
 <main id="zones">
 
@@ -200,10 +265,42 @@
 
 </main>
 
+<!-- ============ MFD ============ -->
+<!-- 键位映射不是猜的：tools 侧的 docs/JF17-MFD.md 有全文，
+     数据源是 DCS 装目录里的 Cockpit/Scripts/command_defs.lua
+     （cmd_names.PNT_734..832 直接写着 "Left MFCD U1" 这种名字）。 -->
+<main id="mfdview">
+  <div id="mfdwrap">
+    <div id="mfds">
+      <button data-mfd="left">左 MFD</button>
+      <button data-mfd="center" class="on">中 MFD</button>
+      <button data-mfd="right">右 MFD</button>
+    </div>
+    <p id="mfdhint">D3 = 回上半区菜单（撤销键）· D2 左 CMBT / 中 雷达 / 右 HSD · D4 左 SMS / 右 CLINK · U5 = 雷达控制菜单 · 屏幕内容 DCS 不导出，其余键功能随画面变化</p>
+
+    <div class="bezel">
+      <div class="brow" id="mfdU"></div>
+      <div class="bmid">
+        <div class="bcol" id="mfdL"></div>
+        <div class="screen">
+          <div id="mfdlast">--</div>
+          <div id="mfdack">还没有按过键</div>
+          <div class="snote">屏幕内容读不到<br>只能靠位置记键</div>
+        </div>
+        <div class="bcol" id="mfdR"></div>
+      </div>
+      <div class="brow" id="mfdD"></div>
+    </div>
+
+    <div id="mfdaux"></div>
+  </div>
+</main>
+
 <script>
 const $ = id => document.getElementById(id);
 const R2D = 180 / Math.PI;
 let fuelMax = 0, fuelMode = "";
+let lastAckKey = null;
 
 function setText(id, v) { const e = $(id); if (e) e.textContent = v; }
 
@@ -325,6 +422,17 @@ function paint(st) {
       $("gearbar").firstElementChild.style.width = (gr * 100).toFixed(0) + "%";
       $("gear").className = "v amber";
     }
+
+    // 反向通道回执：D 执行了 / N 设备空 / M 没有 performClickableAction
+    // 用 "条数:诊断串" 当变化信号 —— 光看诊断串的话，连按两次同一个键
+    // 第二次内容不变，界面会一直停在「等回执」。
+    const ackKey = (sys.acn || 0) + ":" + sys.dbg;
+    if (sys.dbg && ackKey !== lastAckKey) {
+      lastAckKey = ackKey;
+      const ok = /:D0?$/.test(sys.dbg);
+      $("mfdack").textContent = (ok ? "已执行 · " : "没执行 · ") + sys.dbg;
+      $("mfdack").style.color = ok ? "var(--teal)" : "var(--red)";
+    }
   }
 
   if (f) {
@@ -367,6 +475,17 @@ setInterval(tick, 1000);
 const CMD_OFFSET = 2502;
 const HOLD_MS = 500;
 
+// 所有座舱命令都走这一个口：{dev, cmd, val} → /cmd → dcs_cmd.txt → Export.lua
+async function sendCmd(dev, cmd, val) {
+  try {
+    await fetch("/cmd", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dev, cmd, val }),
+    });
+  } catch (err) { /* 忽略：发没发出去看下一帧的 dbg 回执 */ }
+}
+
 document.querySelectorAll(".cbtn").forEach(btn => {
   let timer = null;
   let fired = false;
@@ -385,16 +504,8 @@ document.querySelectorAll(".cbtn").forEach(btn => {
     btn.classList.add("done");
     setTimeout(() => btn.classList.remove("done"), 400);
     try {
-      await fetch("/cmd", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dev: +btn.dataset.dev,
-          cmd: +btn.dataset.el + CMD_OFFSET,
-          val: +btn.dataset.val,
-        }),
-      });
-    } catch (err) { /* 忽略：命令发不发出去由下一帧的 dbg 回执体现 */ }
+      await sendCmd(+btn.dataset.dev, +btn.dataset.el + CMD_OFFSET, +btn.dataset.val);
+    } catch (err) { /* 忽略 */ }
     fired = false;
   };
 
@@ -409,6 +520,111 @@ document.querySelectorAll(".cbtn").forEach(btn => {
   ["pointerup", "pointerleave", "pointercancel"].forEach(ev =>
     btn.addEventListener(ev, cancel));
 });
+
+// ---- 标签页 ----
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+    document.body.classList.toggle("tab-mfd", t.dataset.view === "mfd");
+  });
+});
+
+// ---- MFD ----
+//
+// dev = 47 —— devices.lua 里 MFCD 是 counter() 的第 47 个，三个屏共用一个设备。
+// 命令号 = 元素 ID + 2502，和上面座舱按钮同一套偏移。
+//
+// ID 与键名的对应不是试出来的：DCS 装目录下
+//   Mods/aircraft/JF-17/Cockpit/Scripts/command_defs.lua 的 cmd_names 里，
+//   PNT_734 = "Left MFCD Sym +"、PNT_762 = "Left MFCD D3" 这么一路写到 832。
+// 所以这里只记「基准 ID + 相对偏移」，三块屏只有 Cont 的位置不同。
+const MFCD_DEV = 47;
+const MFD_DEFS = [
+  { key: "left",   base: 734, d0: 26, c0: 24 },  // 左：Cont 排在 D 之前
+  { key: "center", base: 767, d0: 24, c0: 29 },  // 中 / 右：Cont 排在 D 之后
+  { key: "right",  base: 800, d0: 24, c0: 29 },
+];
+
+function mkKey(label, el, opt) {
+  opt = opt || {};
+  const val = opt.val == null ? 1 : opt.val;
+  const hold = opt.hold || 0;
+  const b = document.createElement("button");
+  b.className = "mk" + (opt.cls ? " " + opt.cls : "");
+  b.textContent = label;
+  b.dataset.el = el;
+  let timer = null;
+
+  const fire = async () => {
+    b.classList.remove("holding");
+    b.classList.add("done");
+    setTimeout(() => b.classList.remove("done"), 350);
+    $("mfdlast").textContent = label;
+    $("mfdack").textContent = "已发送 · 等回执…";
+    $("mfdack").style.color = "var(--dim)";
+    // 1.2 秒还没等来回执就别让人干等 —— 多半是 DCS 不在任务里或 Export.lua 没加载
+    setTimeout(() => {
+      if ($("mfdack").textContent === "已发送 · 等回执…") {
+        $("mfdack").textContent = "没有回执 · DCS 那边没在收";
+        $("mfdack").style.color = "var(--amber)";
+      }
+    }, 1200);
+    await sendCmd(MFCD_DEV, el + CMD_OFFSET, val);
+  };
+
+  b.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    if (hold > 0) {
+      b.classList.add("holding");
+      timer = setTimeout(() => { timer = null; fire(); }, hold);
+    } else {
+      fire();
+    }
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev =>
+    b.addEventListener(ev, () => {
+      if (timer) { clearTimeout(timer); timer = null; b.classList.remove("holding"); }
+    }));
+  return b;
+}
+
+function buildMFD(key) {
+  const d = MFD_DEFS.find(x => x.key === key);
+  [["mfdU", 5, i => d.base + 2 + i], ["mfdL", 8, i => d.base + 8 + i],
+   ["mfdR", 8, i => d.base + 16 + i], ["mfdD", 5, i => d.base + d.d0 + i]]
+    .forEach(([id, n, fn]) => {
+      const box = $(id);
+      box.innerHTML = "";
+      const pre = id === "mfdU" ? "U" : id === "mfdL" ? "L" : id === "mfdR" ? "R" : "D";
+      for (let i = 0; i < n; i++) {
+        // D3 是固定的「回上半区菜单」，也就是撤销键，给个暗色边框好找
+        const undo = (pre === "D" && i === 2) ? "undo" : "";
+        box.appendChild(mkKey(pre + (i + 1), fn(i), { cls: undo }));
+      }
+    });
+
+  const aux = $("mfdaux");
+  aux.innerHTML = "";
+  aux.appendChild(mkKey("SYM −", d.base + 1));
+  aux.appendChild(mkKey("SYM +", d.base + 0));
+  aux.appendChild(mkKey("CONT −", d.base + d.c0 + 1));
+  aux.appendChild(mkKey("CONT +", d.base + d.c0));
+  aux.appendChild(mkKey("BRT −", d.base + 32));
+  aux.appendChild(mkKey("BRT +", d.base + 31));
+  // 电源是两档开关（arg_value 1 / -1），不是瞬动按钮，而且按错画面就黑了 —— 要长按
+  aux.appendChild(mkKey("PWR 开", d.base + 7, { val: 1,  hold: 600, cls: "pwr" }));
+  aux.appendChild(mkKey("PWR 关", d.base + 7, { val: -1, hold: 600, cls: "pwr" }));
+}
+
+document.querySelectorAll("#mfds button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#mfds button").forEach(x => x.classList.toggle("on", x === b));
+    buildMFD(b.dataset.mfd);
+    $("mfdlast").textContent = "--";
+  });
+});
+
+buildMFD("center");
 </script>
 </body>
 </html>
