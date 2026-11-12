@@ -65,26 +65,31 @@ fun CombatScreen(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             ArmButton(armed = st.armed, ready = st.ready, onClick = onToggleArm)
-            Spacer(Modifier.height(0.dp))
 
-            GuardButton(
-                text = "武器 ↑",
-                sub = "上一个",
-                enabled = st.armed,
-                guardMs = 150,
-                onDown = { onButtonDown(YokeBtn.WEAPON_PREV) },
-                onUp = { onButtonUp(YokeBtn.WEAPON_PREV) },
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            )
-            GuardButton(
-                text = "武器 ↓",
-                sub = "下一个",
-                enabled = st.armed,
-                guardMs = 150,
-                onDown = { onButtonDown(YokeBtn.WEAPON_NEXT) },
-                onUp = { onButtonUp(YokeBtn.WEAPON_NEXT) },
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            )
+            // 武器上下并排：它们是一对，并排比竖排更容易「盲切」——
+            // 拇指在同一个高度左右蹭，不用上下找位置。
+            Row(
+                Modifier.fillMaxWidth().weight(0.9f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                GuardButton(
+                    text = "武器 ↑",
+                    enabled = st.armed,
+                    guardMs = 150,
+                    onDown = { onButtonDown(YokeBtn.WEAPON_PREV) },
+                    onUp = { onButtonUp(YokeBtn.WEAPON_PREV) },
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+                GuardButton(
+                    text = "武器 ↓",
+                    enabled = st.armed,
+                    guardMs = 150,
+                    onDown = { onButtonDown(YokeBtn.WEAPON_NEXT) },
+                    onUp = { onButtonUp(YokeBtn.WEAPON_NEXT) },
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
+
             GuardButton(
                 text = "锁定",
                 sub = "雷达锁定目标",
@@ -92,6 +97,18 @@ fun CombatScreen(
                 guardMs = 150,
                 onDown = { onButtonDown(YokeBtn.LOCK) },
                 onUp = { onButtonUp(YokeBtn.LOCK) },
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            )
+            // 干扰弹放在锁定和发射之间：被锁定时拇指从锁定往下滑一格就到，
+            // 而且和发射拉开一格距离 —— 这两个按错的代价完全不同。
+            // 颜色用琥珀不用红：红色已经被发射占了，混用会让人在急的时候按错。
+            GuardButton(
+                text = "干扰弹",
+                sub = "投放",
+                enabled = st.armed,
+                guardMs = 150,
+                onDown = { onButtonDown(YokeBtn.COUNTERMEASURE) },
+                onUp = { onButtonUp(YokeBtn.COUNTERMEASURE) },
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
             GuardButton(

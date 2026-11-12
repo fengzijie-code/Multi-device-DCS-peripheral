@@ -50,6 +50,10 @@ object YokeBtn {
     const val RESERVED_TWS = 7
     const val RESERVED_TARGET_PREV = 8
     const val RESERVED_TARGET_NEXT = 9
+
+    // 10 而不是 7：7..9 是给雷达模式和目标选择占的位，干扰弹虽然后加，
+    // 但编号顺序一旦重排，DCS 里已经绑好的键就全废了。
+    const val COUNTERMEASURE = 10      // 干扰弹投放
 }
 
 /**
