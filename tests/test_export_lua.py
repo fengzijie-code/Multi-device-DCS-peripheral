@@ -76,6 +76,12 @@ function require(name)
     error("no module: " .. tostring(name))
 end
 
+-- 这个标记让 Export.lua 里的结构探针跳过，否则测试跑到第 60 帧时
+-- 探针会触发，把夹具里的假数据写进真实的 Saved Games 日志目录
+-- （踩过：SelfData 只有 4 个字段、IAS 244.75，全是假的，而且文件一存在
+--  真机上的探针就不再跑了）。
+_TEST_ENV = true
+
 -- 可变的仿真状态，Python 侧通过 set_state 改
 STATE = {
     t = 0.0,

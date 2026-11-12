@@ -391,6 +391,137 @@ local function send_frame()
     end
 end
 
+-- ============================ 结构探针 ============================
+--
+-- 目的：把 DCS **实际能给**的每一样东西真实抓一次，而不是照着文档猜。
+-- 设计外设布局时最怕的就是「以为这个数据能读到」，做到一半才发现是 nil。
+--
+-- 三个关键取舍：
+--
+-- 1) **抓一次就停**：靠「输出文件是否存在」判断，抓过就不再抓。想重抓就删
+--    掉那个 json。这样不会每次进任务都写一次盘。
+-- 2) **延后到第 60 帧**：LuaExportStart 时座舱还没加载完，LoGet* 大多返回
+--    nil —— 在那里探测会得到满屏「这个接口没有数据」的假结论。
+-- 3) **缺失也如实记**：`__missing__` = 这个版本根本没有这个函数，
+--    `__nil__` = 有函数但当前返回空。两者含义完全不同，不能混。
+
+local PROBE_AT_FRAME = 60
+local PROBE_DIR = (os.getenv("USERPROFILE") or "C:/Users/lenovo")
+                  .. "/Saved Games/DCS/Logs"
+local PROBE_PATH = PROBE_DIR .. "/dcsprobe.json"
+local probe_done = false
+
+-- 需要探的接口。名字即 `LoGet<名字>`。
+local PROBE_FUNCS = {
+    "SelfData", "RadarInfo", "LockedTargetInformation", "TargetInformation",
+    "SightingSystemInfo", "PayloadInfo", "MechInfo", "EngineInfo",
+    "NavigationInfo", "WingInfo", "CockpitInfo", "Route", "FlightInfo",
+    "AltitudeAboveSeaLevel", "AltitudeAboveGroundLevel",
+    "AngleOfAttack", "AngleOfSlide", "AccelerationUnits",
+    "IndicatedAirSpeed", "TrueAirSpeed", "VerticalVelocity", "MachNumber",
+    "ModelTime", "MissionTime", "PlayerPlaneId", "CameraPos",
+}
+
+local function jesc(s)
+    s = tostring(s)
+    s = s:gsub("\\", "\\\\"):gsub('"', '\\"')
+    s = s:gsub("\n", "\\n"):gsub("\r", "\\r"):gsub("\t", "\\t")
+    return '"' .. s .. '"'
+end
+
+local function to_json(v, depth, seen)
+    depth = depth or 0
+    if depth > 6 then return '"<too-deep>"' end
+    local t = type(v)
+    if v == nil then return "null" end
+    if t == "boolean" then return v and "true" or "false" end
+    if t == "number" then
+        if v ~= v or v == math.huge or v == -math.huge then return "null" end
+        return string.format("%.6g", v)
+    end
+    if t == "string" then return jesc(v) end
+    if t ~= "table" then return jesc(tostring(v)) end
+
+    seen = seen or {}
+    if seen[v] then return '"<cycle>"' end
+    seen[v] = true
+
+    local n = 0
+    for _ in pairs(v) do n = n + 1 end
+
+    local parts = {}
+    if n > 0 and n == #v then
+        for i = 1, #v do
+            parts[#parts + 1] = to_json(v[i], depth + 1, seen)
+        end
+        seen[v] = nil
+        return "[" .. table.concat(parts, ",") .. "]"
+    end
+    for k, val in pairs(v) do
+        parts[#parts + 1] = jesc(k) .. ":" .. to_json(val, depth + 1, seen)
+    end
+    seen[v] = nil
+    return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function probe_once()
+    local out = {}
+    for _, name in ipairs(PROBE_FUNCS) do
+        local fn = _G["LoGet" .. name]
+        if type(fn) ~= "function" then
+            out[name] = "__missing__"
+        else
+            local ok, v = pcall(fn)
+            if not ok then
+                out[name] = "__error__:" .. tostring(v)
+            elseif v == nil then
+                out[name] = "__nil__"
+            else
+                out[name] = v
+            end
+        end
+    end
+
+    local okj, txt = pcall(to_json, out)
+    if not okj then
+        log_error("探针序列化失败：" .. tostring(txt))
+        return
+    end
+
+    local f = io and io.open(PROBE_PATH, "w")
+    if f then
+        pcall(function() f:write(txt); f:close() end)
+        log_info("探针已写出：" .. PROBE_PATH
+                 .. "（" .. string.format("%.1f", #txt / 1024) .. " KB）")
+    else
+        log_error("探针写文件失败：io 不可用或路径无权限（" .. PROBE_PATH .. "）")
+    end
+end
+
+local function probe_wanted()
+    if probe_done then return false end
+    if not io then return false end
+
+    -- 测试环境显式退出。单元测试用 lupa 跑这个文件、会跑到第 60 帧，
+    -- 探针跟着触发，把夹具的假数据写进真实日志目录 —— 踩过一次：
+    -- SelfData 只有 4 个字段、IAS 244.75，而那个文件一存在，真机上的
+    -- 探针就再也不会跑了。夹具里置了 _TEST_ENV 来挡住这条路。
+    if _TEST_ENV then return false end
+
+    -- 必须存在这把「钥匙」才抓，避免每次进任务都写盘
+    local flag = io.open(PROBE_DIR .. "/probe.on", "r")
+    if not flag then return false end
+    flag:close()
+
+    -- 已有结果就跳过。想重抓：删掉 json，再放一把钥匙。
+    local done = io.open(PROBE_PATH, "r")
+    if done then
+        done:close()
+        return false
+    end
+    return true
+end
+
 -- ============================ 生命周期 ============================
 
 function LuaExportStart()
@@ -444,6 +575,14 @@ end
 
 function LuaExportAfterNextFrame()
     frame_no = frame_no + 1
+
+    -- 探针只在进座舱后跑一次（第 60 帧 ≈ 1 秒），见文件上方说明
+    if frame_no == PROBE_AT_FRAME and probe_wanted() then
+        probe_done = true
+        local okp, errp = pcall(probe_once)
+        if not okp then log_error("探针异常：" .. tostring(errp)) end
+    end
+
     local ok, err = pcall(send_frame)
     if not ok then
         log_error("发送帧异常：" .. tostring(err))
