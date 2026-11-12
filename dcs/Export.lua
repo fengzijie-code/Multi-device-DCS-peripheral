@@ -330,6 +330,10 @@ local function collect_sys()
         cn     = tonumber(deepget(pay, "Cannon", "shells")),
         -- 起落架收放进度 0–1，做「正在收起」用
         gr     = deepget(mech, "gear", "nose", "rod"),
+        -- 反向通道回执：最近执行成功的命令号 + 累计条数 + 诊断串
+        ack    = last_ack,
+        acn    = ack_count,
+        dbg    = last_dbg,
     }
 end
 
@@ -362,6 +366,9 @@ local function encode_sys(d, t)
         '"wl":'    .. stro(d.wl),
         '"cn":'    .. numo(d.cn, "%.0f"),
         '"gr":'    .. numo(d.gr, "%.3f"),
+        '"ack":'   .. numo(d.ack, "%.0f"),
+        '"acn":'   .. numo(d.acn, "%.0f"),
+        '"dbg":'   .. stro(d.dbg),
     }
     return '{"sys":{' .. table.concat(p, ",") .. '}}'
 end
@@ -537,6 +544,20 @@ end
 local CMD_PORT = 5020
 local cmd_sock = nil
 
+-- 回执：最近一次命令的处理结果，随慢变量包回传。
+--
+-- 为什么需要它：performClickableAction 是「有则执行、无则静默」——命令号
+-- 写错、设备不存在、方法不支持，全都是无声失败。没有回执只能靠肉眼看
+-- 飞机有没有反应，排查极其被动（已经为此浪费了一轮重启）。
+--
+-- dbg 格式： "dev:cmd:D" / "dev:cmd:N" / "dev:cmd:M"
+--   D = 设备拿到了，方法调用了
+--   N = GetDevice 返回空（设备号不对）
+--   M = 设备有，但没有 performClickableAction 方法
+local last_ack = nil
+local ack_count = 0
+local last_dbg = nil
+
 local function open_cmd_socket(socket)
     local ok, s = pcall(socket.udp)
     if not ok or not s then return nil end
@@ -557,23 +578,49 @@ end
 
 local function apply_command(line)
     local dev, cmd, val = line:match("^(%d+):(%d+):(%-?[%d%.]+)$")
-    if not dev then return false end
+    if not dev then
+        last_dbg = "fmt"
+        return false
+    end
     local dnum, cnum, vnum = tonumber(dev), tonumber(cmd), tonumber(val)
 
-    -- 先按元素所属设备点，不行再退回 0 号（有些机型只认主设备）
+    local okd, d = pcall(GetDevice, dnum)
+    if not okd or not d then
+        -- 设备号不对是最常见的失败原因：devices.lua 里那些编号是脚本内部
+        -- 计数器，和 DCS 运行时暴露的 device id 不一定一致
+        last_dbg = string.format("%d:%d:N", dnum, cnum)
+        return false
+    end
+    if type(d.performClickableAction) ~= "function" then
+        last_dbg = string.format("%d:%d:M", dnum, cnum)
+        return false
+    end
+
     local ok1 = pcall(function()
-        local d = GetDevice(dnum)
-        if d and d.performClickableAction then
-            d:performClickableAction(cnum, vnum)
+        d:performClickableAction(cnum, vnum)
+    end)
+    if ok1 then
+        last_ack = cnum
+        ack_count = ack_count + 1
+        last_dbg = string.format("%d:%d:D", dnum, cnum)
+        return true
+    end
+
+    -- 退一步：有些机型要求在 0 号主设备上点
+    local ok2 = pcall(function()
+        local d0 = GetDevice(0)
+        if d0 and d0.performClickableAction then
+            d0:performClickableAction(cnum, vnum)
         end
     end)
-    if ok1 then return true end
-    return pcall(function()
-        local d = GetDevice(0)
-        if d and d.performClickableAction then
-            d:performClickableAction(cnum, vnum)
-        end
-    end)
+    if ok2 then
+        last_ack = cnum
+        ack_count = ack_count + 1
+        last_dbg = string.format("%d:%d:D0", dnum, cnum)
+    else
+        last_dbg = string.format("%d:%d:X", dnum, cnum)
+    end
+    return ok2
 end
 
 -- ============================ 结构探针 ============================
