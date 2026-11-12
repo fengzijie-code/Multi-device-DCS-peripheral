@@ -64,7 +64,7 @@
 | `tools/install-apk.py` `.bat` | 装 APK 到手机 | 双击 .bat |
 | `tools/watch-state.py` | 实时盯数据，一眼看出卡在哪一跳 | 调试神器 |
 
-**文档**（都在 `docs/`）：`PANEL.md` 仪表盘、`YOKE.md` 摇杆、`BINDING.md` 绑键表、`DCS-DATA.md` 数据实测、`JF17-CONTROLS.md` 68 个可控开关、`JF17-MFD.md` MFD 键位、`LAYOUT.md` 外设分工框架。
+**文档**（都在 `docs/`）：`PANEL.md` 仪表盘、`YOKE.md` 摇杆、`BINDING.md` 绑键表、`DCS-DATA.md` 数据实测、`JF17-CONTROLS.md` 68 个可控开关、`JF17-MFD.md` MFD 键位，`JF17-MFD-PAGES.md` 各画面键标签、`LAYOUT.md` 外设分工框架。
 
 ---
 
@@ -122,26 +122,29 @@ curl -X POST -d '{"dev":32,"cmd":3007,"val":0}' http://127.0.0.1:8080/cmd
 
 ## 七、下一步该做什么
 
-### 1. MFD 操作 —— 键位已破，只剩「记功能」
+### 1. MFD 操作 —— 键位和页面标签都已从代码挖出，只剩「进座舱核对一遍」
 
-**2026-11-13 更新：卡点消失了。** 之前写「element ID 到键位的映射无法从代码推断，只能实测」是错的。
-名字一直写在 `D:\DCS World\Mods\aircraft\JF-17\Cockpit\Scripts\command_defs.lua` 第 743–830 行：
-`PNT_734 = "Left MFCD Sym +"`、`PNT_762 = "Left MFCD D3"`……一直到 832。
-当时只翻了 `clickabledata.lua`（三个屏 99 条定义长得一模一样），就断定推不出来。
-`741/774/807` 也不是「打断了顺序的怪 toggle」——它们就是 Power。
+**两条关键线索，都是代码里明写的，别再靠试：**
 
-完整表（三块屏 × 33 键，ID 与命令号）在 `docs/JF17-MFD.md` 第三节，别手抄，去查。
-要点：`dev = 47`（MFCD），`cmd = ID + 2502`，按钮发 `val=1`，Power 发 `1`/`-1`。
+1. **哪个 ID 是哪颗键** → `command_defs.lua` 第 743–830 行的 `cmd_names`
+   （`PNT_762 = "Left MFCD D3"`）。三块屏 × 33 键的 ID/命令号表在 `docs/JF17-MFD.md` 第三节。
+   要点：`dev = 47`（MFCD），`cmd = ID + 2502`，按钮 `val=1`，Power 是两档开关 `1`/`-1`。
+2. **每个画面上每颗键写的是什么** → `Cockpit/Scripts/MFCD/Indicator/*.lua`，
+   这就是 MFD 画面的绘制代码，键标签是 `{value="XXX", cx=…, cy=…}`，坐标常量直接对应物理键。
+   `python tools/dump-mfd-pages.py` 导出全部 61 个页面 → **`docs/JF17-MFD-PAGES.md`**。
 
-**已经做完的**：`panel.html` 加了 MFD 标签页，三块屏切换 + 34 个按钮，
-点一下就是一次 `performClickableAction`，屏幕中央显示按了什么键和 DCS 的回执（D/N/M）。Export.lua 没动。
+已经确定的：主菜单（D3）是 `U1 RDR / U2 INS / U3 TACAN / U4 APR / U5 POD`、
+`L1 HSD / L2 EFIS / L3 CLNK / L4 DATA`、`R1 SMS / R2 CMBT / R3 BIT / R4 CHKLS / R5 PFL`；
+雷达页左列是搜索参数（`L3`=方位角、`L5`=扫描行数、`L4`=天线稳定）；**切雷达模式 = 雷达页按 U1**
+（手册图注 A + 模式菜单页 `L1–L5`=条目 1–5、`R1–R5`=条目 6–10）。
 
-**还需要用户在座舱里做的**（只剩这一步，且不用再盲试键位）：
-1. 中 MFD 按 `D2`（792）到雷达页，看 U1 的画面名确认。
-2. 依次按 U1–U5、R1–R8、L1–L8，记下屏幕变化（按错按 `D3`（793）回菜单）。
-3. 结果填进 `docs/JF17-MFD.md` 第七节的实测记录表。
+**已经做完的**：`panel.html` 有 MFD 标签页，三块屏切换 + 34 个按钮，
+点一下就是一次 `performClickableAction`，屏幕中央显示按了什么键和 DCS 回执（D/N/M）。Export.lua 没动，改完只需刷新浏览器。
 
-**没解决的**：MFD 画面内容 DCS 不导出，所以「哪个键当前是什么功能」永远得靠人看着屏幕记一次。
+**明天要做的**：`docs/JF17-MFD.md` 第七节有 9 步实测清单（每步带预期，对不上才是新闻）。
+真正的新信息只有两条：**U1 模式菜单里 10 个条目分别是什么**、**CNTL 菜单里 L/HST/DCLT 对应 R 几**。
+
+**永远解决不了的**：MFD 画面内容 DCS 不导出（`LoGet*` 没有 MFD 接口），所以「此刻屏幕显示什么」拿不到 —— 但「按键是什么、页面上有什么标签」现在全是代码级确定的。
 
 ### 2. 其他待办
 
