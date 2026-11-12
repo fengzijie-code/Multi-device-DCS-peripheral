@@ -1,15 +1,16 @@
 package com.fengzijie.dcsperipheral.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.fengzijie.dcsperipheral.input.YokeState
@@ -51,14 +52,22 @@ fun CombatScreen(
             modifier = Modifier.width(62.dp).fillMaxHeight(),
         )
 
-        StickPad(
-            rollDeg = st.rollDeg,
-            pitchDeg = st.pitchDeg,
-            rudder = st.rudder,
-            rangeDeg = rangeDeg,
-            armed = st.armed,
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-        )
+        // 杆位块固定 160dp 居中，不再撑满整列。
+        // 战斗中它的作用是「瞥一眼确认杆在哪」，不是精确读数 ——
+        // 撑满会把右列的按钮挤到边上，而按钮才是这个页面真正要用的东西。
+        Box(
+            Modifier.weight(1f).fillMaxHeight(),
+            contentAlignment = Alignment.Center,
+        ) {
+            StickPad(
+                rollDeg = st.rollDeg,
+                pitchDeg = st.pitchDeg,
+                rudder = st.rudder,
+                rangeDeg = rangeDeg,
+                armed = st.armed,
+                modifier = Modifier.size(160.dp),
+            )
+        }
 
         Column(
             Modifier.width(196.dp).fillMaxHeight(),

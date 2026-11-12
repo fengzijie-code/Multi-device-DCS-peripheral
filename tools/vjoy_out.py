@@ -81,7 +81,7 @@ VJD_STAT = {0: "已被本进程占用", 1: "空闲可用", 2: "被别的程序�
 
 CENTER = 16384          # vJoy 轴中点。范围 1..32767，不是 0..32767
 HALF = 16383
-MAX_BTN = 20
+MAX_BTN = 30
 
 #   手机通道            vJoy 轴
 DEFAULT_MAP = {

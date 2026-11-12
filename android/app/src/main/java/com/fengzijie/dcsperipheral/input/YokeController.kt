@@ -608,7 +608,7 @@ class YokeController(
 
     private companion object {
         const val TAG = "DcsPeripheral"
-        const val BUTTON_COUNT = 20
+        const val BUTTON_COUNT = 30
         const val MIN_PULSE_MS = 120L
 
         /**
