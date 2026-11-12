@@ -49,6 +49,11 @@ except ImportError:  # 允许从别处直接跑
 # 必须和 dcs/Export.lua 里的 CMD_PORT 一致。
 CMD_UDP_PORT = 5020
 
+# 兜底通道：同一条命令也写进这个文件，Export.lua 每帧读一次。
+# UDP 那条路在 DCS 的 Lua 沙盒里实测收不到，文件这条路是唯一确定能用的。
+# 路径必须和 dcs/Export.lua 里的 CMD_FILE 一致。
+CMD_FILE = Path.home() / "Saved Games" / "DCS" / "Logs" / "dcs_cmd.txt"
+
 for _s in (sys.stdout, sys.stderr):
     try:
         _s.reconfigure(encoding="utf-8", errors="replace")
@@ -826,9 +831,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(400, b'{"ok":0,"err":"bad fields"}', "application/json")
                 return
             line = f"{dev}:{cmd}:{val:g}".encode()
+            # 双通道：UDP（实测 DCS 那边收不到，先留着）+ 文件（确定能用）。
+            # 文件是兜底，不能省 —— 没有它这条链路目前是断的。
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                     s.sendto(line, ("127.0.0.1", CMD_UDP_PORT))
+            except OSError:
+                pass
+            try:
+                CMD_FILE.write_text(line.decode("ascii"), encoding="utf-8")
             except OSError as e:
                 self._send(500, json.dumps({"ok": 0, "err": str(e)}).encode(),
                            "application/json")

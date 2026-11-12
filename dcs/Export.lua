@@ -544,6 +544,18 @@ end
 local CMD_PORT = 5020
 local cmd_sock = nil
 
+-- 文件兜底通道。
+--
+-- UDP 这条路实测收不到（端口确实被绑定了，但 receive 一直返回空，
+-- 可能是 LuaSocket 的 UDP 在 DCS 沙盒里的行为问题）。与其继续猜，
+-- 不如加一条确定能用的：PC 把命令写进这个文件，这里每帧看一眼，
+-- 读到就删。
+--
+-- 每帧 io.open 一个不存在的文件开销很小（一次系统调用），而 io 在
+-- 这个环境里是确认可用的（结构探针就是用它写的文件）。
+local CMD_FILE = (os.getenv("USERPROFILE") or "C:/Users/lenovo")
+                 .. "/Saved Games/DCS/Logs/dcs_cmd.txt"
+
 -- 回执：最近一次命令的处理结果，随慢变量包回传。
 --
 -- 为什么需要它：performClickableAction 是「有则执行、无则静默」——命令号
@@ -799,6 +811,10 @@ function LuaExportStart()
         log_error("反向通道开启失败（端口 " .. CMD_PORT .. " 占用？）")
     end
 
+    -- 清掉上一局残留的命令文件：否则你上次退出前点的那一下，会在这次
+    -- 进任务的第一帧被执行 —— 比如一起飞起落架就被收起来。
+    if io then pcall(os.remove, CMD_FILE) end
+
     -- 探针：把后续要用的表结构打一次，供后续扩展字段时对照
     describe_table("LoGetEngineInfo",   LoGetEngineInfo,   16)
     describe_table("LoGetMechInfo",     LoGetMechInfo,     16)
@@ -828,25 +844,30 @@ function LuaExportAfterNextFrame()
         log_error("发送帧异常：" .. tostring(err))
     end
 
-    -- 收座舱操作。每帧最多处理 4 条：点得再快也够用，又不至于让一批
-    -- 积压的命令在同一帧里砸下来（那会让飞机瞬移一样地切换状态）。
+    -- 收座舱操作：先看文件（确定能用），再看 UDP（可能收不到）。
+    -- 每帧最多处理 4 条，点得再快也够用，又不至于让一批积压的命令在
+    -- 同一帧砸下来（那会让飞机瞬移一样地切换状态）。
     --
     -- 整段 pcall 兜底：反向通道出任何问题都不能影响遥测，遥测才是主链路。
-    if cmd_sock then
-        local okr = pcall(function()
-            for _ = 1, 4 do
-                local line = cmd_sock:receive()
-                if not line then break end
-                local okc = pcall(apply_command, line)
-                if not okc then
-                    log_error("执行座舱命令失败：" .. tostring(line))
-                end
+    local okr = pcall(function()
+        for _ = 1, 4 do
+            local line = nil
+            local f = io and io.open(CMD_FILE, "r")
+            if f then
+                line = f:read("*l")
+                f:close()
+                pcall(os.remove, CMD_FILE)
             end
-        end)
-        if not okr then
-            cmd_sock = nil      -- 收不了就彻底停掉，别每帧刷错误日志
-            log_error("反向通道已关闭（接收异常）")
+            if not line and cmd_sock then
+                local got = cmd_sock:receive()
+                if got then line = got end
+            end
+            if not line then break end
+            pcall(apply_command, line)
         end
+    end)
+    if not okr then
+        log_error("反向通道接收异常")
     end
 end
 
