@@ -496,6 +496,57 @@ fun Chip(
 }
 
 /**
+ * 配平按钮（force trim）。
+ *
+ * 单击 = 把当前杆位记成配平量，松手后停在这儿。
+ * 长按 = 清零。
+ *
+ * 为什么不像校零那样要求长按才能触发：直升机飞行员是一边压杆一边配平的，
+ * 要求按住 0.7 秒根本没法用。而且配平点错了可以再点一次纠正，
+ * 不像校零 —— 校零会把传感器零点写坏，那个才必须防误触。
+ *
+ * 反过来「长按清除」是刻意的：清除会把飞机交回中立杆位，飞行中是个
+ * 姿态突变，值得多一道门槛。
+ */
+@Composable
+fun TrimButton(
+    trim: Float,
+    enabled: Boolean,
+    onCapture: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val active = trim != 0f
+    Box(
+        modifier = modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (active) Ink.Amber.copy(alpha = 0.16f) else Ink.Surface)
+            .border(
+                1.dp,
+                if (active) Ink.Amber.copy(alpha = 0.65f) else Ink.Line,
+                RoundedCornerShape(8.dp),
+            )
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectTapGestures(
+                    onTap = { onCapture() },
+                    onLongPress = { onClear() },
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = if (active) "配平 ${if (trim > 0) "+" else ""}${(trim * 100).toInt()}%" else "配平",
+            color = if (active) Ink.Amber else Ink.Dim,
+            fontSize = 10.sp,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+/**
  * 长按才生效的按钮（校零 / 调参）。**防误触专用。**
  *
  * 为什么需要它：这两个按钮紧贴在视角 pad 下面，手指在 pad 上滑动很容易划出

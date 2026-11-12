@@ -64,6 +64,8 @@ fun YokeScreen(
     onToggleArm: () -> Unit,
     onCalibrate: () -> Unit,
     onSettings: () -> Unit,
+    onTrimCapture: () -> Unit,
+    onTrimClear: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(modifier = modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -85,6 +87,17 @@ fun YokeScreen(
                 rangeDeg = set.rangeDeg,
                 armed = st.armed,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
+            Spacer(Modifier.height(5.dp))
+
+            // 配平紧贴杆位盘：它是「把杆锁在这儿」的动作，离杆越近越直觉。
+            // 直升机专用 —— 固定翼上它保持中性（不按就一直是 0），不影响。
+            TrimButton(
+                trim = st.trimY,
+                enabled = st.armed,
+                onCapture = onTrimCapture,
+                onClear = onTrimClear,
+                modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(5.dp))
 

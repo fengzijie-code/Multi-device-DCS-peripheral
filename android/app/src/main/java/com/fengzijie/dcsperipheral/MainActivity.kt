@@ -223,6 +223,8 @@ private fun Root() {
                         mode = "calib"
                         prefs.edit().putString("mode", "calib").apply()
                     },
+                    onTrimCapture = { ctl?.captureTrim() },
+                    onTrimClear = { ctl?.clearTrim() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),

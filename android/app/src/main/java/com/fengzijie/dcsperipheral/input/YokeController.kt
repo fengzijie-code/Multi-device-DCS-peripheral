@@ -46,6 +46,15 @@ data class YokeSettings(
     val invertViewY: Boolean = false,
 )
 
+/**
+ * 配平偏移的上限。
+ *
+ * 不给到 1.0 是有意的：满杆配平等于「一解锁就压到底」，对固定翼是灾难，
+ * 对直升机也几乎没有用处（真要满杆说明该检查重心/载重了）。0.7 足够压平
+ * 大多数直升机的悬停与巡航偏差，又留了一点反应余量。
+ */
+private const val TRIM_MAX = 0.7f
+
 data class YokeState(
     val armed: Boolean = false,
     val sensorOk: Boolean = false,
@@ -68,6 +77,14 @@ data class YokeState(
     val rudder: Float = 0f,
     val vx: Float = 0f,
     val vy: Float = 0f,
+    /**
+     * 配平偏移（force trim）。0 = 没配平。
+     *
+     * 语义是「松手后保持住这个杆位」，不是「把当前姿态当成新零点」：
+     * 后者松手会回到中立，而直升机要的恰恰是**别**回中立。
+     */
+    val trimX: Float = 0f,
+    val trimY: Float = 0f,
     /** 0..1；`throttleTaken` 为 false 时这个值不发给飞机 */
     val throttle: Float = 0f,
     val throttleTaken: Boolean = false,
@@ -123,6 +140,22 @@ class YokeController(
     @Volatile private var vjoyFlag = 0
     @Volatile private var notice: String? = null
     private var job: Job? = null
+
+    // ---- 配平（force trim）----
+    //
+    // 为什么需要它：手机是「绝对位置」映射，松手 = 轴回 0 = 杆回中立。
+    // 固定翼没问题（杆中位就是平飞配平点），但直升机的中立周期变距**不是**
+    // 平飞位：悬停/平飞往往要一直顶着杆。真实直升机靠 force trim 把杆位锁住，
+    // 松手不停在那儿；我们没有力反馈杆，只能在软件里补这一层。
+    //
+    // 上限 0.7 而不是 1.0：满杆配平等于一起飞就压到底，太危险。
+    // 0.7 足够压平大多数直升机的悬停/巡航偏差，又留了反应余量。
+    @Volatile private var trimX = 0f
+    @Volatile private var trimY = 0f
+    // 「如果现在解锁，杆会在哪」。配平按钮拿它当新偏移，所以必须先减去旧偏移
+    // 再加上去，否则连按两次会翻倍。
+    @Volatile private var lastOutX = 0f
+    @Volatile private var lastOutY = 0f
 
     private val url = "${baseUrl.trimEnd('/')}/input"
 
@@ -203,6 +236,25 @@ class YokeController(
     }
 
     fun toggleArmed() = setArmed(!armed)
+
+    // ------------------------------------------------------------ 配平
+
+    /**
+     * 把当前杆位记成配平偏移：杆台此刻在哪，松手后就停在哪。
+     *
+     * 直接取 lastOut（已含旧偏移），所以连按两次不会翻倍，效果是「再微调一点」。
+     */
+    fun captureTrim() {
+        trimX = lastOutX.coerceIn(-TRIM_MAX, TRIM_MAX)
+        trimY = lastOutY.coerceIn(-TRIM_MAX, TRIM_MAX)
+        notice = if (trimX == 0f && trimY == 0f) "配平已清零" else "已配平，松手保持"
+    }
+
+    fun clearTrim() {
+        trimX = 0f
+        trimY = 0f
+        notice = "配平已清零"
+    }
 
     // ------------------------------------------------------------ 触摸输入
 
@@ -381,6 +433,19 @@ class YokeController(
             var y = if (s.invertY) -yPos else yPos
             var r = if (s.invertRudder) -rPos else rPos
 
+            // 叠加配平偏移，再整体夹到 ±1。
+            //
+            // 放在反转之后：配平量是「用户想要的输出」，不是「手的位置」，
+            // 所以它得跟发送值同一边。
+            //
+            // 超限时 xPos/yPos 已经是 0，加完只剩配平量 —— 这正是想要的：
+            // 用户转头看别处把手机举超了，姿态输入该被忽略，但已经配好的
+            // 平飞状态不能跟着消失，否则飞机当场失去配平。
+            x = (x + trimX).coerceIn(-1f, 1f)
+            y = (y + trimY).coerceIn(-1f, 1f)
+            lastOutX = x
+            lastOutY = y
+
             val btnNow = effectiveButtons(now)
             val thrNow = if (s.throttleInvert) 1f - throttle else throttle
 
@@ -454,6 +519,8 @@ class YokeController(
                     rudder = rPos,
                     vx = sendVX,
                     vy = sendVY,
+                    trimX = trimX,
+                    trimY = trimY,
                     throttle = throttle,
                     throttleTaken = throttleTaken,
                     buttons = sendB,
