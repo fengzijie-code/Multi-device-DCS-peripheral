@@ -15,12 +15,13 @@ android {
         applicationId = "com.fengzijie.dcsperipheral"
         minSdk = 26
         targetSdk = 37
-        versionCode = 5
+        versionCode = 6
         // v1.2.0：移除手机端视角轴（用户买了头瞄，视角交给头瞄）。
         // v1.3.0：起降页新增减速板开/收、机轮刹车（按住=刹车）三个按钮。
         // v1.3.1：把减速板/机轮刹车从杆位区移到右侧「校零」与「解锁」之间。
+        // v1.3.2：武器控制从「武器↑/↓」两个按钮改成单个「武器切换」（S8 单向循环）。
         // v1.00 是最后一个保留视角的版本，详见 docs/HANDOFF.md。
-        versionName = "1.3.1"
+        versionName = "1.3.2"
     }
 
     buildTypes {

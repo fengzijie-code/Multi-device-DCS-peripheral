@@ -389,23 +389,23 @@ def main() -> int:
         # 无挂载任务里 CurrentStation 永远是 0，这一项没有可判的状态量，
         # 不能把「前置条件不满足」记成产品缺陷。
         R.add("F-WPN-01", "武器切换 → CurrentStation/st/wn/wc 变化", "SKIP",
-              "POST /input b=BTN5 脉冲（本任务无挂载，跳过）",
+              "POST /input b=BTN4 脉冲（本任务无挂载，跳过）",
               "需要带挂载的任务才能验证；本次 7 个挂点全 x0",
               f"{stations_n} 挂点行={st_lines[:4]} CurrentStation={station0} "
               f"sys.st={sy0.get('st')} wl={sy0.get('wl')}；/input 链路本身已验证通", True)
     elif not args.allow_input:
         R.add("F-WPN-01", "武器切换 → CurrentStation/st/wn/wc 变化", "SKIP",
-              "需 POST /input 发 vJoy BTN5（默认跳过，避免动 vJoy）",
+              "需 POST /input 发 vJoy BTN4（默认跳过，避免动 vJoy）",
               "加 --allow-input 后执行",
               f"基线 CurrentStation={station0}  sys.st={sy0.get('st')} wl={sy0.get('wl')}", True)
     else:
-        live.input_btn(4)                     # WEAPON_NEXT = 4 (0-based bit)
+        live.input_btn(3)                     # WEAPON_SWITCH = 3 (0-based bit → JOY_BTN4)
         time.sleep(1.2)
         sy_w = live.sys()
         moved = (str(sy_w.get("st")) != str(sy0.get("st")) or
                  (sy_w.get("st") is not None))
         R.add("F-WPN-01", "武器切换 → CurrentStation/st/wn/wc 变化", "VERIFY",
-              "POST /input b=BTN5 脉冲 → 松开",
+              "POST /input b=BTN4 脉冲 → 松开",
               "sys.st 从 None 变成挂点号，或 wn/wc 跟着变",
               f"bef st={sy0.get('st')} wn={sy0.get('wn')} → aft st={sy_w.get('st')} "
               f"wn={sy_w.get('wn')} wc={sy_w.get('wc')}", moved)

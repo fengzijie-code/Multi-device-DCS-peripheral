@@ -41,10 +41,11 @@ object YokeBtn {
     const val GEAR = 2
 
     // 战斗页。编号必须和 vJoy 里配的按钮号对齐（1 起算），DCS 里绑的也是这个。
-    // 3..6 是当前用到的，7..9 先占位给以后的目标选择 / 雷达模式，避免到时候
-    // 重排编号 —— 一重排，DCS 里绑好的键全要重绑。
-    const val WEAPON_PREV = 3          // 上一个武器
-    const val WEAPON_NEXT = 4          // 下一个武器
+    // 3,5,6 是当前用到的，7..9 先占位给以后的目标选择 / 雷达模式，避免到时候
+    // 重排编号 —— 一重排，DCS 里绑好的键全要重绑。4 号空着：JF-17 没有「上一个 /
+    // 下一个武器」，只有 S8: Change Weapons 单向循环，武器切换一个键（占 3 号）就够，
+    // 不需要第二个，所以 4 号留作空位。
+    const val WEAPON_SWITCH = 3        // 武器切换 → DCS：S8: Change Weapons（单向循环）
     const val LOCK = 5                 // 锁定目标
     const val FIRE = 6                 // 发射
 

@@ -154,6 +154,11 @@ tools\start-usb.bat        # 开机后只跑这一个
 > 「校零」与「解锁」之间（同属起降/整备类操作，放在一起更顺手）。`versionName 1.3.0→1.3.1`、
 > `versionCode 4→5`；APK：`release/v1.3.1/DCS-Peripheral-Android-v1.3.1.apk`。功能与 DCS 绑键不变。
 
+> **v1.3.2（2026-11-14，同次会话）**：武器控制从「武器↑/↓」两个按钮改成单个「武器切换」
+> （`WEAPON_SWITCH = 3` → `JOY_BTN4` → `S8: Change Weapons`，脉冲）。JF-17 只有单向循环、没有上/下两条命令，
+> 所以一个键就够，`JOY_BTN5` 释放。`versionName 1.3.1→1.3.2`、`versionCode 5→6`；
+> APK：`release/v1.3.2/DCS-Peripheral-Android-v1.3.2.apk`。
+
 ---
 
 ## 文档索引

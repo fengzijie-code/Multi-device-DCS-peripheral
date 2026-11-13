@@ -195,7 +195,7 @@ v1.2.0 起视角已移除，右列只留两个发射键）。
 |---|---|
 | 机炮（发射左） | **按住 250ms 才发**，红；绑 `S4: Fire Main Gun` |
 | 武器投放（发射右） | **按住 250ms 才发**，红；绑 `S3: Weapon Launch` |
-| 武器 ↑ / ↓ | 并排两个，切上一个 / 下一个武器，按住 150ms 生效 |
+| 武器切换 | 单个按钮（S8 单向循环），按一下循环一个武器站，按住 150ms 生效 |
 | 锁定 | 雷达锁定目标，按住 150ms 生效 |
 | 干扰弹 | 按住 150ms 生效，琥珀色（红色全留给两个发射键，混用会在急的时候按错） |
 
@@ -223,8 +223,7 @@ v1.2.0 起视角已移除，右列只留两个发射键）。
 | 减速板开 | `SPEED_BRAKE_OPEN = 12` | `JOY_BTN13` | `Speed Brake Extend` | 按下型 |
 | 减速板收 | `SPEED_BRAKE_CLOSE = 13` | `JOY_BTN14` | `Speed Brake Retract` | 按下型 |
 | 机轮刹车 | `WHEEL_BRAKE = 14` | `JOY_BTN15` | `Wheel Brake`（按住=刹车） | 保持 |
-| 循环选武器 | `WEAPON_PREV = 3` | `JOY_BTN4` | `S8: Change Weapons` | 脉冲 |
-| 循环选武器 | `WEAPON_NEXT = 4` | `JOY_BTN5` | `S8: Change Weapons`（JF-17 只有单向循环，没有上/下两条） | 脉冲 |
+| 武器切换 | `WEAPON_SWITCH = 3` | `JOY_BTN4` | `S8: Change Weapons`（JF-17 只有单向循环，没有上/下两条） | 脉冲 |
 | 锁定 | `LOCK = 5` | `JOY_BTN6` | `T5_Press: Lock Target` | 保持 |
 | 武器投放 | `FIRE = 6` | `JOY_BTN7` | `S3: Weapon Launch` | 保持 |
 | 干扰弹 | `COUNTERMEASURE = 10` | `JOY_BTN11` | `T2_Backward: Countermeasures Dispense` | 脉冲 |

@@ -32,7 +32,7 @@ import com.fengzijie.dcsperipheral.input.YokeState
  * 右上角一整组是「机炮 / 武器投放」两个发射键，都在右手拇指下，
  * 不用横跨屏幕找键。
  *
- * 绿点盘（杆位指示）留在油门右侧，雷达锁定 / 武器↑↓ / 干扰弹填进中间剩余空间。
+ * 绿点盘（杆位指示）留在油门右侧，雷达锁定 / 武器切换 / 干扰弹填进中间剩余空间。
  *
  * 发射拆成**机炮 / 武器投放**两个键：DCS 里 `Trigger`(机炮扳机) 和
  * `Weapon Release`(投放) 本来就是两条独立命令，旧版一个 BTN7 把两者混绑。
@@ -119,25 +119,17 @@ fun CombatScreen(
                     )
                     Spacer(Modifier.height(4.dp))
 
-                    // 武器上下并排：一对操作，拇指在同一高度左右蹭就能盲切。
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        GuardButton(
-                            text = "武器 ↑",
-                            enabled = st.armed,
-                            guardMs = 150,
-                            onDown = { onButtonDown(YokeBtn.WEAPON_PREV) },
-                            onUp = { onButtonUp(YokeBtn.WEAPON_PREV) },
-                            modifier = Modifier.width(132.dp).height(60.dp),
-                        )
-                        GuardButton(
-                            text = "武器 ↓",
-                            enabled = st.armed,
-                            guardMs = 150,
-                            onDown = { onButtonDown(YokeBtn.WEAPON_NEXT) },
-                            onUp = { onButtonUp(YokeBtn.WEAPON_NEXT) },
-                            modifier = Modifier.width(132.dp).height(60.dp),
-                        )
-                    }
+                    // 武器切换：JF-17 只有 S8: Change Weapons 单向循环，没有上/下两条，
+                    // 所以一个键就够（占 BTN4）。宽 270dp 与下面「锁定 / 干扰弹」行对齐。
+                    GuardButton(
+                        text = "武器切换",
+                        sub = "S8",
+                        enabled = st.armed,
+                        guardMs = 150,
+                        onDown = { onButtonDown(YokeBtn.WEAPON_SWITCH) },
+                        onUp = { onButtonUp(YokeBtn.WEAPON_SWITCH) },
+                        modifier = Modifier.width(270.dp).height(60.dp),
+                    )
 
                     // 雷达锁定 / 干扰弹并排。干扰弹保持琥珀，红色全给发射键。
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
