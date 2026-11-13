@@ -128,6 +128,12 @@
     border-radius:8px;padding:7px 8px;font:inherit;font-size:12.5px;
     -webkit-appearance:none;appearance:none;
   }
+  #mfdrefresh{
+    flex:0 0 auto;background:#0d1117;border:1px solid var(--line);color:var(--dim);
+    border-radius:8px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  }
+  #mfdrefresh.busy{color:var(--teal);border-color:rgba(63,185,80,.5)}
 
   /* MFD 键：全部用同一个样式，位置靠容器决定 */
   .mk{
@@ -294,6 +300,7 @@
     <div id="mfdbar">
       <label for="mfdsel">当前画面</label>
       <select id="mfdsel"></select>
+      <button id="mfdrefresh" title="立即重读 DCS 回传的屏幕状态">刷新</button>
     </div>
 
     <div class="bezel">
@@ -443,7 +450,7 @@ function paint(st) {
     }
 
     // 屏幕回传优先：它直接告诉我们每块屏现在是哪一页
-    if (sys.mfd) applyScreenText(sys.mfd);
+    if (sys.mfd) { applyScreenText(sys.mfd, forceSync); forceSync = false; }
 
     // 座舱按键回传（Export 每帧扫 MFD 参数得到的）
     if (sys.bp) applyCockpitPresses(sys.bp);
@@ -651,6 +658,7 @@ const mfdPage = Object.assign(
 let mfdCur = "center";
 let mfdBack = null;        // 进下半区之前的页面，R8 再按一次回去
 let mfdSeq = 0;            // 座舱回传的按键序号（Export 的 sys.bp）
+let forceSync = false;     // 点了「刷新」后，下一次轮询放宽识别门槛
 const recentSent = {};     // 元素号 → 我们刚发出去的时间，用来忽略自己按的
 
 const pageOf = id => id === MFD_UNKNOWN
@@ -684,22 +692,36 @@ function keyFromEl(el) {
 // 屏幕回传：DCS 的 list_indication 给出当前页的元素名，元素名是页面脚本里
 // 静态定义的（rdr_aa_* / adi_* / wpt_* …），所以能唯一反推页面。
 // 这是权威来源 —— 不管谁切的页（iPad、鼠标、键盘快捷键），它都跟得上。
-function pageFromElems(elems) {
+// 通用元素名（几乎每页都有，比如底图的 split_white_line），不参与识别
+const GENERIC_PRE = (() => {
+  const c = {};
+  for (const p of Object.values(MFD_PAGES))
+    for (const x of new Set((p.e || []).map(y => y.replace(/_+$/, "")))) c[x] = (c[x] || 0) + 1;
+  const n = Object.keys(MFD_PAGES).length;
+  const set = new Set(Object.keys(c).filter(k => c[k] > n * 0.15));
+  set.add("split_white_line");
+  return set;
+})();
+
+function pageFromElems(elems, force) {
   if (!elems || !elems.length) return null;
   let best = null, bestScore = 0;
   for (const pid of Object.keys(MFD_PAGES)) {
-    const pre = (MFD_PAGES[pid].e || []).map(x => x.replace(/_+$/, "")).filter(Boolean);
-    if (!pre.length) continue;
+    const pre = new Set((MFD_PAGES[pid].e || [])
+      .map(x => x.replace(/_+$/, "")).filter(x => x && !GENERIC_PRE.has(x)));
+    if (!pre.size) continue;
     let hit = 0;
-    for (const e of elems) if (pre.some(q => e.startsWith(q))) hit++;
-    if (!hit) continue;
-    const score = hit / Math.sqrt(pre.length);
-    if (score > bestScore) { bestScore = score; best = pid; }
+    for (const e of elems)
+      if (e && !GENERIC_PRE.has(e) && [...pre].some(q => e.startsWith(q))) hit++;
+    const cov = hit / elems.length;                 // 覆盖率：dump 里多少名字能被这页解释
+    const ok = force ? (hit >= 1 && cov >= 0.4)     // 强制：有命中就要
+                     : (cov >= 0.45 && hit >= 2);   // 自动：至少两个命中且覆盖近半
+    if (ok && cov > bestScore) { bestScore = cov; best = pid; }
   }
-  return bestScore >= 1.0 ? { pid: best, score: bestScore } : null;
+  return best ? { pid: best, score: bestScore } : null;
 }
 
-function applyScreenText(mfd) {
+function applyScreenText(mfd, force) {
   const map = { L: "left", C: "center", R: "right" };
   let touched = false;
   for (const part of String(mfd).split("|")) {
@@ -708,7 +730,7 @@ function applyScreenText(mfd) {
     const screen = map[part.slice(0, eq)];
     const elems = part.slice(eq + 1).split(",").filter(Boolean);
     if (!screen || !elems.length) continue;
-    const r = pageFromElems(elems);
+    const r = pageFromElems(elems, force);
     if (r && mfdPage[screen] !== r.pid) {
       mfdPage[screen] = r.pid;
       if (screen === mfdCur) touched = true;
@@ -870,6 +892,18 @@ function renderBezel() {
     + Object.keys(MFD_PAGES).map(id => `<option value="${id}">${MFD_PAGES[id].t}</option>`).join("");
   sel.addEventListener("change", () => setPage(sel.value));
 })();
+
+// 刷新：立即拉一次状态，并放宽门槛强制吃下识别结果。
+// 为什么需要它：少数页面元素名太少，正常门槛（1.0）够不着，
+// 面板会停在旧页面上不动 —— 快捷键切页后偶尔能看到。
+$("mfdrefresh").addEventListener("click", () => {
+  const b = $("mfdrefresh");
+  b.classList.add("busy");
+  forceSync = true;
+  tick();
+  setTimeout(tick, 700);
+  setTimeout(() => b.classList.remove("busy"), 900);
+});
 
 document.querySelectorAll("#mfds button").forEach(b => {
   b.addEventListener("click", () => {
