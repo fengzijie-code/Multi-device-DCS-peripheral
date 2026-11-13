@@ -152,7 +152,8 @@ TRANS = {
 ORDER = ["UP_MainMenu"] + sorted(k for k in TITLES if k != "UP_MainMenu")
 
 
-NAME_RE = re.compile(r'name\s*=\s*"([a-z][a-z0-9_]*)"')
+# 单双引号都要认：脚本里两种写法混用（current_wpt.name = 'rdr_aa_current_wpt'）
+NAME_RE = re.compile(r"name\s*=\s*[\"']([a-z][a-z0-9_]*)[\"']")
 
 
 def elem_names(path):
@@ -178,6 +179,9 @@ def main():
         if pid.endswith("_Base"):
             continue
         base = pages.get(pid + "_Base")
+        # 雷达四个子页共用 UP_U1_RDR_Base.lua（rdr_frame_box_clip 等就写在那层）
+        if pid.startswith("UP_U1_RDR_") and names.get("UP_U1_RDR_Base"):
+            names[pid] = sorted(set(names.get(pid, [])) | set(names["UP_U1_RDR_Base"]))
         if names.get(pid + "_Base"):
             names[pid] = sorted(set(names.get(pid, [])) | set(names[pid + "_Base"]))
         # 雷达四个子页共用 UP_U1_RDR_Base.lua（U5=CNTL 就写在那一层）
@@ -187,6 +191,33 @@ def main():
             pages[pid] = {**base, **pages[pid]}
     for pid in [k for k in pages if k.endswith("_Base")]:
         del pages[pid]
+
+    # 元素名按脚本 dofile 引用链传递合并：
+    #   UP_R1_SMS_AA -> AA_Base -> SMS_Base（sms_pilon 在最底层，全家引用它）
+    #   UP_U1_RDR_AA -> AA_Base -> Contact（rdr_aa_current_wpt 在 Contact 层）
+    # 只认没被注释的 dofile（SMS_AA.lua 里有 --dofile 的旧引用，不能算）。
+    DOFILE_RE = re.compile(r'dofile\s*\(.*?"([A-Za-z0-9_./-]+\.lua)"')
+    includes = {}
+    for f in sorted(_dump.IND.glob("*.lua")):
+        text = _dump.strip_comments(f.read_text(encoding="utf-8", errors="replace"))
+        includes[f.stem] = {m.group(1).rsplit("/", 1)[-1][:-4] for m in DOFILE_RE.finditer(text)}
+
+    def inc_closure(stem):
+        seen, stack = set(), list(includes.get(stem, ()))
+        while stack:
+            d = stack.pop()
+            if d in seen or d not in includes:
+                continue
+            seen.add(d)
+            stack.extend(includes[d])
+        return seen
+
+    for pid in list(names):
+        acc = set(names[pid])
+        for d in inc_closure(pid):
+            acc |= set(names.get(d, ()))
+        if len(acc) > len(names[pid]):
+            names[pid] = sorted(acc)
     # FULL_BASE 是所有页共享的底图（带 D2/D3/D4 那几个通用元素），不是一页画面。
     # 留着会让识别打分时「谁都能匹配上一堆元素」，必须踢掉。
     pages.pop("FULL_BASE", None)
@@ -199,10 +230,6 @@ def main():
             acc |= set(names.get(sub, []))
         if acc:
             names[pid] = sorted(acc)
-
-    # osb_txt 是每个页面都用的通用键标签元素，不带页面信息，剔除
-    for pid in list(names):
-        names[pid] = [n for n in names[pid] if not n.startswith("osb_txt")]
 
     for pid, ov in OVERRIDE.items():
         if pid in pages:

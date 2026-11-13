@@ -591,12 +591,12 @@ const MFD_DEFS = [
 
 // MFDPAGES:BEGIN —— 由 tools/gen-mfd-pages.py 生成，别手改
 const MFD_PAGES = {
-  "UP_MainMenu":{"t":"主菜单","k":{"U1":"RDR","U2":"INS","U3":"TACAN","U4":"APR","U5":"POD","R1":"SMS","R2":"CMBT","R3":"BIT","R4":"CHKLS","R5":"PFL","L1":"HSD","L2":"EFIS","L3":"CLNK","L4":"DATA"},"d":"所有画面都从这里进。D3 随时回这一页。","n":{"U1":"UP_U1_RDR_AA","U2":"UP_U2_INS","U3":"UP_U3_TACAN","U4":"UP_U4_APR","U5":"UP_U5_POD","L1":"UP_L1_HSD","L2":"UP_L2_EFIS","L3":"UP_L3_CLINK","L4":"UP_L4_DATA","R1":"UP_R1_SMS_AA","R2":"UP_R2_CMBT","R3":"UP_R3_BIT","R4":"UP_R4_CHKLS","R5":"UP_R5_PFL"}},
-  "DOWN_AFINFO":{"t":"下半区·机场信息","k":{"R6":"NEXT","R7":"BACK","R8":"RTN"}},
-  "DOWN_CLINK":{"t":"下半区·数据链","k":{"R8":"RTN"}},
+  "UP_MainMenu":{"t":"主菜单","k":{"U1":"RDR","U2":"INS","U3":"TACAN","U4":"APR","U5":"POD","R1":"SMS","R2":"CMBT","R3":"BIT","R4":"CHKLS","R5":"PFL","L1":"HSD","L2":"EFIS","L3":"CLNK","L4":"DATA"},"e":["osb_txt_"],"d":"所有画面都从这里进。D3 随时回这一页。","n":{"U1":"UP_U1_RDR_AA","U2":"UP_U2_INS","U3":"UP_U3_TACAN","U4":"UP_U4_APR","U5":"UP_U5_POD","L1":"UP_L1_HSD","L2":"UP_L2_EFIS","L3":"UP_L3_CLINK","L4":"UP_L4_DATA","R1":"UP_R1_SMS_AA","R2":"UP_R2_CMBT","R3":"UP_R3_BIT","R4":"UP_R4_CHKLS","R5":"UP_R5_PFL"}},
+  "DOWN_AFINFO":{"t":"下半区·机场信息","k":{"R6":"NEXT","R7":"BACK","R8":"RTN"},"e":["osb_txt_"]},
+  "DOWN_CLINK":{"t":"下半区·数据链","k":{"R8":"RTN"},"e":["osb_txt_"]},
   "DOWN_EPI1":{"t":"下半区·应急程序 1","k":{"L6":"NORM","R6":"EPI1","R8":"RTN"}},
   "DOWN_EPI2":{"t":"下半区·应急程序 2","k":{"L6":"NORM","R6":"EPI2","R8":"RTN"}},
-  "DOWN_MainMenu":{"t":"下半区·菜单","k":{"R6":"EPI1","R7":"EPI2","R8":"RTN","L6":"AFD","L7":"SMS"}},
+  "DOWN_MainMenu":{"t":"下半区·菜单","k":{"R6":"EPI1","R7":"EPI2","R8":"RTN","L6":"AFD","L7":"SMS"},"e":["osb_txt_"]},
   "DOWN_SMS":{"t":"下半区·外挂","k":{"R8":"RTN"},"e":["sms_down_pilon"]},
   "UP_DATA_AS":{"t":"DATA·大气","k":{"U1":"AS DATA"}},
   "UP_DATA_DEdit":{"t":"DATA·数字输入","k":{"L1":"1","L2":"2","L3":"3","L4":"4","L5":"5","R1":"6","R2":"7","R3":"8","R4":"9","R5":"0"}},
@@ -609,16 +609,16 @@ const MFD_PAGES = {
   "UP_DATA_RLS":{"t":"DATA·挂点","k":{"U1":"RLS","U5":"RTN","L1":"RLS1","L2":"RLS2","L3":"RLS3","L4":"RLS4","L5":"RLS5","R1":"RLS6","R2":"RLS7","R3":"RLS8","R4":"RLS9","R5":"RLS10"}},
   "UP_DATA_SPCHK":{"t":"DATA·飞控自检","k":{"U1":"SPCHK","U5":"FCS"},"n":{"U5":"UP_DATA_FCS"}},
   "UP_EDIT":{"t":"数字键盘","k":{"L1":"1","L2":"2","L3":"3","L4":"4","L5":"5","R1":"6","R2":"7","R3":"8","R4":"9","R5":"0","D1":"CLR"}},
-  "UP_L1_HSD":{"t":"水平状态 HSD","k":{"U5":"TRU"},"e":["af_dot_sym","airspace_a_line","airspace_b_line","airspace_c_line","airspace_d_line","apr_route_line","apr_rwy_id","dl_tgt_line_dashed","dst_id_node","dst_sym_diam","dst_sym_node","faf_cir","faf_dot_sym","faf_rwy_line","flight_tgt_assign_line","msl_env_line","nav_hdg_box_value","oap_line","oap_sym_node","rdr_env_line","route_text_poly","skr_sym_node","tcn_text_poly","tgt_cca","tgt_dlz_imp_az_dashed","tgt_dlz_imp_az_solid","tgt_line_dashed","tgt_line_solid","tgt_sym_node","wpt_id_","wpt_route_line","wpt_sym_"],"n":{}},
+  "UP_L1_HSD":{"t":"水平状态 HSD","k":{"U5":"TRU"},"e":["af_dot_sym","airspace_a_line","airspace_b_line","airspace_c_line","airspace_d_line","apr_route_line","apr_rwy_id","dl_tgt_line_dashed","dst_id_node","dst_sym_diam","dst_sym_node","faf_cir","faf_dot_sym","faf_rwy_line","flight_tgt_assign_line","maws_contact_","msl_env_line","nav_hdg_box_value","oap_line","oap_sym_node","rdr_env_line","route_text_poly","rwr_contact_","sa_dl_contact_","sa_rdr_contact_","skr_sym_node","tcn_text_poly","tgt_cca","tgt_dlz_imp_az_dashed","tgt_dlz_imp_az_solid","tgt_line_dashed","tgt_line_solid","tgt_sym_node","wpt_id_","wpt_route_line","wpt_sym_"],"n":{}},
   "UP_L2_EFIS":{"t":"电子仪表 EFIS","k":{"L5":"NORM","R5":"ILS"},"e":["adi_","adi_alt_box_value","adi_alt_scale_idx_0","adi_alt_scale_long_0","adi_altbar_base","adi_altbar_clip","adi_ball_ground","adi_ball_sky","adi_cdi_h_","adi_cdi_mark_h","adi_cdi_v_","adi_hdg_box_value","adi_hdg_scale_idx_0","adi_hdg_scale_long_0","adi_hdgbar_base","adi_hdgbar_clip","adi_ils_gs","adi_ils_loc","adi_spd_box_value","adi_spd_scale_idx_0","adi_spd_scale_long_0","adi_spdbar_base","adi_spdbar_clip","adi_vvs_scale_idx_0","adi_vvs_scale_long_0","adi_vvsbar_base","adi_vvsbar_clip","efis_aoa_value","efis_hgin_value","efis_ils_osb","efis_mach_value","idx_","long_","short_"],"n":{}},
   "UP_L3_CLINK":{"t":"数据链 CLINK","k":{"U1":"CLINK"},"n":{}},
   "UP_L3_CLINK_List":{"t":"数据链·列表","k":{"U1":"RTN"},"e":["clink_group_list_"]},
   "UP_L4_DATA":{"t":"数据 DATA","k":{"U1":"DATA","L1":"RLS","L2":"NAV","L3":"AS","L4":"FUEL","R1":"DST","R2":"FCS","R3":"ENG","R4":"DTC"},"d":"DATA 主页。左列 挂点/导航/大气/燃油，右列 目的地/飞控/发动机/数据卡。","n":{"L1":"UP_DATA_RLS","L2":"UP_DATA_NAV","L3":"UP_DATA_AS","L4":"UP_DATA_FUEL","R1":"UP_DATA_DST","R2":"UP_DATA_FCS","R3":"UP_DATA_ENG","R4":"UP_DATA_DTC"}},
-  "UP_R1_SMS_AA":{"t":"外挂·空对空","k":{"U1":"A/A1","U5":"LOAD","U2":"FEED","L2":"GUN","D1":"CLR","D2":"CMBT","D4":"JET","U3":"NORM","R2":"MSL STATE"},"e":["sms_aa_feed_osb","sms_aa_gun_osb"],"d":"空对空外挂。L3 机炮准心、L4 限数、U5 进挂载页。","n":{"U5":"UP_R1_SMS_Load","R2":"UP_R1_SMS_AA_Wpn"}},
+  "UP_R1_SMS_AA":{"t":"外挂·空对空","k":{"U1":"A/A1","U5":"LOAD","U2":"FEED","L2":"GUN","D1":"CLR","D2":"CMBT","D4":"JET","U3":"NORM","R2":"MSL STATE"},"e":["sms_aa_feed_osb","sms_aa_gun_osb","sms_pilon_","sms_pilon_mark_"],"d":"空对空外挂。L3 机炮准心、L4 限数、U5 进挂载页。","n":{"U5":"UP_R1_SMS_Load","R2":"UP_R1_SMS_AA_Wpn"}},
   "UP_R1_SMS_AA_Gunsight":{"t":"外挂·空对空·准心","k":{"L3":"LCOS","L4":"SSLC","L5":"SS"}},
   "UP_R1_SMS_AA_Limiter":{"t":"外挂·空对空·机炮限数","k":{"L3":"OFF","L4":"0.2","L5":"0.5"}},
   "UP_R1_SMS_AA_Wpn":{"t":"外挂·空对空·选弹","k":{"L3":"AA 1","L4":"AA 2","L5":"AA 3","R3":"AA 4","R4":"AA 5","R5":"AA 6"}},
-  "UP_R1_SMS_AG":{"t":"外挂·空对地","k":{"U1":"A/S1","U2":"FEED","U5":"LOAD","L2":"GUN","L1":"CNTL","D1":"CLR","D2":"CMBT","D4":"JET","R2":"MSL STATE"},"e":["sms_pilon_prog_mark_"],"n":{"U5":"UP_R1_SMS_Load","L1":"UP_R1_SMS_AG_Mode"}},
+  "UP_R1_SMS_AG":{"t":"外挂·空对地","k":{"U1":"A/S1","U2":"FEED","U5":"LOAD","L2":"GUN","L1":"CNTL","D1":"CLR","D2":"CMBT","D4":"JET","R2":"MSL STATE"},"e":["sms_pilon_","sms_pilon_mark_","sms_pilon_prog_mark_"],"n":{"U5":"UP_R1_SMS_Load","L1":"UP_R1_SMS_AG_Mode"}},
   "UP_R1_SMS_AG_Fuze":{"t":"外挂·对地·引信","k":{"L3":"SAFE","L4":"NOSE","L5":"TAIL","R3":"N+T"}},
   "UP_R1_SMS_AG_Intv":{"t":"外挂·对地·间隔","k":{"L3":"0","L4":"0.1","L5":"0.2","R2":"0.4","R3":"0.8","R4":"1.2","R5":"1.6"}},
   "UP_R1_SMS_AG_Mode":{"t":"外挂·对地·投放模式","k":{"L3":"AUTO","L4":"CCIP","L5":"DTOS","R1":"VIP","R2":"DIR"}},
@@ -630,15 +630,15 @@ const MFD_PAGES = {
   "UP_R1_SMS_Load_Type":{"t":"挂载·类型","k":{"L2":"BOMB","L3":"CLST","L4":"ROCK","R2":"MILS","R3":"FUEL","R4":"POD"}},
   "UP_R1_SMS_Load_Wpn":{"t":"挂载·选弹","k":{"L1":"PL-5E","L2":"SD-10","L3":"C-802K","L4":"CM-802AKG","L5":"RKT-1","R1":"MK-82","R2":"MK-83","R3":"WMD7","R4":"STEP","R5":"BACK"}},
   "UP_R1_SMS_Prog":{"t":"外挂·程序","k":{"L2":"AA 1","L3":"AA 2","L4":"AG 1","L5":"AG 2","R2":"AG 3","R3":"AG 4","R4":"AG 5","R5":"AG 6"}},
-  "UP_R2_CMBT":{"t":"战斗 CMBT","k":{"U1":"CMBT","U5":"LOAD","U2":"FEED","L2":"GUN","L3":"AUTO","L4":"CH","L5":"PRG02","R3":"STBY","R4":"TYPE1","R5":"F+B"},"e":["sms_aa_feed_osb","sms_aa_gun_osb","split_green_line"],"d":"战斗页：干扰弹与投放程序。"},
-  "UP_R3_BIT":{"t":"自检 BIT","k":{"U1":"LMFCD","U2":"RMFCD","U3":"CMFCD","U4":"HUD","U5":"EMMC","R1":"RDR","R2":"INS","R3":"SMS","R4":"RWR","R5":"OESP","L1":"WMMC1M","L2":"WMMC2","L3":"CNI","L5":"1"}},
-  "UP_R4_CHKLS":{"t":"检查单 CHKLS","k":{"U1":"CHLST","U3":"COLD"},"e":["list_txt_"]},
+  "UP_R2_CMBT":{"t":"战斗 CMBT","k":{"U1":"CMBT","U5":"LOAD","U2":"FEED","L2":"GUN","L3":"AUTO","L4":"CH","L5":"PRG02","R3":"STBY","R4":"TYPE1","R5":"F+B"},"e":["sms_aa_feed_osb","sms_aa_gun_osb","sms_pilon_","sms_pilon_mark_","split_green_line"],"d":"战斗页：干扰弹与投放程序。"},
+  "UP_R3_BIT":{"t":"自检 BIT","k":{"U1":"LMFCD","U2":"RMFCD","U3":"CMFCD","U4":"HUD","U5":"EMMC","R1":"RDR","R2":"INS","R3":"SMS","R4":"RWR","R5":"OESP","L1":"WMMC1M","L2":"WMMC2","L3":"CNI","L5":"1"},"e":["osb_txt_"]},
+  "UP_R4_CHKLS":{"t":"检查单 CHKLS","k":{"U1":"CHLST","U3":"COLD"},"e":["list_txt_","osb_txt_"]},
   "UP_R5_PFL":{"t":"PFL","k":{"U1":"PFL","R4":"STEP","R5":"BACK","L1":"FCS","L2":"FIRE","L3":"ENG","L4":"INS","L5":"SMS","U5":"1/1"}},
-  "UP_U1_RDR_AA":{"t":"雷达·空对空","k":{"U5":"CNTL","U3":"STBY","U4":"SIL","L1":"B\\nI\\nN\\nD","L2":"E\\nX\\nP","L3":"60","L4":"N\\nO\\nR","L5":"4\\nB\\nR","U1":"模式","R1":"距离+","R2":"L/H","R3":"HST","R5":"DCLT"},"e":["rdr_aa_ase_circle","rdr_aa_az_sym","rdr_aa_beam_az_hpt_bar","rdr_aa_beam_az_spt_bar","rdr_aa_el_sym","rdr_beam_el_range","rdr_tdc_sym"],"d":"左列是搜索参数：方位角 60 / 天线稳定 NOR / 扫描行数 4BR。U1 进模式菜单，U5 进控制菜单。","n":{"U1":"UP_U1_RDR_Mode","U5":"UP_U1_RDR_AA_CNTL","U2":"UP_U1_RDR_AA_CNTL"}},
-  "UP_U1_RDR_AA_CNTL":{"t":"雷达·控制菜单","k":{"U5":"CNTL"},"d":"雷达控制菜单。U5 再按一次退回雷达页。","n":{"U5":"UP_U1_RDR_AA"}},
-  "UP_U1_RDR_AG":{"t":"雷达·空对地","k":{"U5":"CNTL","U3":"STBY","U4":"SIL","L3":"60","U1":"模式","R1":"距离+","R2":"距离-","R5":"PRF"},"e":["rdr_ag_az_sym","rdr_ag_el_sym","rdr_ag_tdc_combo","rdr_ag_tdc_line_hori","rdr_ag_tdc_line_vert","rdr_beam_el_range"],"n":{"U1":"UP_U1_RDR_Mode","U5":"UP_U1_RDR_AG_CNTL","U2":"UP_U1_RDR_AG_CNTL"}},
-  "UP_U1_RDR_AG_CNTL":{"t":"雷达·对地控制菜单","k":{"U5":"CNTL","R4":"BCN\\n00"},"n":{"U5":"UP_U1_RDR_AG"}},
-  "UP_U1_RDR_Mode":{"t":"雷达·模式选择","k":{"U5":"CNTL","L1":"RWS","L2":"TWS","L3":"VS","L4":"MAP","L5":"GMTI","R1":"SEA1","R2":"SEA2","R3":"BCN","R4":"WA","R5":"TA"},"e":["rdr_aa_beam_az_hpt_bar","rdr_aa_beam_az_spt_bar","rdr_ag_tdc_line_hori","rdr_ag_tdc_line_vert","rdr_tdc_sym"],"d":"雷达模式菜单。左列 RWS/TWS/VS/MAP/GMTI，右列 SEA1/SEA2/BCN/WA/TA。","n":{"L1":"UP_U1_RDR_AA","L2":"UP_U1_RDR_AA","L3":"UP_U1_RDR_AA","L4":"UP_U1_RDR_AA","L5":"UP_U1_RDR_AA","R1":"UP_U1_RDR_AA","R2":"UP_U1_RDR_AA","R3":"UP_U1_RDR_AA","R4":"UP_U1_RDR_AA","R5":"UP_U1_RDR_AA"}},
+  "UP_U1_RDR_AA":{"t":"雷达·空对空","k":{"U5":"CNTL","U3":"STBY","U4":"SIL","L1":"B\\nI\\nN\\nD","L2":"E\\nX\\nP","L3":"60","L4":"N\\nO\\nR","L5":"4\\nB\\nR","U1":"模式","R1":"距离+","R2":"L/H","R3":"HST","R5":"DCLT"},"e":["aa_exp_ref_box","rdr_aa_ase_circle","rdr_aa_az_sym","rdr_aa_beam_az_hpt_bar","rdr_aa_beam_az_spt_bar","rdr_aa_current_wpt","rdr_aa_current_wpt_id","rdr_aa_el_sym","rdr_beam_el_range","rdr_contact_aa_","rdr_dl_contact_","rdr_frame_box_clip","rdr_tdc_sym"],"d":"左列是搜索参数：方位角 60 / 天线稳定 NOR / 扫描行数 4BR。U1 进模式菜单，U5 进控制菜单。","n":{"U1":"UP_U1_RDR_Mode","U5":"UP_U1_RDR_AA_CNTL","U2":"UP_U1_RDR_AA_CNTL"}},
+  "UP_U1_RDR_AA_CNTL":{"t":"雷达·控制菜单","k":{"U5":"CNTL"},"e":["aa_exp_ref_box","rdr_aa_ase_circle","rdr_aa_az_sym","rdr_aa_beam_az_hpt_bar","rdr_aa_beam_az_spt_bar","rdr_aa_current_wpt","rdr_aa_current_wpt_id","rdr_aa_el_sym","rdr_beam_el_range","rdr_contact_aa_","rdr_dl_contact_","rdr_frame_box_clip","rdr_tdc_sym"],"d":"雷达控制菜单。U5 再按一次退回雷达页。","n":{"U5":"UP_U1_RDR_AA"}},
+  "UP_U1_RDR_AG":{"t":"雷达·空对地","k":{"U5":"CNTL","U3":"STBY","U4":"SIL","L3":"60","U1":"模式","R1":"距离+","R2":"距离-","R5":"PRF"},"e":["ag_frz_ac","map_spi_pnt","rdr_ag_az_sym","rdr_ag_current_wpt","rdr_ag_current_wpt_id","rdr_ag_el_sym","rdr_ag_tdc_combo","rdr_ag_tdc_line_hori","rdr_ag_tdc_line_vert","rdr_beam_el_range","rdr_contact_ag_","rdr_contact_ag_locked","rdr_contact_ag_locked_hdg","rdr_contact_ag_locked_line_hori","rdr_contact_ag_locked_line_vert","rdr_contact_bcn","rdr_frame_box_clip"],"n":{"U1":"UP_U1_RDR_Mode","U5":"UP_U1_RDR_AG_CNTL","U2":"UP_U1_RDR_AG_CNTL"}},
+  "UP_U1_RDR_AG_CNTL":{"t":"雷达·对地控制菜单","k":{"U5":"CNTL","R4":"BCN\\n00"},"e":["ag_frz_ac","map_spi_pnt","rdr_ag_az_sym","rdr_ag_current_wpt","rdr_ag_current_wpt_id","rdr_ag_el_sym","rdr_ag_tdc_combo","rdr_ag_tdc_line_hori","rdr_ag_tdc_line_vert","rdr_beam_el_range","rdr_contact_ag_","rdr_contact_ag_locked","rdr_contact_ag_locked_hdg","rdr_contact_ag_locked_line_hori","rdr_contact_ag_locked_line_vert","rdr_contact_bcn","rdr_frame_box_clip"],"n":{"U5":"UP_U1_RDR_AG"}},
+  "UP_U1_RDR_Mode":{"t":"雷达·模式选择","k":{"U5":"CNTL","L1":"RWS","L2":"TWS","L3":"VS","L4":"MAP","L5":"GMTI","R1":"SEA1","R2":"SEA2","R3":"BCN","R4":"WA","R5":"TA"},"e":["aa_exp_ref_box","ag_frz_ac","map_spi_pnt","rdr_aa_beam_az_hpt_bar","rdr_aa_beam_az_spt_bar","rdr_aa_current_wpt","rdr_aa_current_wpt_id","rdr_ag_current_wpt","rdr_ag_current_wpt_id","rdr_ag_tdc_line_hori","rdr_ag_tdc_line_vert","rdr_contact_aa_","rdr_contact_ag_","rdr_contact_ag_locked","rdr_contact_ag_locked_hdg","rdr_contact_ag_locked_line_hori","rdr_contact_ag_locked_line_vert","rdr_contact_bcn","rdr_dl_contact_","rdr_frame_box_clip","rdr_tdc_sym"],"d":"雷达模式菜单。左列 RWS/TWS/VS/MAP/GMTI，右列 SEA1/SEA2/BCN/WA/TA。","n":{"L1":"UP_U1_RDR_AA","L2":"UP_U1_RDR_AA","L3":"UP_U1_RDR_AA","L4":"UP_U1_RDR_AA","L5":"UP_U1_RDR_AA","R1":"UP_U1_RDR_AA","R2":"UP_U1_RDR_AA","R3":"UP_U1_RDR_AA","R4":"UP_U1_RDR_AA","R5":"UP_U1_RDR_AA"}},
   "UP_U2_INS":{"t":"惯导 INS","k":{"U1":"INS"},"n":{}},
   "UP_U3_TACAN":{"t":"塔康 TACAN","k":{"U1":"TACAN"},"n":{}},
   "UP_U3_TACAN_Prog":{"t":"塔康·程序","k":{"U1":"TACAN","L1":"TCN01","L2":"TCN02","L3":"TCN03","L4":"TCN04","L5":"TCN05","R1":"TCN06","R2":"TCN07","R3":"TCN08","R4":"TCN09","R5":"TCN10"}},
@@ -669,6 +669,7 @@ let mfdCur = "center";
 let mfdBack = null;        // 进下半区之前的页面，R8 再按一次回去
 let mfdSeq = 0;            // 座舱回传的按键序号（Export 的 sys.bp）
 let forceSync = false;     // 点了「刷新」后，下一次轮询放宽识别门槛
+const mfdLow = {};         // 每块屏的下半区页面（雷达页下半区固定是 SMS）
 const recentSent = {};     // 元素号 → 我们刚发出去的时间，用来忽略自己按的
 
 const pageOf = id => id === MFD_UNKNOWN
@@ -713,22 +714,23 @@ const GENERIC_PRE = (() => {
   return set;
 })();
 
-function pageFromElems(elems, force) {
-  if (!elems || !elems.length) return null;
-  let best = null, bestScore = 0;
+function scoreSeg(names, force) {
+  const cands = [];
   for (const pid of Object.keys(MFD_PAGES)) {
     const pre = new Set((MFD_PAGES[pid].e || [])
       .map(x => x.replace(/_+$/, "")).filter(x => x && !GENERIC_PRE.has(x)));
     if (!pre.size) continue;
     let hit = 0;
-    for (const e of elems)
-      if (e && !GENERIC_PRE.has(e) && [...pre].some(q => e.startsWith(q))) hit++;
-    const cov = hit / elems.length;                 // 覆盖率：dump 里多少名字能被这页解释
-    const ok = force ? (hit >= 1 && cov >= 0.4)     // 强制：有命中就要
-                     : (cov >= 0.45 && hit >= 2);   // 自动：至少两个命中且覆盖近半
-    if (ok && cov > bestScore) { bestScore = cov; best = pid; }
+    for (const e of names)
+      if ([...pre].some(q => e.startsWith(q) || q.startsWith(e))) hit++;
+    const cov = names.length ? hit / names.length : 0;
+    const ok = force ? (hit >= 1 && cov >= 0.4)
+                     : (cov >= 0.45 && (hit >= 2 || cov >= 0.9));
+    if (ok) cands.push({ pid, hit, cov });
   }
-  return best ? { pid: best, score: bestScore } : null;
+  cands.sort((a, b) => b.cov - a.cov);
+  return { pid: cands.length ? cands[0].pid : null,
+           score: cands.length ? cands[0].cov : 0, cands };
 }
 
 function applyScreenText(mfd, force) {
@@ -740,11 +742,33 @@ function applyScreenText(mfd, force) {
     const screen = map[part.slice(0, eq)];
     const elems = part.slice(eq + 1).split(",").filter(Boolean);
     if (!screen || !elems.length) continue;
-    const r = pageFromElems(elems, force);
-    if (r && mfdPage[screen] !== r.pid) {
-      mfdPage[screen] = r.pid;
-      if (screen === mfdCur) touched = true;
+
+    // LOWER_BASE 之后是下半区：JF-17 的雷达页下半区固定显示 SMS，
+    // 载荷越多下半区元素越多，不拆开会把上半区带偏。
+    const li = elems.lastIndexOf("LOWER_BASE");
+    const upper = (li >= 0 ? elems.slice(0, li) : elems).filter(e => !GENERIC_PRE.has(e));
+    const lower = (li >= 0 ? elems.slice(li) : []).filter(e => !GENERIC_PRE.has(e));
+
+    const ur = scoreSeg(upper, force);
+    let pid = ur.pid;
+    if (!pid && upper.some(e => e.startsWith("osb_txt"))) pid = "UP_MainMenu";
+
+    let lowPid = null;
+    if (li < 0) {
+      // 旧版 Export 没有分界标记，整屏混着上下半区元素，互相稀释覆盖率。
+      // 结构上主画面总在上半区：UP 页能解释就当主页面，DOWN 页只记下半区备注。
+      const up = ur.cands.find(c => c.pid.startsWith("UP_"));
+      const down = ur.cands.find(c => c.pid.startsWith("DOWN_"));
+      if (up) { pid = up.pid; lowPid = down ? down.pid : null; }
+      else if (!pid && down) pid = down.pid;
+    } else if (lower.length) {
+      const lr = scoreSeg(lower, force);
+      if (lr.pid && lr.pid.startsWith("DOWN_")) lowPid = lr.pid;
+      else if (!pid && lr.pid) pid = lr.pid;   // 有的画面只有下半区有内容
     }
+
+    if (pid && mfdPage[screen] !== pid) { mfdPage[screen] = pid; touched = true; }
+    if (mfdLow[screen] !== lowPid) { mfdLow[screen] = lowPid; if (screen === mfdCur) touched = true; }
   }
   if (touched) { savePages(); paintPage(); renderBezel(); }
 }
@@ -778,7 +802,10 @@ function applyCockpitPresses(bp) {
 function paintPage() {
   const p = pageOf(mfdPage[mfdCur]);
   $("mfdpage").textContent = p.t;
-  $("mfddesc").textContent = p.d || "";
+  let desc = p.d || "";
+  const low = mfdLow[mfdCur];
+  if (low) desc += (desc ? " ｜ " : "") + "下半区：" + pageOf(low).t;
+  $("mfddesc").textContent = desc;
   $("mfdsel").value = mfdPage[mfdCur];
 }
 

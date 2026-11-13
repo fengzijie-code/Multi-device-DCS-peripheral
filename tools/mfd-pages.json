@@ -17,6 +17,9 @@
 "L3": "CLNK",
 "L4": "DATA"
 },
+"e": [
+"osb_txt_"
+],
 "d": "所有画面都从这里进。D3 随时回这一页。",
 "n": {
 "U1": "UP_U1_RDR_AA",
@@ -41,13 +44,19 @@
 "R6": "NEXT",
 "R7": "BACK",
 "R8": "RTN"
-}
+},
+"e": [
+"osb_txt_"
+]
 },
 "DOWN_CLINK": {
 "t": "下半区·数据链",
 "k": {
 "R8": "RTN"
-}
+},
+"e": [
+"osb_txt_"
+]
 },
 "DOWN_EPI1": {
 "t": "下半区·应急程序 1",
@@ -73,7 +82,10 @@
 "R8": "RTN",
 "L6": "AFD",
 "L7": "SMS"
-}
+},
+"e": [
+"osb_txt_"
+]
 },
 "DOWN_SMS": {
 "t": "下半区·外挂",
@@ -222,12 +234,16 @@
 "faf_dot_sym",
 "faf_rwy_line",
 "flight_tgt_assign_line",
+"maws_contact_",
 "msl_env_line",
 "nav_hdg_box_value",
 "oap_line",
 "oap_sym_node",
 "rdr_env_line",
 "route_text_poly",
+"rwr_contact_",
+"sa_dl_contact_",
+"sa_rdr_contact_",
 "skr_sym_node",
 "tcn_text_poly",
 "tgt_cca",
@@ -342,7 +358,9 @@
 },
 "e": [
 "sms_aa_feed_osb",
-"sms_aa_gun_osb"
+"sms_aa_gun_osb",
+"sms_pilon_",
+"sms_pilon_mark_"
 ],
 "d": "空对空外挂。L3 机炮准心、L4 限数、U5 进挂载页。",
 "n": {
@@ -391,6 +409,8 @@
 "R2": "MSL STATE"
 },
 "e": [
+"sms_pilon_",
+"sms_pilon_mark_",
 "sms_pilon_prog_mark_"
 ],
 "n": {
@@ -538,6 +558,8 @@
 "e": [
 "sms_aa_feed_osb",
 "sms_aa_gun_osb",
+"sms_pilon_",
+"sms_pilon_mark_",
 "split_green_line"
 ],
 "d": "战斗页：干扰弹与投放程序。"
@@ -559,7 +581,10 @@
 "L2": "WMMC2",
 "L3": "CNI",
 "L5": "1"
-}
+},
+"e": [
+"osb_txt_"
+]
 },
 "UP_R4_CHKLS": {
 "t": "检查单 CHKLS",
@@ -568,7 +593,8 @@
 "U3": "COLD"
 },
 "e": [
-"list_txt_"
+"list_txt_",
+"osb_txt_"
 ]
 },
 "UP_R5_PFL": {
@@ -603,12 +629,18 @@
 "R5": "DCLT"
 },
 "e": [
+"aa_exp_ref_box",
 "rdr_aa_ase_circle",
 "rdr_aa_az_sym",
 "rdr_aa_beam_az_hpt_bar",
 "rdr_aa_beam_az_spt_bar",
+"rdr_aa_current_wpt",
+"rdr_aa_current_wpt_id",
 "rdr_aa_el_sym",
 "rdr_beam_el_range",
+"rdr_contact_aa_",
+"rdr_dl_contact_",
+"rdr_frame_box_clip",
 "rdr_tdc_sym"
 ],
 "d": "左列是搜索参数：方位角 60 / 天线稳定 NOR / 扫描行数 4BR。U1 进模式菜单，U5 进控制菜单。",
@@ -623,6 +655,21 @@
 "k": {
 "U5": "CNTL"
 },
+"e": [
+"aa_exp_ref_box",
+"rdr_aa_ase_circle",
+"rdr_aa_az_sym",
+"rdr_aa_beam_az_hpt_bar",
+"rdr_aa_beam_az_spt_bar",
+"rdr_aa_current_wpt",
+"rdr_aa_current_wpt_id",
+"rdr_aa_el_sym",
+"rdr_beam_el_range",
+"rdr_contact_aa_",
+"rdr_dl_contact_",
+"rdr_frame_box_clip",
+"rdr_tdc_sym"
+],
 "d": "雷达控制菜单。U5 再按一次退回雷达页。",
 "n": {
 "U5": "UP_U1_RDR_AA"
@@ -641,12 +688,23 @@
 "R5": "PRF"
 },
 "e": [
+"ag_frz_ac",
+"map_spi_pnt",
 "rdr_ag_az_sym",
+"rdr_ag_current_wpt",
+"rdr_ag_current_wpt_id",
 "rdr_ag_el_sym",
 "rdr_ag_tdc_combo",
 "rdr_ag_tdc_line_hori",
 "rdr_ag_tdc_line_vert",
-"rdr_beam_el_range"
+"rdr_beam_el_range",
+"rdr_contact_ag_",
+"rdr_contact_ag_locked",
+"rdr_contact_ag_locked_hdg",
+"rdr_contact_ag_locked_line_hori",
+"rdr_contact_ag_locked_line_vert",
+"rdr_contact_bcn",
+"rdr_frame_box_clip"
 ],
 "n": {
 "U1": "UP_U1_RDR_Mode",
@@ -660,6 +718,25 @@
 "U5": "CNTL",
 "R4": "BCN\\n00"
 },
+"e": [
+"ag_frz_ac",
+"map_spi_pnt",
+"rdr_ag_az_sym",
+"rdr_ag_current_wpt",
+"rdr_ag_current_wpt_id",
+"rdr_ag_el_sym",
+"rdr_ag_tdc_combo",
+"rdr_ag_tdc_line_hori",
+"rdr_ag_tdc_line_vert",
+"rdr_beam_el_range",
+"rdr_contact_ag_",
+"rdr_contact_ag_locked",
+"rdr_contact_ag_locked_hdg",
+"rdr_contact_ag_locked_line_hori",
+"rdr_contact_ag_locked_line_vert",
+"rdr_contact_bcn",
+"rdr_frame_box_clip"
+],
 "n": {
 "U5": "UP_U1_RDR_AG"
 }
@@ -680,10 +757,26 @@
 "R5": "TA"
 },
 "e": [
+"aa_exp_ref_box",
+"ag_frz_ac",
+"map_spi_pnt",
 "rdr_aa_beam_az_hpt_bar",
 "rdr_aa_beam_az_spt_bar",
+"rdr_aa_current_wpt",
+"rdr_aa_current_wpt_id",
+"rdr_ag_current_wpt",
+"rdr_ag_current_wpt_id",
 "rdr_ag_tdc_line_hori",
 "rdr_ag_tdc_line_vert",
+"rdr_contact_aa_",
+"rdr_contact_ag_",
+"rdr_contact_ag_locked",
+"rdr_contact_ag_locked_hdg",
+"rdr_contact_ag_locked_line_hori",
+"rdr_contact_ag_locked_line_vert",
+"rdr_contact_bcn",
+"rdr_dl_contact_",
+"rdr_frame_box_clip",
 "rdr_tdc_sym"
 ],
 "d": "雷达模式菜单。左列 RWS/TWS/VS/MAP/GMTI，右列 SEA1/SEA2/BCN/WA/TA。",
