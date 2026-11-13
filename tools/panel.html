@@ -134,7 +134,7 @@
 
   #mfdbar{display:flex;align-items:center;gap:8px;margin:0 2px 8px}
   #mfdbar label{font-size:11px;color:var(--dim);flex:0 0 auto}
-  #mfdsel{
+  #mfdsel,#mfdlowsel{
     flex:1;min-width:0;background:#0d1117;border:1px solid var(--line);color:var(--fg);
     border-radius:8px;padding:7px 8px;font:inherit;font-size:12.5px;
     -webkit-appearance:none;appearance:none;
@@ -316,11 +316,13 @@
       <button data-mfd="center" class="on">中 MFD</button>
       <button data-mfd="right">右 MFD</button>
     </div>
-    <p id="mfdhint">键上写的字，就是这个键<b>此刻</b>在屏幕上写的字（来自 DCS 的 MFD 绘制脚本）。页面由 DCS <b>实时回传</b>（每秒一次读指示器），鼠标点、键盘快捷键切页都会自动跟上；万一没跟上，用上面的下拉框改。D3 随时回主菜单，R8 进出下半区。</p>
+    <p id="mfdhint">键上写的字，就是这个键<b>此刻</b>在屏幕上写的字（来自 DCS 的 MFD 绘制脚本）。页面由 DCS <b>实时回传</b>（每秒一次读指示器），鼠标点、键盘快捷键切页都会自动跟上；万一没跟上，用上面的下拉框改（上、下半区各一个）。一块 MFD 是上下两个独立画面：U + LR1-5 + D 管上半，LR6-8 只管下半，互不干扰。D3 随时回上半区主菜单。</p>
 
     <div id="mfdbar">
-      <label for="mfdsel">当前画面</label>
+      <label for="mfdsel">上半区</label>
       <select id="mfdsel"></select>
+      <label for="mfdlowsel">下半区</label>
+      <select id="mfdlowsel"></select>
       <button id="mfdrefresh" title="立即重读 DCS 回传的屏幕状态">刷新</button>
     </div>
 
@@ -701,6 +703,16 @@ const mfdLow = Object.assign(
 let mfdBackLow = null;     // 下半区进菜单前的页面，RTN 再按回去
 const recentSent = {};     // 元素号 → 我们刚发出去的时间，用来忽略自己按的
 
+// 清洗旧版脏状态：旧模型把 DOWN 页面也存进 mfdPage，导致「上半区 = 下半区·菜单」、
+// 上半区按键全失灵。上半区永远只能是 UP_/未同步，DOWN 页面一律挪去 mfdLow。
+for (const s of ["left", "center", "right"]) {
+  if (mfdPage[s] && mfdPage[s].startsWith("DOWN_")) {
+    if (!mfdLow[s]) mfdLow[s] = mfdPage[s];
+    mfdPage[s] = MFD_UNKNOWN;
+  }
+}
+savePages();
+
 const pageOf = id => id === MFD_UNKNOWN
   ? { t: "未同步", k: {}, d: "不知道这块屏现在显示什么。用上面的下拉框选一次，之后按键会自动跟随。" }
   : (MFD_PAGES[id] || { t: id, k: {} });
@@ -788,11 +800,12 @@ function applyScreenText(mfd, force) {
     let lowPid = null;
     if (li < 0) {
       // 旧版 Export 没有分界标记，整屏混着上下半区元素，互相稀释覆盖率。
-      // 结构上主画面总在上半区：UP 页能解释就当主页面，DOWN 页只记下半区备注。
+      // 结构上主画面总在上半区：UP 页能解释就当主页面，DOWN 页只记下半区。
+      // 上半区认不出就让它保持未知 —— 绝不能让下半区页面冒充上半区（否则上半区全锁死）。
       const up = ur.cands.find(c => c.pid.startsWith("UP_"));
       const down = ur.cands.find(c => c.pid.startsWith("DOWN_"));
       if (up) { pid = up.pid; lowPid = down ? down.pid : null; }
-      else if (!pid && down) pid = down.pid;
+      else if (down) lowPid = down.pid;
     } else if (lower.length) {
       const lr = scoreSeg(lower, force);
       if (lr.pid && lr.pid.startsWith("DOWN_")) lowPid = lr.pid;
@@ -843,9 +856,18 @@ function paintPage() {
   $("mfdlow").textContent = lp.t;
   $("mfdlowdesc").textContent = lp.d || "";
   $("mfdsel").value = mfdPage[mfdCur];
+  $("mfdlowsel").value = mfdLow[mfdCur] || "";
 }
 
 function setPage(id, opts) {
+  // 防御：DOWN 页面属于下半区，绝不占上半区的位置（否则上半区按键全失灵）
+  if (id && id.startsWith("DOWN_")) {
+    mfdLow[mfdCur] = id;
+    savePages();
+    paintPage();
+    renderBezel();
+    return;
+  }
   mfdPage[mfdCur] = id;
   savePages();
   if (!opts || !opts.keepLast) $("mfdlast").textContent = "还没按过键";
@@ -1003,10 +1025,22 @@ function renderBezel() {
 
 // 画面下拉：换屏或手动纠正页面都用它
 (function initSelect() {
-  const sel = $("mfdsel");
+  // 上半区下拉只列 UP_ 页面，下半区下拉只列 DOWN_ 页面 —— 不可能选串
+  const upIds = Object.keys(MFD_PAGES).filter(id => !id.startsWith("DOWN_"));
+  const lowIds = Object.keys(MFD_PAGES).filter(id => id.startsWith("DOWN_"));
+  const sel = $("mfdsel"), lowSel = $("mfdlowsel");
   sel.innerHTML = `<option value="${MFD_UNKNOWN}">（未同步 · 选一次当前画面）</option>`
-    + Object.keys(MFD_PAGES).map(id => `<option value="${id}">${MFD_PAGES[id].t}</option>`).join("");
+    + upIds.map(id => `<option value="${id}">${MFD_PAGES[id].t}</option>`).join("");
+  lowSel.innerHTML = `<option value="">（未同步）</option>`
+    + lowIds.map(id => `<option value="${id}">${MFD_PAGES[id].t}</option>`).join("");
   sel.addEventListener("change", () => setPage(sel.value));
+  lowSel.addEventListener("change", () => {
+    if (!lowSel.value) return;
+    mfdLow[mfdCur] = lowSel.value;
+    savePages();
+    paintPage();
+    renderBezel();
+  });
 })();
 
 // 刷新：立即拉一次状态，并放宽门槛强制吃下识别结果。
