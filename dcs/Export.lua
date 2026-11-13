@@ -414,22 +414,44 @@ local MFD_IND = { { "L", 8 }, { "C", 9 }, { "R", 10 } }
 local function mfd_tokens(id)
     local ok, v = pcall(list_indication, id)
     if not ok or type(v) ~= "string" or #v == 0 then return "" end
-    -- 只留元素名（小写+下划线那种），它们是页面脚本里静态定义的，
-    -- 比文字可靠：文字会带着上一页的残留，元素名只属于当前页。
-    local seen, list = {}, {}
+    -- dump 里 UPPER_BASE/LOWER_BASE 会出现**多段**（页面树是嵌套的：根部一段、
+    -- 主内容一段、下半区菜单一段）。旧版把标记去重，唯一的 LOWER_BASE 落在
+    -- 开头，面板按它切就把整个屏幕当成了上半区、下半区永远识别不出。
+    -- 现在按段收集：主内容 = 最后一个非空 UPPER 段；下半区 = 最后一个非空 LOWER 段。
+    -- token 除元素名外还收全大写词（RWS/TWS/VS/EPI1…）：模式菜单这类浮层页
+    -- 几乎没有命名元素，文本是唯一特征。竖排字母（B/I/N/D 一行一个）和纯数字
+    -- 天然被排除。
+    local secs, cur = {}, nil   -- cur = { kind="U"/"L", list={…}, seenosb=bool }
     for line in v:gmatch("[^\r\n]+") do
         local s = line:gsub("^%s+", ""):gsub("%s+$", "")
-        local keep = s:match("^[a-z][a-z0-9_]*$")
-            or s == "UPPER_BASE" or s == "LOWER_BASE"   -- 上下半区分界，识别要靠它切
-        if keep and not (s:find("osb_txt") and seen[s:gsub("%d+$", "")]) then
-            if not seen[s] then
-                seen[s] = true
-                list[#list + 1] = s
-                if #list >= 60 then break end
+        if s == "UPPER_BASE" or s == "LOWER_BASE" then
+            cur = { kind = (s == "UPPER_BASE") and "U" or "L", list = {}, seenosb = false }
+            secs[#secs + 1] = cur
+        elseif cur and #s > 0 then
+            local keep = s:match("^[a-z][a-z0-9_]*$")
+            if not keep and s:match("^%u[%u%d]+$") then keep = true end
+            if s:find("osb_txt", 1, true) then
+                if cur.seenosb then keep = false else cur.seenosb = true end
             end
+            if keep and #cur.list < 60 then cur.list[#cur.list + 1] = s end
         end
     end
-    return table.concat(list, ",")
+    local function lastsec(kind)
+        for i = #secs, 1, -1 do
+            local sc = secs[i]
+            if sc and sc.kind == kind and #sc.list > 0 then return sc.list end
+        end
+        return nil
+    end
+    local up, low = lastsec("U"), lastsec("L")
+    if not up and not low then return "" end
+    local out = { "UPPER_BASE" }
+    for _, t in ipairs(up or {}) do out[#out + 1] = t end
+    if low then
+        out[#out + 1] = "LOWER_BASE"
+        for _, t in ipairs(low) do out[#out + 1] = t end
+    end
+    return table.concat(out, ",")
 end
 
 local function mfd_text_report()

@@ -682,10 +682,10 @@ const MFD_PAGES = {
   "UP_MainMenu":{"t":"主菜单","k":{"U1":"RDR","U2":"INS","U3":"TACAN","U4":"APR","U5":"POD","R1":"SMS","R2":"CMBT","R3":"BIT","R4":"CHKLS","R5":"PFL","L1":"HSD","L2":"EFIS","L3":"CLNK","L4":"DATA"},"e":["osb_txt_"],"d":"所有画面都从这里进。D3 随时回这一页。","n":{"U1":"UP_U1_RDR_AA","U2":"UP_U2_INS","U3":"UP_U3_TACAN","U4":"UP_U4_APR","U5":"UP_U5_POD","L1":"UP_L1_HSD","L2":"UP_L2_EFIS","L3":"UP_L3_CLINK","L4":"UP_L4_DATA","R1":"UP_R1_SMS_AA","R2":"UP_R2_CMBT","R3":"UP_R3_BIT","R4":"UP_R4_CHKLS","R5":"UP_R5_PFL"}},
   "DOWN_AFINFO":{"t":"下半区·机场信息","k":{"R6":"NEXT","R7":"BACK","R8":"RTN"},"e":["osb_txt_"],"d":"起飞/降落机场信息。R6 下一页，R7 上一页，R8 返回。"},
   "DOWN_CLINK":{"t":"下半区·数据链","k":{"R8":"RTN"},"e":["osb_txt_"],"d":"数据链状态。R8 返回。"},
-  "DOWN_EPI1":{"t":"下半区·应急程序 1","k":{"L6":"NORM","R6":"EPI1","R8":"RTN"},"d":"应急程序检查单第 1 页。L6 回下半区菜单。"},
-  "DOWN_EPI2":{"t":"下半区·应急程序 2","k":{"L6":"NORM","R6":"EPI2","R8":"RTN"},"d":"应急程序检查单第 2 页。L6 回下半区菜单。"},
+  "DOWN_EPI1":{"t":"下半区·应急程序 1","k":{"L6":"NORM","R6":"EPI1","R8":"RTN"},"e":["EPI1","NORM"],"d":"应急程序检查单第 1 页。L6 回下半区菜单。"},
+  "DOWN_EPI2":{"t":"下半区·应急程序 2","k":{"L6":"NORM","R6":"EPI2","R8":"RTN"},"e":["EPI2","NORM"],"d":"应急程序检查单第 2 页。L6 回下半区菜单。"},
   "DOWN_FUEL":{"t":"下半区·燃油","k":{},"d":"燃油/发动机监控（油量表、TOTAL FEED）。纯图形显示，面板认不出，可从下拉框手动选。"},
-  "DOWN_MainMenu":{"t":"下半区·菜单","k":{"R6":"EPI1","R7":"EPI2","R8":"RTN","L6":"AFD","L7":"SMS"},"e":["osb_txt_"],"d":"下半区小菜单：R6/R7 应急程序，L6 机场信息，L7 外挂摘要。R8 返回。"},
+  "DOWN_MainMenu":{"t":"下半区·菜单","k":{"R6":"EPI1","R7":"EPI2","R8":"RTN","L6":"AFD","L7":"SMS"},"e":["RTN","osb_txt_"],"d":"下半区小菜单：R6/R7 应急程序，L6 机场信息，L7 外挂摘要。R8 返回。"},
   "DOWN_SMS":{"t":"下半区·外挂","k":{"R8":"RTN"},"e":["sms_down_pilon"],"d":"外挂摘要：各挂点当前挂的武器。上半区雷达页的下半区固定显示它。"},
   "UP_DATA_AS":{"t":"DATA·大气","k":{"U1":"AS DATA"}},
   "UP_DATA_DEdit":{"t":"DATA·数字输入","k":{"L1":"1","L2":"2","L3":"3","L4":"4","L5":"5","R1":"6","R2":"7","R3":"8","R4":"9","R5":"0"}},
@@ -723,11 +723,11 @@ const MFD_PAGES = {
   "UP_R3_BIT":{"t":"自检 BIT","k":{"U1":"LMFCD","U2":"RMFCD","U3":"CMFCD","U4":"HUD","U5":"EMMC","R1":"RDR","R2":"INS","R3":"SMS","R4":"RWR","R5":"OESP","L1":"WMMC1M","L2":"WMMC2","L3":"CNI","L5":"1"},"e":["osb_txt_"]},
   "UP_R4_CHKLS":{"t":"检查单 CHKLS","k":{"U1":"CHLST","U3":"COLD"},"e":["list_txt_","osb_txt_"]},
   "UP_R5_PFL":{"t":"PFL","k":{"U1":"PFL","R4":"STEP","R5":"BACK","L1":"FCS","L2":"FIRE","L3":"ENG","L4":"INS","L5":"SMS","U5":"1/1"}},
-  "UP_U1_RDR_AA":{"t":"雷达·空对空","k":{"U5":"CNTL","U3":"STBY","U4":"SIL","L1":"B\\nI\\nN\\nD","L2":"E\\nX\\nP","L3":"60","L4":"N\\nO\\nR","L5":"4\\nB\\nR","U1":"模式","R1":"距离+","R2":"L/H","R3":"HST","R5":"DCLT"},"e":["aa_exp_ref_box","rdr_aa_ase_circle","rdr_aa_az_sym","rdr_aa_beam_az_hpt_bar","rdr_aa_beam_az_spt_bar","rdr_aa_current_wpt","rdr_aa_current_wpt_id","rdr_aa_el_sym","rdr_beam_el_range","rdr_contact_aa_","rdr_dl_contact_","rdr_frame_box_clip","rdr_tdc_sym"],"d":"左列是搜索参数：方位角 60 / 天线稳定 NOR / 扫描行数 4BR。U1 进模式菜单，U5 进控制菜单。","n":{"U1":"UP_U1_RDR_Mode","U5":"UP_U1_RDR_AA_CNTL","U2":"UP_U1_RDR_AA_CNTL"}},
+  "UP_U1_RDR_AA":{"t":"雷达·空对空","k":{"U5":"CNTL","U3":"STBY","U4":"SIL","L1":"B\\nI\\nN\\nD","L2":"E\\nX\\nP","L3":"60","L4":"N\\nO\\nR","L5":"4\\nB\\nR","U1":"模式","R1":"距离+","R2":"L/H","R3":"HST","R5":"DCLT"},"e":["SIL","STBY","aa_exp_ref_box","rdr_aa_ase_circle","rdr_aa_az_sym","rdr_aa_beam_az_hpt_bar","rdr_aa_beam_az_spt_bar","rdr_aa_current_wpt","rdr_aa_current_wpt_id","rdr_aa_el_sym","rdr_beam_el_range","rdr_contact_aa_","rdr_dl_contact_","rdr_frame_box_clip","rdr_tdc_sym"],"d":"左列是搜索参数：L1 BIND / L2 EXP / 方位角 60 / 天线 NOR / 扫描行数 BR。U1 进模式菜单，U5 进控制菜单。实测（2026-11-13 命令探针）：L1 BIND 在 RWS 有目标回波时按下会进 TWS，无目标时按了没反应；L2 EXP 在 RWS 下标签整体隐藏（OSB 禁用），只在 TWS 下生效；雷达未上电/STBY 时本页所有 OSB 都没反应，但 D3 仍能退出页面（页面切换是 MFCD 层的，不归雷达管）。iPad 点了没反应先确认：雷达是不是在 STBY / 有没有目标。","n":{"U1":"UP_U1_RDR_Mode","U5":"UP_U1_RDR_AA_CNTL","U2":"UP_U1_RDR_AA_CNTL"}},
   "UP_U1_RDR_AA_CNTL":{"t":"雷达·控制菜单","k":{"U5":"CNTL"},"e":["aa_exp_ref_box","rdr_aa_ase_circle","rdr_aa_az_sym","rdr_aa_beam_az_hpt_bar","rdr_aa_beam_az_spt_bar","rdr_aa_current_wpt","rdr_aa_current_wpt_id","rdr_aa_el_sym","rdr_beam_el_range","rdr_contact_aa_","rdr_dl_contact_","rdr_frame_box_clip","rdr_tdc_sym"],"d":"雷达控制菜单。U5 再按一次退回雷达页。","n":{"U5":"UP_U1_RDR_AA"}},
-  "UP_U1_RDR_AG":{"t":"雷达·空对地","k":{"U5":"CNTL","U3":"STBY","U4":"SIL","L3":"60","U1":"模式","R1":"距离+","R2":"距离-","R5":"PRF"},"e":["ag_frz_ac","map_spi_pnt","rdr_ag_az_sym","rdr_ag_current_wpt","rdr_ag_current_wpt_id","rdr_ag_el_sym","rdr_ag_tdc_combo","rdr_ag_tdc_line_hori","rdr_ag_tdc_line_vert","rdr_beam_el_range","rdr_contact_ag_","rdr_contact_ag_locked","rdr_contact_ag_locked_hdg","rdr_contact_ag_locked_line_hori","rdr_contact_ag_locked_line_vert","rdr_contact_bcn","rdr_frame_box_clip"],"n":{"U1":"UP_U1_RDR_Mode","U5":"UP_U1_RDR_AG_CNTL","U2":"UP_U1_RDR_AG_CNTL"}},
+  "UP_U1_RDR_AG":{"t":"雷达·空对地","k":{"U5":"CNTL","U3":"STBY","U4":"SIL","L3":"60","U1":"模式","R1":"距离+","R2":"距离-","R5":"PRF"},"e":["SIL","STBY","ag_frz_ac","map_spi_pnt","rdr_ag_az_sym","rdr_ag_current_wpt","rdr_ag_current_wpt_id","rdr_ag_el_sym","rdr_ag_tdc_combo","rdr_ag_tdc_line_hori","rdr_ag_tdc_line_vert","rdr_beam_el_range","rdr_contact_ag_","rdr_contact_ag_locked","rdr_contact_ag_locked_hdg","rdr_contact_ag_locked_line_hori","rdr_contact_ag_locked_line_vert","rdr_contact_bcn","rdr_frame_box_clip"],"n":{"U1":"UP_U1_RDR_Mode","U5":"UP_U1_RDR_AG_CNTL","U2":"UP_U1_RDR_AG_CNTL"}},
   "UP_U1_RDR_AG_CNTL":{"t":"雷达·对地控制菜单","k":{"U5":"CNTL","R4":"BCN\\n00"},"e":["ag_frz_ac","map_spi_pnt","rdr_ag_az_sym","rdr_ag_current_wpt","rdr_ag_current_wpt_id","rdr_ag_el_sym","rdr_ag_tdc_combo","rdr_ag_tdc_line_hori","rdr_ag_tdc_line_vert","rdr_beam_el_range","rdr_contact_ag_","rdr_contact_ag_locked","rdr_contact_ag_locked_hdg","rdr_contact_ag_locked_line_hori","rdr_contact_ag_locked_line_vert","rdr_contact_bcn","rdr_frame_box_clip"],"n":{"U5":"UP_U1_RDR_AG"}},
-  "UP_U1_RDR_Mode":{"t":"雷达·模式选择","k":{"U5":"CNTL","L1":"RWS","L2":"TWS","L3":"VS","L4":"MAP","L5":"GMTI","R1":"SEA1","R2":"SEA2","R3":"BCN","R4":"WA","R5":"TA"},"e":["aa_exp_ref_box","ag_frz_ac","map_spi_pnt","rdr_aa_beam_az_hpt_bar","rdr_aa_beam_az_spt_bar","rdr_aa_current_wpt","rdr_aa_current_wpt_id","rdr_ag_current_wpt","rdr_ag_current_wpt_id","rdr_ag_tdc_line_hori","rdr_ag_tdc_line_vert","rdr_contact_aa_","rdr_contact_ag_","rdr_contact_ag_locked","rdr_contact_ag_locked_hdg","rdr_contact_ag_locked_line_hori","rdr_contact_ag_locked_line_vert","rdr_contact_bcn","rdr_dl_contact_","rdr_frame_box_clip","rdr_tdc_sym"],"d":"雷达模式菜单。左列 RWS/TWS/VS/MAP/GMTI，右列 SEA1/SEA2/BCN/WA/TA。","n":{"L1":"UP_U1_RDR_AA","L2":"UP_U1_RDR_AA","L3":"UP_U1_RDR_AA","L4":"UP_U1_RDR_AA","L5":"UP_U1_RDR_AA","R1":"UP_U1_RDR_AA","R2":"UP_U1_RDR_AA","R3":"UP_U1_RDR_AA","R4":"UP_U1_RDR_AA","R5":"UP_U3_TACAN"}},
+  "UP_U1_RDR_Mode":{"t":"雷达·模式选择","k":{"U5":"CNTL","L1":"RWS","L2":"TWS","L3":"VS","L4":"MAP","L5":"GMTI","R1":"SEA1","R2":"SEA2","R3":"BCN","R4":"WA","R5":"TA"},"e":["GMTI","MAP","RWS","TWS","VS","aa_exp_ref_box","ag_frz_ac","map_spi_pnt","rdr_aa_beam_az_hpt_bar","rdr_aa_beam_az_spt_bar","rdr_aa_current_wpt","rdr_aa_current_wpt_id","rdr_ag_current_wpt","rdr_ag_current_wpt_id","rdr_ag_tdc_line_hori","rdr_ag_tdc_line_vert","rdr_contact_aa_","rdr_contact_ag_","rdr_contact_ag_locked","rdr_contact_ag_locked_hdg","rdr_contact_ag_locked_line_hori","rdr_contact_ag_locked_line_vert","rdr_contact_bcn","rdr_dl_contact_","rdr_frame_box_clip","rdr_tdc_sym"],"d":"雷达模式菜单。左列 RWS/TWS/VS/MAP/GMTI，右列 SEA1/SEA2/BCN/WA/TA。","n":{"L1":"UP_U1_RDR_AA","L2":"UP_U1_RDR_AA","L3":"UP_U1_RDR_AA","L4":"UP_U1_RDR_AA","L5":"UP_U1_RDR_AA","R1":"UP_U1_RDR_AA","R2":"UP_U1_RDR_AA","R3":"UP_U1_RDR_AA","R4":"UP_U1_RDR_AA","R5":"UP_U3_TACAN"}},
   "UP_U2_INS":{"t":"惯导 INS","k":{"U1":"INS"},"d":"惯导状态页：显示 INS OFF / 对准（ALIGN）进度与剩余时间、当前经纬度。周边键只有 U1，纯状态显示。","n":{}},
   "UP_U3_TACAN":{"t":"塔康 TACAN","k":{"U1":"TACAN","L2":"模式","R2":"频道","L3":"航线","R3":"波段","L4":"站高","R4":"磁差"},"d":"塔康主页（手册 1.12.6/2.5.1）：显示工作模式/频道/磁航线/编码 X-Y/塔康高度/磁差。塔康不直接输数字——10 个导航程序（波道等参数由数据卡预存）在程序页里选，U1 进程序页；雷达模式菜单 R5(TA) 也能进来。键旁改值（L2 模式/R2 频道/L3 航线/R3 波段/L4 站高/R4 磁差）为推断，待实测。","n":{"U1":"UP_U3_TACAN_Prog"}},
   "UP_U3_TACAN_Prog":{"t":"塔康·程序","k":{"U1":"TACAN","L1":"TCN01","L2":"TCN02","L3":"TCN03","L4":"TCN04","L5":"TCN05","R1":"TCN06","R2":"TCN07","R3":"TCN08","R4":"TCN09","R5":"TCN10"},"d":"塔康程序页（手册：系统含 10 个塔康导航程序，当前程序由飞行员人工选定）：L1-5/R1-5 选 TCN01-TCN10 作为当前程序，各程序的波道/航线/波段由数据卡预存。U1 回塔康主页。页面无元素名，手动选下拉框。","n":{"U1":"UP_U3_TACAN"}},
@@ -831,11 +831,15 @@ function scoreSeg(names, force) {
     for (const e of names)
       if ([...pre].some(q => e.startsWith(q) || q.startsWith(e))) hit++;
     const cov = names.length ? hit / names.length : 0;
+    // 两条及格线：老线（cov 高）管指纹小而准的页；新线（hit≥3 且 cov≥0.3）
+    // 管雷达模式菜单这种浮层页 —— 它的独占文本特征（VS/MAP/GMTI）能拉开
+    // 命中数差距，但整屏 token 多、cov 天然偏低，老线会把它冤枉掉。
     const ok = force ? (hit >= 1 && cov >= 0.4)
-                     : (cov >= 0.45 && (hit >= 2 || cov >= 0.9));
+                     : ((cov >= 0.45 && (hit >= 2 || cov >= 0.9)) || (hit >= 3 && cov >= 0.3));
     if (ok) cands.push({ pid, hit, cov });
   }
-  cands.sort((a, b) => b.cov - a.cov);
+  // 命中数优先、覆盖率次之：并列 cov=1.0 的候选里，谁的独占特征多谁是真的
+  cands.sort((a, b) => b.hit - a.hit || b.cov - a.cov);
   return { pid: cands.length ? cands[0].pid : null,
            score: cands.length ? cands[0].cov : 0, cands };
 }

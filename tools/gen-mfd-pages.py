@@ -270,6 +270,22 @@ def main():
     # 脚本内容，但不进数据的话下拉框里就没有、用户也没法手动标
     pages.setdefault("DOWN_FUEL", {})
 
+    # 文本指纹：模式菜单这类浮层页在 list_indication 里几乎全是动态文本、
+    # 命名元素和雷达主页高度重叠（实测 2026-11-13：三个候选 hit/cov 全并列，
+    # 按键序 AA 稳赢 —— 用户在模式选择页却显示"空对空"）。Export 端已把
+    # 全大写词（RWS/TWS/VS、STBY、RTN…）收进 token，这里把它们补进指纹。
+    # 竖排字母（B/I/N/D 一行一个）成不了词，天然不会进来。
+    TEXT_FPS = {
+        "UP_U1_RDR_Mode": ["RWS", "TWS", "VS", "MAP", "GMTI"],   # 模式菜单项，VS/MAP/GMTI 是独占特征
+        "UP_U1_RDR_AA": ["STBY", "SIL"],                         # 雷达 STBY 时扫描元素全消失，靠这两个词撑住识别
+        "UP_U1_RDR_AG": ["STBY", "SIL"],
+        "DOWN_MainMenu": ["RTN"],                                # 下半区小菜单实时 dump 里只有 RTN 一个词
+        "DOWN_EPI1": ["EPI1", "NORM"],
+        "DOWN_EPI2": ["EPI2", "NORM"],
+    }
+    for pid, words in TEXT_FPS.items():
+        names[pid] = sorted(set(names.get(pid, [])) | set(words))
+
     for pid, ov in OVERRIDE.items():
         if pid in pages:
             pages[pid] = {**pages[pid], **ov}

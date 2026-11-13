@@ -67,6 +67,10 @@
 "R6": "EPI1",
 "R8": "RTN"
 },
+"e": [
+"EPI1",
+"NORM"
+],
 "d": "应急程序检查单第 1 页。L6 回下半区菜单。"
 },
 "DOWN_EPI2": {
@@ -76,6 +80,10 @@
 "R6": "EPI2",
 "R8": "RTN"
 },
+"e": [
+"EPI2",
+"NORM"
+],
 "d": "应急程序检查单第 2 页。L6 回下半区菜单。"
 },
 "DOWN_FUEL": {
@@ -93,6 +101,7 @@
 "L7": "SMS"
 },
 "e": [
+"RTN",
 "osb_txt_"
 ],
 "d": "下半区小菜单：R6/R7 应急程序，L6 机场信息，L7 外挂摘要。R8 返回。"
@@ -649,6 +658,8 @@
 "R5": "DCLT"
 },
 "e": [
+"SIL",
+"STBY",
 "aa_exp_ref_box",
 "rdr_aa_ase_circle",
 "rdr_aa_az_sym",
@@ -708,6 +719,8 @@
 "R5": "PRF"
 },
 "e": [
+"SIL",
+"STBY",
 "ag_frz_ac",
 "map_spi_pnt",
 "rdr_ag_az_sym",
@@ -777,6 +790,11 @@
 "R5": "TA"
 },
 "e": [
+"GMTI",
+"MAP",
+"RWS",
+"TWS",
+"VS",
 "aa_exp_ref_box",
 "ag_frz_ac",
 "map_spi_pnt",
