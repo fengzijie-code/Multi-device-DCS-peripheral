@@ -170,6 +170,10 @@ tools\start-usb.bat        # 开机后只跑这一个
 > 四个方向绑到 JF-17 的 `TDC Slew Up/Down/Left/Right`（见 `BINDING.md` §2）。
 > `versionName 1.3.3→1.3.4`、`versionCode 7→8`；APK：`release/v1.3.4/DCS-Peripheral-Android-v1.3.4.apk`。
 
+> **v1.3.5（2026-11-14，同次会话）**：把右侧操作组整体放大以便盲操 —— 右列 220→250dp、发射行 78→94dp、
+> 锁定 54→60dp、雷达簇 158→200dp、TDC 箭头 46→56dp（字号也相应加大）。布局不变，仅尺寸放大。
+> `versionName 1.3.4→1.3.5`、`versionCode 8→9`；APK：`release/v1.3.5/DCS-Peripheral-Android-v1.3.5.apk`。
+
 ---
 
 ## 文档索引

@@ -160,13 +160,13 @@ fun CombatScreen(
             // ---- 右上操作组：发射三键 + 雷达簇，全部在右手拇指下 ----
             // 视角已移除：用户买了头瞄，看视角交给头瞄（见 docs/HANDOFF.md）。
             Column(
-                modifier = Modifier.width(220.dp).fillMaxHeight(),
+                modifier = Modifier.width(250.dp).fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 // 发射三键：干扰弹(琥珀) | 机炮(红) | 武器(红)。用户要求干扰弹移到机炮左侧。
                 // 都是瞬时触发（guardMs=0）；机炮/武器是不可逆动作用红色警示，干扰弹用琥珀。
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(78.dp),
+                    modifier = Modifier.fillMaxWidth().height(94.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     GuardButton(
@@ -174,6 +174,8 @@ fun CombatScreen(
                         sub = "投放",
                         enabled = st.armed,
                         guardMs = 0,
+                        textSp = 16f,
+                        subSp = 11f,
                         onDown = { onButtonDown(YokeBtn.COUNTERMEASURE) },
                         onUp = { onButtonUp(YokeBtn.COUNTERMEASURE) },
                         modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -184,8 +186,8 @@ fun CombatScreen(
                         enabled = st.armed,
                         guardMs = 0,
                         danger = true,
-                        textSp = 16f,
-                        subSp = 11f,
+                        textSp = 17f,
+                        subSp = 12f,
                         onDown = { onButtonDown(YokeBtn.GUN_FIRE) },
                         onUp = { onButtonUp(YokeBtn.GUN_FIRE) },
                         modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -196,8 +198,8 @@ fun CombatScreen(
                         enabled = st.armed,
                         guardMs = 0,
                         danger = true,
-                        textSp = 16f,
-                        subSp = 11f,
+                        textSp = 17f,
+                        subSp = 12f,
                         onDown = { onButtonDown(YokeBtn.FIRE) },
                         onUp = { onButtonUp(YokeBtn.FIRE) },
                         modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -208,7 +210,7 @@ fun CombatScreen(
                 // 用户要求：雷达锁定放在四个移动键左侧；四向做成菱形方便拇指推。
                 // TDC 四向 = JF-17 的 T5/TDC 帽，四个按钮按住即持续移动雷达光标。
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(158.dp),
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -220,7 +222,7 @@ fun CombatScreen(
                         guardMs = 0,
                         onDown = { onButtonDown(YokeBtn.LOCK) },
                         onUp = { onButtonUp(YokeBtn.LOCK) },
-                        modifier = Modifier.width(54.dp).fillMaxHeight(),
+                        modifier = Modifier.width(60.dp).fillMaxHeight(),
                     )
                     // 方框 + 菱形四向：上 / 左 右 / 下。
                     Box(
@@ -228,7 +230,7 @@ fun CombatScreen(
                             .weight(1f)
                             .fillMaxHeight()
                             .border(1.dp, Ink.Line, RoundedCornerShape(8.dp))
-                            .padding(8.dp),
+                            .padding(12.dp),
                     ) {
                         Column(
                             modifier = Modifier.fillMaxSize(),
@@ -242,8 +244,8 @@ fun CombatScreen(
                                     text = "↑", sub = null, enabled = st.armed, guardMs = 0,
                                     onDown = { onButtonDown(YokeBtn.TDC_UP) },
                                     onUp = { onButtonUp(YokeBtn.TDC_UP) },
-                                    textSp = 18f,
-                                    modifier = Modifier.size(46.dp),
+                                    textSp = 22f,
+                                    modifier = Modifier.size(56.dp),
                                 )
                             }
                             Row(
@@ -254,15 +256,15 @@ fun CombatScreen(
                                     text = "←", sub = null, enabled = st.armed, guardMs = 0,
                                     onDown = { onButtonDown(YokeBtn.TDC_LEFT) },
                                     onUp = { onButtonUp(YokeBtn.TDC_LEFT) },
-                                    textSp = 18f,
-                                    modifier = Modifier.size(46.dp),
+                                    textSp = 22f,
+                                    modifier = Modifier.size(56.dp),
                                 )
                                 GuardButton(
                                     text = "→", sub = null, enabled = st.armed, guardMs = 0,
                                     onDown = { onButtonDown(YokeBtn.TDC_RIGHT) },
                                     onUp = { onButtonUp(YokeBtn.TDC_RIGHT) },
-                                    textSp = 18f,
-                                    modifier = Modifier.size(46.dp),
+                                    textSp = 22f,
+                                    modifier = Modifier.size(56.dp),
                                 )
                             }
                             Row(
@@ -273,8 +275,8 @@ fun CombatScreen(
                                     text = "↓", sub = null, enabled = st.armed, guardMs = 0,
                                     onDown = { onButtonDown(YokeBtn.TDC_DOWN) },
                                     onUp = { onButtonUp(YokeBtn.TDC_DOWN) },
-                                    textSp = 18f,
-                                    modifier = Modifier.size(46.dp),
+                                    textSp = 22f,
+                                    modifier = Modifier.size(56.dp),
                                 )
                             }
                         }
