@@ -289,7 +289,7 @@
       <button data-mfd="center" class="on">中 MFD</button>
       <button data-mfd="right">右 MFD</button>
     </div>
-    <p id="mfdhint">键上写的字，就是这个键<b>此刻</b>在屏幕上写的字（来自 DCS 的 MFD 绘制脚本）。页面跟着按键自动走（座舱里鼠标点的也算）。但<b>用键盘快捷键切页我读不到</b>，那种情况用下拉框重新同步一次。D3 随时回主菜单，R8 进出下半区。</p>
+    <p id="mfdhint">键上写的字，就是这个键<b>此刻</b>在屏幕上写的字（来自 DCS 的 MFD 绘制脚本）。页面由 DCS <b>实时回传</b>（每秒一次读指示器），鼠标点、键盘快捷键切页都会自动跟上；万一没跟上，用上面的下拉框改。D3 随时回主菜单，R8 进出下半区。</p>
 
     <div id="mfdbar">
       <label for="mfdsel">当前画面</label>
