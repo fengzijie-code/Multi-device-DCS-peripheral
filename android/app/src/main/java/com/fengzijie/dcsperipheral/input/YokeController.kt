@@ -39,11 +39,6 @@ data class YokeSettings(
     // ---- 油门 ----
     /** 油门方向：DCS 里这根轴是反的，默认翻过来。 */
     val throttleInvert: Boolean = true,
-    // ---- 视角 ----
-    /** 横纵互换。DCS 自动识别轴的时候容易认错，互换一下不用重绑。 */
-    val swapViewAxes: Boolean = false,
-    val invertViewX: Boolean = false,
-    val invertViewY: Boolean = false,
 
     // ---- 配平（直升机） ----
     /**
@@ -87,8 +82,6 @@ data class YokeState(
     val r: Float = 0f,
     /** 最终的偏航量（-1..1），已含滑块优先、拧动、反转。杆位盘底部显示这个。 */
     val rudder: Float = 0f,
-    val vx: Float = 0f,
-    val vy: Float = 0f,
     /**
      * 配平偏移（force trim）。0 = 没配平。
      *
@@ -110,9 +103,10 @@ data class YokeState(
 )
 
 /**
- * 把手机变成一台六通道控制器。
+ * 把手机变成一台五通道控制器。
  *
- * 通道：左右 / 前后 / 脚舵（拧手机）/ 油门（触摸）/ 视角横纵（触摸）/ 按钮。
+ * 通道：左右 / 前后 / 脚舵（拧手机）/ 油门（触摸）/ 按钮。
+ * （视角以前也走这里，用户买了头瞄后已整体移除，详见 docs/HANDOFF.md。）
  *
  * 三件事必须分开想，否则会写出「一卡全卡」的东西：
  *   1. 采传感器  —— 200Hz，在系统回调线程里，只做存四元数，绝不联网
@@ -121,7 +115,7 @@ data class YokeState(
  *
  * ═══ 安全策略（这一段比功能重要）═══
  * 为什么要区分「回中类」和「保持类」通道：
- *   杆、脚舵、视角松手就该回零，断线归零是安全的。
+ *   杆、脚舵松手就该回零，断线归零是安全的。
  *   油门**不是** —— 它天生要停在原地。断线时把它拽回慢车，飞机在进近中
  *   会直接掉下去。所以油门有三重保护：
  *     · 未解锁不发（飞机保持自己的油门）
@@ -181,8 +175,6 @@ class YokeController(
 
     /** 用户碰过油门滑块没有。没碰过就绝不发油门 —— 见类注释。 */
     @Volatile private var throttleTaken = false
-    @Volatile private var viewX = 0f
-    @Volatile private var viewY = 0f
     @Volatile private var lastThrottleSave = 0L
 
     /**
@@ -209,10 +201,9 @@ class YokeController(
         // 停之前一定把「已上锁 + 全零」发出去，否则 PC 那边要等 500ms
         // 看门狗才回中，白白多一段时间的满杆
         armed = false
-        viewX = 0f; viewY = 0f
         rudderTouch = null
         synchronized(btnLock) { btnHeld = 0; btnPulse = 0 }
-        runCatching { post(0f, 0f, 0f, 0f, 0f, null, 0) }
+        runCatching { post(0f, 0f, 0f, null, 0) }
         saveThrottle(force = true)
         job?.cancel()
         job = null
@@ -294,15 +285,6 @@ class YokeController(
         if (!force && now - lastThrottleSave < 500) return
         lastThrottleSave = now
         prefs.edit().putFloat("yk_throttle", throttle).apply()
-    }
-
-    fun setView(x: Float, y: Float) {
-        viewX = x.coerceIn(-1f, 1f)
-        viewY = y.coerceIn(-1f, 1f)
-    }
-
-    fun releaseView() {
-        viewX = 0f; viewY = 0f
     }
 
     /** 手指按在脚舵滑块上：以滑块为准。 */
@@ -472,28 +454,16 @@ class YokeController(
 
             // 未解锁一律发零。油门例外：它压根不发（字段缺失），
             // 让 DCS 保持自己那边的油门位置。
-            // 视角：手机上是「按住拖哪算哪」，但发出去之前允许互换和翻转。
-            // 互换是为了救 DCS 自动识别认错轴的场景（拖横的它认成 JOY_RY），
-            // 那种情况重绑一遍很烦，换个开关就解决了。
-            var vX = viewX
-            var vY = viewY
-            if (s.swapViewAxes) {
-                val tmp = vX; vX = vY; vY = tmp
-            }
-            if (s.invertViewX) vX = -vX
-            if (s.invertViewY) vY = -vY
 
             val sendX = if (armed) x else 0f
             val sendY = if (armed) y else 0f
             val sendR = if (armed) r else 0f
-            val sendVX = if (armed) vX else 0f
-            val sendVY = if (armed) vY else 0f
             val sendB = if (armed) btnNow else 0
             val sendT = if (armed && throttleTaken) thrNow else null
 
             // --- 发 ---
             val tt = SystemClock.elapsedRealtime()
-            val res = post(sendX, sendY, sendR, sendVX, sendVY, sendT, sendB)
+            val res = post(sendX, sendY, sendR, sendT, sendB)
             val postMs = SystemClock.elapsedRealtime() - tt
             if (res >= 0) {
                 rttMs = postMs
@@ -538,8 +508,6 @@ class YokeController(
                     r = sendR,
                     // 同样用控制位置，不是发送值
                     rudder = rPos,
-                    vx = sendVX,
-                    vy = sendVY,
                     trimX = trimX,
                     trimY = trimY,
                     throttle = throttle,
@@ -587,15 +555,13 @@ class YokeController(
 
     /** 见 HttpChannel 的注释：走裸 socket 是为了能设 TCP_NODELAY。 */
     private fun post(
-        x: Float, y: Float, r: Float, vx: Float, vy: Float,
+        x: Float, y: Float, r: Float,
         t: Float?, b: Int,
     ): Int {
         val sb = StringBuilder(96)
         sb.append("{\"x\":").append(f(x))
         sb.append(",\"y\":").append(f(y))
         sb.append(",\"r\":").append(f(r))
-        sb.append(",\"vx\":").append(f(vx))
-        sb.append(",\"vy\":").append(f(vy))
         // 油门缺省 = 这次别管油门。见类注释里的「保持类通道」。
         if (t != null) sb.append(",\"t\":").append(f(t))
         sb.append(",\"b\":").append(b)

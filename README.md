@@ -100,6 +100,32 @@ tools\start-usb.bat        # 开机后只跑这一个
 
 ---
 
+## v1.2.0 —— 移除手机端视角轴（2026-11-14）
+
+> **触发**：用户买了头瞄（head tracking），手机端的「视角」拖拽区不再需要。
+> 这一个版本把视角轴**整条链路**拿掉：手机 UI 的视角区、`YokeController` 的视角
+> 发送段、校准页三个视角开关、PC 端 `vjoy_out.py` 的 `Rx/Ry` 视角轴映射、
+> `beacon.py` 的回中类列表，以及守住这些的静态测试（T-STAT-010/011/012、T-IN-003）。
+> 详见 `docs/HANDOFF.md`「下一版移除视角」一节。
+
+| 项 | 值 |
+|---|---|
+| Git tag | `v1.2.0` |
+| `versionName` / `versionCode` | `1.2.0` / `3` |
+| Android APK | `release/v1.2.0/DCS-Peripheral-Android-v1.2.0.apk`（构建后生成） |
+
+**这一版包含**：
+- **Android 端**：移除战斗页右上角视角区、起降/校准页的视角相关控件；战斗页右列
+  现在只剩「机炮 / 武器投放」两个发射键。**视角交给头瞄**。
+- **PC 桥接端**：`vjoy_out.py` 不再占用 vJoy 的 `Rx/Ry` 轴，空出来给头瞄直接用
+  （头瞄和手机不再抢同一对轴，也不会被桥接的「回中」每帧拉回正中）。
+
+**保留**：`v1.00` 的 git tag 仍可作「含视角」的回滚点。`vJoy` 的 `Rx/Ry` 若头瞄
+不用，也可在 Configure vJoy 里关掉，不影响手机其余轴。构建命令同前：
+`gradlew :app:assembleRelease --offline`（JDK `D:\Android Studio\jbr`）。
+
+---
+
 ## 文档索引
 
 | 文档 | 内容 |

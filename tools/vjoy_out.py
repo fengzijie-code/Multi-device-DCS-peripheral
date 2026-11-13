@@ -17,8 +17,6 @@ vjoy_out.py — 把手机发来的操纵量写进虚拟摇杆
     前后倾斜               y   →  pitch     Y       Pitch
     拧手机（屏幕法线旋转）  r   →  rudder    Rz      Rudder
     左侧竖条               t   →  throttle  Z       Throttle
-    视角区拖动             vx  →  viewH     Rx      View Horizontal
-    视角区拖动             vy  →  viewV     Ry      View Vertical
     按钮                   b   →  bit0..    Btn 1.. 襟翼/起落架…
 
 为什么单独一个进程，而不是塞进 beacon.py：
@@ -87,13 +85,11 @@ MAX_BTN = 30
 DEFAULT_MAP = {
     "x": "x", "y": "y", "r": "rz",
     "t": "z",
-    "vx": "rx", "vy": "ry",
 }
-SPRING = ("x", "y", "r", "vx", "vy")     # 松手回零
-HOLD = ("t",)                            # 松手保持
+SPRING = ("x", "y", "r")     # 松手回零
+HOLD = ("t",)                # 松手保持
 
-CH_CN = {"x": "左右", "y": "前后", "r": "脚舵", "t": "油门",
-         "vx": "视角横", "vy": "视角纵"}
+CH_CN = {"x": "左右", "y": "前后", "r": "脚舵", "t": "油门"}
 
 
 # ------------------------------------------------------------------ DLL
@@ -395,7 +391,7 @@ def run(args) -> int:
     print("═" * 66)
     print(f"  虚拟摇杆输出   Device {args.id}   {where}")
     print("═" * 66)
-    for ch in ("x", "y", "r", "t", "vx", "vy"):
+    for ch in ("x", "y", "r", "t"):
         if ch in mapping:
             ax = mapping[ch]
             flag = f"  {RED}未启用{RESET}" if ax in missing else ""
@@ -609,7 +605,7 @@ def main() -> int:
     ap.add_argument("--id", type=int, default=1, help="vJoy 设备号（默认 1）")
     ap.add_argument("--port", type=int, default=5011, help="收操纵量的 UDP 端口")
     ap.add_argument("--map", default="default",
-                    help="通道→轴映射，如 x=X,y=Y,r=RZ,t=Z,vx=RX,vy=RY"
+                    help="通道→轴映射，如 x=X,y=Y,r=RZ,t=Z"
                          "（默认就是这一组；给 default 用默认）")
     ap.add_argument("--negate", default="",
                     help="需要取反的通道，逗号分隔，如 x,t")

@@ -66,8 +66,8 @@ object YokeBtn {
  * 飞行页 —— 手握着手机不放就能完成全部操作。
  *
  * 版面从左到右按「离手多远」排：油门贴在左边缘（左拇指），杆位盘居中
- * （只是显示，不用碰），视角摇杆偏右（右拇指），按钮在左右两端。
- * 这样不用挪动手掌就能同时够到油门和视角。
+ * （只是显示，不用碰），解锁/状态/校零/调参在右侧，按钮在左右两端。
+ * （视角摇杆已移除：用户买了头瞄，看视角交给头瞄。）
  *
  * 杆位盘在这一页只显示不响应触摸 —— 飞行中误触一个可交互区域比少一个
  * 功能危险得多。
@@ -79,8 +79,6 @@ fun YokeScreen(
     onThrottle: (Float) -> Unit,
     onRudder: (Float) -> Unit,
     onRudderRelease: () -> Unit,
-    onView: (Float, Float) -> Unit,
-    onViewRelease: () -> Unit,
     onButtonDown: (Int) -> Unit,
     onButtonUp: (Int) -> Unit,
     onToggleArm: () -> Unit,
@@ -209,14 +207,7 @@ fun YokeScreen(
             }
 
             Spacer(Modifier.height(4.dp))
-            ViewPad(
-                enabled = st.armed,
-                onChange = onView,
-                onRelease = onViewRelease,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            )
-
-            // 间距从 4dp 拉到 10dp：光靠长按还不够，手指从 pad 滑出来时先
+            // 间距从 4dp 拉到 10dp：光靠长按还不够，手指从状态区滑出来时先
             // 撞到空白区域，比直接压在按钮上更容易「反应过来就松手」。
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth().height(36.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -400,29 +391,7 @@ fun CalibScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Chip(
-                    // 这三个是给「DCS 自动识别认错轴」准备的。DCS 绑定轴时
-                    // 是「动一下它自己认」，横着拖的时候如果手指按得偏上/偏下，
-                    // 它可能认成另一根轴。重绑很烦，这里互换一下就行。
-                    text = if (set.swapViewAxes) "视角 横纵互换" else "视角 横纵正常",
-                    on = set.swapViewAxes,
-                    onClick = { onSettings(set.copy(swapViewAxes = !set.swapViewAxes)) },
-                    modifier = Modifier.weight(1.3f),
-                )
-                Chip(
-                    text = if (set.invertViewX) "视角横 反转" else "视角横 正常",
-                    on = set.invertViewX,
-                    onClick = { onSettings(set.copy(invertViewX = !set.invertViewX)) },
-                    modifier = Modifier.weight(1f),
-                )
-                Chip(
-                    text = if (set.invertViewY) "视角纵 反转" else "视角纵 正常",
-                    on = set.invertViewY,
-                    onClick = { onSettings(set.copy(invertViewY = !set.invertViewY)) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            // 视角开关已移除：视角交给头瞄，手机端不再发视角轴（见 docs/HANDOFF.md）。
             Stepper(
                 label = "拧舵行程",
                 value = "${set.rudderRangeDeg.toInt()}°",

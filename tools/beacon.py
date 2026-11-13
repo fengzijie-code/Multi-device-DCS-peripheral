@@ -511,7 +511,7 @@ class InputHub:
 
     通道分两类，这个区分很重要：
 
-      **回中类**（x/y/r/vx/vy，-1..1）
+      **回中类**（x/y/r，-1..1）
           松手就该回零。断线时全部归零是安全的。
 
       **保持类**（t 油门，0..1）
@@ -523,7 +523,7 @@ class InputHub:
     MAX_ABS = 1.0
     VJOY_STALE_S = 2.5
     INPUT_FRESH_S = 1.5
-    SPRING = ("x", "y", "r", "vx", "vy")     # 松手回零的轴
+    SPRING = ("x", "y", "r")     # 松手回零的轴（视角移除后只剩这三根）
     HOLD = ("t",)                            # 松手保持的轴
     MAX_BUTTONS = 30
 

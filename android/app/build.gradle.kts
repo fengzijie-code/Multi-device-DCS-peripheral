@@ -15,10 +15,10 @@ android {
         applicationId = "com.fengzijie.dcsperipheral"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        // v1.00 只归档了 Android APK；v1.1.0 补上 iPad 端发布包，并把两端版本号对齐。
-        // 仍是保留视角功能的版本（用户换头瞄后才会移除）。
-        versionName = "1.1.0"
+        versionCode = 3
+        // v1.2.0：移除手机端视角轴（用户买了头瞄，视角交给头瞄）。
+        // v1.00 是最后一个保留视角的版本，详见 docs/HANDOFF.md。
+        versionName = "1.2.0"
     }
 
     buildTypes {

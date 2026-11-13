@@ -23,20 +23,16 @@ import com.fengzijie.dcsperipheral.input.YokeState
 /**
  * 战斗页 —— 交战那几秒钟要用的东西。
  *
- * 2026-11-13 重排（20:53 更正：**视角 / 机炮 / 武器三个都在右上角**，不是左上角）：
+ * 2026-11-14 改版：**视角已从手机端移除**（用户买了头瞄，看视角交给头瞄）。
+ * 战斗页只剩交战必需项，版面：
  *
- *   油门 | 绿点盘(贴油门右侧) | 中间按钮区 | 视角(右上) + 机炮/武器(其下)
+ *   油门 | 绿点盘(贴油门右侧) | 中间按钮区 | 机炮/武器(右上)
  *        | 脚舵 ————————————————————— 跨整宽，压在最底下
  *
- * 用户先说了「视角放左上角」，随即更正为「武器、机炮和视角都放右上角」。
- * 所以把「视角 + 两个发射键」当成**一整组**镜像到屏幕最右列顶部：
- * 视角 96dp 靠右（CenterEnd），机炮/武器并排贴在它正下方。
- * 这一组是右手拇指交战时的落点，三个都在同一只手下，不用横跨屏幕找键。
+ * 右上角一整组是「机炮 / 武器投放」两个发射键，都在右手拇指下，
+ * 不用横跨屏幕找键。
  *
- * 绿点盘（杆位指示）留在**油门右侧**，不再用 weight 独占中间整块；
- * 雷达锁定 / 武器↑↓ / 干扰弹填进中间剩余空间，正好都在绿点盘旁边。
- * 旧版视角区是 fillMaxWidth().height(96dp)，一个 96dp 方块独占一整行、
- * 两侧全空，现在这一行的左右都被别的控件占满。
+ * 绿点盘（杆位指示）留在油门右侧，雷达锁定 / 武器↑↓ / 干扰弹填进中间剩余空间。
  *
  * 发射拆成**机炮 / 武器投放**两个键：DCS 里 `Trigger`(机炮扳机) 和
  * `Weapon Release`(投放) 本来就是两条独立命令，旧版一个 BTN7 把两者混绑。
@@ -56,8 +52,6 @@ fun CombatScreen(
     onThrottle: (Float) -> Unit,
     onRudder: (Float) -> Unit,
     onRudderRelease: () -> Unit,
-    onView: (Float, Float) -> Unit,
-    onViewRelease: () -> Unit,
     onButtonDown: (Int) -> Unit,
     onButtonUp: (Int) -> Unit,
     onToggleArm: () -> Unit,
@@ -167,7 +161,7 @@ fun CombatScreen(
                         )
                     }
                 }
-                // 状态条挪到这里：右列放大后视角 + 发射键刚好占满，塞不下两行字。
+                // 状态条挪到这里：右列发射键占满后，中间留白处刚好够放一行小字。
                 // 中间这块有留白，合并成一行小字足够，也不抢任何触摸区。
                 Text(
                     text = st.notice ?: ("链路 ${st.rttMs} ms · ${fmt1(st.hz)} Hz · " + when (st.vjoy) {
@@ -183,33 +177,13 @@ fun CombatScreen(
                 )
             }
 
-            // ---- 右上角操作组：视角 → 机炮 / 武器，全部在右手拇指下 ----
-            // 21:14 用户嫌这一组太小、尤其视角，整组放大：
-            //   列宽 150→220dp、视角 96→160dp 正方形、发射键 60→84dp 高、
-            //   文字 13/10sp → 18/12sp。中间那组刚按用户要求缩小，保持不动。
-            // 视角放大后映射半径从 38dp 变成 70dp（min(宽,高)/2-10）：
-            // 拖满舵的行程更长、控制更细腻，松手回中不变。
-            // 160dp 是横屏高度的上限：再大就会把右下角状态条挤没（实测 168dp 会）。
+            // ---- 右上角操作组：机炮 / 武器，全部在右手拇指下 ----
+            // 视角已移除：用户买了头瞄，看视角交给头瞄（见 docs/HANDOFF.md）。
             Column(
                 modifier = Modifier.width(220.dp).fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                // 视角：右上角，160dp 正方形靠右（CenterEnd），和屏幕右边缘对齐。
-                // 正方形下圆形指示仍然内切容器，绿点指示和控件视觉一致。
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(160.dp),
-                    contentAlignment = Alignment.CenterEnd,
-                ) {
-                    ViewPad(
-                        enabled = st.armed,
-                        onChange = onView,
-                        onRelease = onViewRelease,
-                        modifier = Modifier.size(160.dp),
-                        labelSp = 13f,
-                    )
-                }
-
-                // 发射两键：视角正下方，左机炮 / 右武器投放。
+                // 发射两键：左上机炮 / 右上武器投放。
                 // 两个都是不可逆动作，所以都吃 250ms 长按门槛、都用红色。
                 Row(
                     modifier = Modifier.fillMaxWidth().height(84.dp),

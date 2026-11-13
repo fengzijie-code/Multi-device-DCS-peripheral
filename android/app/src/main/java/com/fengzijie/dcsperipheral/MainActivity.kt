@@ -214,8 +214,6 @@ private fun Root() {
                     onThrottle = { ctl?.nudgeThrottle(it) },
                     onRudder = { ctl?.setRudder(it) },
                     onRudderRelease = { ctl?.releaseRudder() },
-                    onView = { x, y -> ctl?.setView(x, y) },
-                    onViewRelease = { ctl?.releaseView() },
                     onButtonDown = { ctl?.pressButton(it) },
                     onButtonUp = { ctl?.releaseButton(it) },
                     onToggleArm = { ctl?.toggleArmed() },
@@ -228,8 +226,6 @@ private fun Root() {
                     onThrottle = { ctl?.nudgeThrottle(it) },
                     onRudder = { ctl?.setRudder(it) },
                     onRudderRelease = { ctl?.releaseRudder() },
-                    onView = { x, y -> ctl?.setView(x, y) },
-                    onViewRelease = { ctl?.releaseView() },
                     onButtonDown = { ctl?.pressButton(it) },
                     onButtonUp = { ctl?.releaseButton(it) },
                     onToggleArm = { ctl?.toggleArmed() },
@@ -396,7 +392,7 @@ private fun EmptyHint(text: String, modifier: Modifier = Modifier) {
  * 存在，改代码里的默认值就**不会生效**。实测发现俯仰和油门方向相反，光把
  * 默认值改成 true 对已经装过的机器没用，必须显式迁移一次。
  */
-private const val SETTINGS_VER = 2
+private const val SETTINGS_VER = 3
 
 private fun loadYokeSettings(p: android.content.SharedPreferences): YokeSettings {
     if (p.getInt("yk_ver", 1) < 2) {
@@ -405,6 +401,15 @@ private fun loadYokeSettings(p: android.content.SharedPreferences): YokeSettings
         p.edit()
             .putBoolean("yk_invy", true)
             .putBoolean("yk_thr_inv", true)
+            .putInt("yk_ver", SETTINGS_VER)
+            .apply()
+    }
+    if (p.getInt("yk_ver", 1) < 3) {
+        // v3：视角轴整体移除（用户买了头瞄）。清掉旧的视角偏好，避免残留。
+        p.edit()
+            .remove("yk_view_swap")
+            .remove("yk_view_invx")
+            .remove("yk_view_invy")
             .putInt("yk_ver", SETTINGS_VER)
             .apply()
     }
@@ -420,9 +425,6 @@ private fun loadYokeSettings(p: android.content.SharedPreferences): YokeSettings
         rudderRangeDeg = p.getFloat("yk_rudder_range", 28f),
         invertRudder = p.getBoolean("yk_rudder_inv", false),
         throttleInvert = p.getBoolean("yk_thr_inv", true),
-        swapViewAxes = p.getBoolean("yk_view_swap", false),
-        invertViewX = p.getBoolean("yk_view_invx", false),
-        invertViewY = p.getBoolean("yk_view_invy", false),
         // 默认关：飞固定翼是主场景，配平按钮在那里没用还占地方
         trimOn = p.getBoolean("yk_trim_on", false),
     )
@@ -441,9 +443,6 @@ private fun saveYokeSettings(p: android.content.SharedPreferences, s: YokeSettin
         .putFloat("yk_rudder_range", s.rudderRangeDeg)
         .putBoolean("yk_rudder_inv", s.invertRudder)
         .putBoolean("yk_thr_inv", s.throttleInvert)
-        .putBoolean("yk_view_swap", s.swapViewAxes)
-        .putBoolean("yk_view_invx", s.invertViewX)
-        .putBoolean("yk_view_invy", s.invertViewY)
         .putBoolean("yk_trim_on", s.trimOn)
         .apply()
 }
@@ -475,7 +474,7 @@ private fun Header(
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text = "DCS 外设 · v1.1.0",
+                text = "DCS 外设 · v1.2.0",
                 color = Ink.Fg,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
@@ -498,7 +497,7 @@ private fun Header(
         ModeTab("仪表", on = mode == "pfd", onClick = { onMode("pfd") })
         Spacer(Modifier.width(4.dp))
         // 起降和战斗共用同一套控制器和同一个 ARM 状态，只是版面不同：
-        // 起降要脚舵/襟翼/起落架/视角，战斗只要武器和发射。
+        // 起降要脚舵/襟翼/起落架，战斗只要武器和发射（视角已交给头瞄）。
         ModeTab("起降", on = mode == "yoke", armed = yokeArmed, onClick = { onMode("yoke") })
         Spacer(Modifier.width(4.dp))
         ModeTab("战斗", on = mode == "combat", armed = yokeArmed, onClick = { onMode("combat") })
