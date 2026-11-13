@@ -110,6 +110,8 @@
   .brow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;height:2.6rem}
   .bmid{flex:1;display:grid;grid-template-columns:3.2rem minmax(0,1fr) 3.2rem;gap:6px;min-height:0}
   .bcolwrap{display:flex;flex-direction:column;gap:6px;min-height:0}
+  /* LR5 与 LR6 之间的小分隔：虚线，提示下面三颗键只管下半区 */
+  .bsep{flex:0 0 8px;border-top:2px dashed #2c3540;margin:1px 3px}
   /* 上半区 5 个键 + 下半区 3 个键：和实体 MFD 一致（LR1-5 配上块画面，LR6-8 配下块） */
   .bcol{display:grid;gap:6px;min-height:0}
   .bcol5{flex:5;grid-template-rows:repeat(5,minmax(0,1fr))}
@@ -330,6 +332,7 @@
       <div class="bmid">
         <div class="bcolwrap">
           <div class="bcol bcol5" id="mfdL"></div>
+          <div class="bsep" title="以下三颗键只控制下半区画面"></div>
           <div class="bcol bcol3" id="mfdL2"></div>
         </div>
         <div class="screen">
@@ -346,6 +349,7 @@
         </div>
         <div class="bcolwrap">
           <div class="bcol bcol5" id="mfdR"></div>
+          <div class="bsep" title="以下三颗键只控制下半区画面"></div>
           <div class="bcol bcol3" id="mfdR2"></div>
         </div>
       </div>
