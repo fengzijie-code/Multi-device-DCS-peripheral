@@ -90,7 +90,11 @@ TITLES = {
 
 DESC = {
     "UP_MainMenu": "所有画面都从这里进。D3 随时回这一页。",
-    "UP_U1_RDR_AA": "左列是搜索参数：方位角 60 / 天线稳定 NOR / 扫描行数 4BR。U1 进模式菜单，U5 进控制菜单。",
+    "UP_U1_RDR_AA": "左列是搜索参数：L1 BIND / L2 EXP / 方位角 60 / 天线 NOR / 扫描行数 BR。U1 进模式菜单，U5 进控制菜单。"
+        "实测（2026-11-13 命令探针）：L1 BIND 在 RWS 有目标回波时按下会进 TWS，无目标时按了没反应；"
+        "L2 EXP 在 RWS 下标签整体隐藏（OSB 禁用），只在 TWS 下生效；"
+        "雷达未上电/STBY 时本页所有 OSB 都没反应，但 D3 仍能退出页面（页面切换是 MFCD 层的，不归雷达管）。"
+        "iPad 点了没反应先确认：雷达是不是在 STBY / 有没有目标。",
     "UP_U1_RDR_Mode": "雷达模式菜单。左列 RWS/TWS/VS/MAP/GMTI，右列 SEA1/SEA2/BCN/WA/TA。",
     "UP_U1_RDR_AA_CNTL": "雷达控制菜单。U5 再按一次退回雷达页。",
     "UP_L4_DATA": "DATA 主页。左列 挂点/导航/大气/燃油，右列 目的地/飞控/发动机/数据卡。",
