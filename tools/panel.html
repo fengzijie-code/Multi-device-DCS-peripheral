@@ -114,12 +114,13 @@
   .bcol{display:grid;gap:6px;min-height:0}
   .bcol5{flex:5;grid-template-rows:repeat(5,minmax(0,1fr))}
   .bcol3{flex:3;grid-template-rows:repeat(3,minmax(0,1fr))}
-  .lowzone{
-    border:1px dashed #2a3340;border-radius:8px;padding:6px 8px;margin-top:4px;
-    background:#080b10;min-height:0;
-  }
-  #mfdlow{font-size:14px;font-weight:600;color:#9fb0c0}
-  #mfdlowdesc{font-size:10px;color:#68737f;line-height:1.35}
+  /* 屏幕分成上下两个半区，中间一条分隔线 —— 对应实体 MFD 的上下两块画面。
+     LR1-5 键配上半区，LR6-8 键配下半区 */
+  .half{flex:1;width:100%;min-height:0;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;gap:3px;padding:2px 0}
+  .half.lowhalf{border-top:2px solid #46505c;background:#04070b;border-radius:0 0 6px 6px}
+  #mfdlow{font-size:15px;font-weight:600;color:#9fb0c0;letter-spacing:.02em}
+  #mfdlowdesc{font-size:10px;color:#68737f;line-height:1.35;max-width:96%}
   .screen{
     min-height:0;background:#05080c;border:1px solid #1d242e;border-radius:8px;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
@@ -331,9 +332,11 @@
           <div class="bcol bcol3" id="mfdL2"></div>
         </div>
         <div class="screen">
-          <div id="mfdpage">--</div>
-          <div id="mfddesc"></div>
-          <div class="lowzone" id="mfdlowbox">
+          <div class="half">
+            <div id="mfdpage">--</div>
+            <div id="mfddesc"></div>
+          </div>
+          <div class="half lowhalf">
             <div id="mfdlow">--</div>
             <div id="mfdlowdesc"></div>
           </div>
@@ -612,12 +615,13 @@ const MFD_DEFS = [
 // MFDPAGES:BEGIN —— 由 tools/gen-mfd-pages.py 生成，别手改
 const MFD_PAGES = {
   "UP_MainMenu":{"t":"主菜单","k":{"U1":"RDR","U2":"INS","U3":"TACAN","U4":"APR","U5":"POD","R1":"SMS","R2":"CMBT","R3":"BIT","R4":"CHKLS","R5":"PFL","L1":"HSD","L2":"EFIS","L3":"CLNK","L4":"DATA"},"e":["osb_txt_"],"d":"所有画面都从这里进。D3 随时回这一页。","n":{"U1":"UP_U1_RDR_AA","U2":"UP_U2_INS","U3":"UP_U3_TACAN","U4":"UP_U4_APR","U5":"UP_U5_POD","L1":"UP_L1_HSD","L2":"UP_L2_EFIS","L3":"UP_L3_CLINK","L4":"UP_L4_DATA","R1":"UP_R1_SMS_AA","R2":"UP_R2_CMBT","R3":"UP_R3_BIT","R4":"UP_R4_CHKLS","R5":"UP_R5_PFL"}},
-  "DOWN_AFINFO":{"t":"下半区·机场信息","k":{"R6":"NEXT","R7":"BACK","R8":"RTN"},"e":["osb_txt_"]},
-  "DOWN_CLINK":{"t":"下半区·数据链","k":{"R8":"RTN"},"e":["osb_txt_"]},
-  "DOWN_EPI1":{"t":"下半区·应急程序 1","k":{"L6":"NORM","R6":"EPI1","R8":"RTN"}},
-  "DOWN_EPI2":{"t":"下半区·应急程序 2","k":{"L6":"NORM","R6":"EPI2","R8":"RTN"}},
-  "DOWN_MainMenu":{"t":"下半区·菜单","k":{"R6":"EPI1","R7":"EPI2","R8":"RTN","L6":"AFD","L7":"SMS"},"e":["osb_txt_"]},
-  "DOWN_SMS":{"t":"下半区·外挂","k":{"R8":"RTN"},"e":["sms_down_pilon"]},
+  "DOWN_AFINFO":{"t":"下半区·机场信息","k":{"R6":"NEXT","R7":"BACK","R8":"RTN"},"e":["osb_txt_"],"d":"起飞/降落机场信息。R6 下一页，R7 上一页，R8 返回。"},
+  "DOWN_CLINK":{"t":"下半区·数据链","k":{"R8":"RTN"},"e":["osb_txt_"],"d":"数据链状态。R8 返回。"},
+  "DOWN_EPI1":{"t":"下半区·应急程序 1","k":{"L6":"NORM","R6":"EPI1","R8":"RTN"},"d":"应急程序检查单第 1 页。L6 回下半区菜单。"},
+  "DOWN_EPI2":{"t":"下半区·应急程序 2","k":{"L6":"NORM","R6":"EPI2","R8":"RTN"},"d":"应急程序检查单第 2 页。L6 回下半区菜单。"},
+  "DOWN_FUEL":{"t":"下半区·燃油","k":{},"d":"燃油/发动机监控（油量表、TOTAL FEED）。纯图形显示，面板认不出，可从下拉框手动选。"},
+  "DOWN_MainMenu":{"t":"下半区·菜单","k":{"R6":"EPI1","R7":"EPI2","R8":"RTN","L6":"AFD","L7":"SMS"},"e":["osb_txt_"],"d":"下半区小菜单：R6/R7 应急程序，L6 机场信息，L7 外挂摘要。R8 返回。"},
+  "DOWN_SMS":{"t":"下半区·外挂","k":{"R8":"RTN"},"e":["sms_down_pilon"],"d":"外挂摘要：各挂点当前挂的武器。上半区雷达页的下半区固定显示它。"},
   "UP_DATA_AS":{"t":"DATA·大气","k":{"U1":"AS DATA"}},
   "UP_DATA_DEdit":{"t":"DATA·数字输入","k":{"L1":"1","L2":"2","L3":"3","L4":"4","L5":"5","R1":"6","R2":"7","R3":"8","R4":"9","R5":"0"}},
   "UP_DATA_DST":{"t":"DATA·目的地","k":{"U1":"DST","U2":"FP-A","U4":"CPY","U5":"CLR","L2":"STEP","L3":"BACK"}},
@@ -686,10 +690,15 @@ const mfdPage = Object.assign(
   (() => { try { return JSON.parse(localStorage.getItem(MFD_STORE) || "{}"); } catch (e) { return {}; } })()
 );
 let mfdCur = "center";
-let mfdBack = null;        // 进下半区之前的页面，R8 再按一次回去
 let mfdSeq = 0;            // 座舱回传的按键序号（Export 的 sys.bp）
 let forceSync = false;     // 点了「刷新」后，下一次轮询放宽识别门槛
-const mfdLow = {};         // 每块屏的下半区页面（雷达页下半区固定是 SMS）
+// 一块 MFD = 上下两个独立画面：U+LR1-5+D 管上半，LR6-8 管下半。
+// mfdPage 是上半区页面，mfdLow 是下半区页面 —— 各走各的跳转，互不干扰。
+const mfdLow = Object.assign(
+  { left: null, center: null, right: null },
+  (() => { try { return JSON.parse(localStorage.getItem(MFD_STORE + "_low") || "{}"); } catch (e) { return {}; } })()
+);
+let mfdBackLow = null;     // 下半区进菜单前的页面，RTN 再按回去
 const recentSent = {};     // 元素号 → 我们刚发出去的时间，用来忽略自己按的
 
 const pageOf = id => id === MFD_UNKNOWN
@@ -697,7 +706,10 @@ const pageOf = id => id === MFD_UNKNOWN
   : (MFD_PAGES[id] || { t: id, k: {} });
 
 function savePages() {
-  try { localStorage.setItem(MFD_STORE, JSON.stringify(mfdPage)); } catch (e) {}
+  try {
+    localStorage.setItem(MFD_STORE, JSON.stringify(mfdPage));
+    localStorage.setItem(MFD_STORE + "_low", JSON.stringify(mfdLow));
+  } catch (e) {}
 }
 
 // 元素号 → 哪块屏的哪颗键（734..766 左 / 767..799 中 / 800..832 右）
@@ -810,7 +822,10 @@ function applyCockpitPresses(bp) {
     mfdCur = k.screen;
     const nx = nextPage(k.name);
     mfdCur = save;
-    if (nx) mfdPage[k.screen] = nx;
+    if (nx) {
+      if (isLowerKey(k.name)) mfdLow[k.screen] = nx;   // 座舱按的下半区键只动下半区
+      else mfdPage[k.screen] = nx;
+    }
     if (k.screen === mfdCur) {
       $("mfdlast").textContent = "座舱按 " + k.name;
       paintPage();
@@ -823,19 +838,10 @@ function paintPage() {
   const p = pageOf(mfdPage[mfdCur]);
   $("mfdpage").textContent = p.t;
   $("mfddesc").textContent = p.d || "";
-  // 下半区是独立的一块画面（雷达页下半区固定显示外挂/燃油那些），单独给个框
-  const box = $("mfdlowbox");
-  const low = mfdLow[mfdCur];
-  if (low) {
-    const lp = pageOf(low);
-    $("mfdlow").textContent = lp.t;
-    $("mfdlowdesc").textContent = lp.d || "";
-    box.style.display = "";
-  } else {
-    $("mfdlow").textContent = "下半区：无独立画面";
-    $("mfdlowdesc").textContent = "";
-    box.style.display = "";
-  }
+  // 下半区是独立画面（LR6-8 键控制它），跟上半区平级显示
+  const lp = pageOf(mfdLow[mfdCur] || "DOWN_MainMenu");
+  $("mfdlow").textContent = lp.t;
+  $("mfdlowdesc").textContent = lp.d || "";
   $("mfdsel").value = mfdPage[mfdCur];
 }
 
@@ -847,16 +853,40 @@ function setPage(id, opts) {
   renderBezel();
 }
 
-// 按一个键之后，页面会跳到哪
+// 一块 MFD 是上下两个独立画面：U + LR1-5 + D 管上半，LR6-8 只管下半。
+// 两个半区各跳各的，按 LR6-8 永远不会动上半区，反过来也一样。
+const isLowerKey = n => /^[LR][678]$/.test(n);
+
+// 下半区的跳转是个固定小菜单（页面数据里没有 n 表），写死在这。
+// 识别（sys.mfd）随时会用真实画面纠正它。
+function nextLower(keyName) {
+  const cur = mfdLow[mfdCur] || "DOWN_MainMenu";
+  if (keyName === "R8") {                       // RTN：回下半区主菜单
+    if (cur === "DOWN_MainMenu") return cur;
+    const b = mfdBackLow; mfdBackLow = null;
+    return b || "DOWN_MainMenu";
+  }
+  const t = {
+    DOWN_MainMenu: { R6: "DOWN_EPI1", R7: "DOWN_EPI2", L6: "DOWN_AFINFO", L7: "DOWN_SMS" },
+    DOWN_EPI1:     { L6: "DOWN_MainMenu" },
+    DOWN_EPI2:     { L6: "DOWN_MainMenu" },
+    DOWN_AFINFO:   {},
+    DOWN_SMS:      {},
+    DOWN_CLINK:    {},
+  }[cur] || {};
+  const nx = t[keyName] || null;
+  if (nx && cur === "DOWN_MainMenu") mfdBackLow = "DOWN_MainMenu";
+  return nx;
+}
+
+// 按一个键之后，页面会跳到哪（只算跳转目标，不关心是哪个半区）
 function nextPage(keyName) {
+  if (isLowerKey(keyName)) return nextLower(keyName);
   const cur = mfdPage[mfdCur];
   const p = pageOf(cur);
   if (keyName === "D3") return "UP_MainMenu";
-  if (keyName === "R8") {
-    if (cur.startsWith("DOWN_")) { const b = mfdBack; mfdBack = null; return b || "UP_MainMenu"; }
-    mfdBack = cur;
-    return "DOWN_MainMenu";
-  }
+  // R8 是「下半区小菜单」开关：只动下半区，上半区原地不动
+  if (keyName === "R8") return "DOWN_MainMenu";
   // 手册 p53 的快速切换键：D2 左 CMBT / 中 雷达 / 右 HSD，D4 左 SMS / 中 无 / 右 CLINK
   if (keyName === "D2") return { left: "UP_R2_CMBT", center: "UP_U1_RDR_AA", right: "UP_L1_HSD" }[mfdCur];
   if (keyName === "D4") return { left: "UP_R1_SMS_AA", center: null, right: "UP_L3_CLINK" }[mfdCur];
@@ -899,7 +929,17 @@ function mkKey(name, label, el, opt) {
     if (opt.release !== false) {
       setTimeout(() => sendCmd(MFCD_DEV, el + CMD_OFFSET, 0), 90);
     }
-    if (nx && nx !== mfdPage[mfdCur]) setPage(nx, { keepLast: true });
+    if (nx) {
+      if (isLowerKey(name)) {
+        // 下半区键：只换下半区画面，上半区原地不动
+        mfdLow[mfdCur] = nx;
+        savePages();
+        paintPage();
+        renderBezel();
+      } else if (nx !== mfdPage[mfdCur]) {
+        setPage(nx, { keepLast: true });
+      }
+    }
   };
 
   b.addEventListener("pointerdown", e => {
@@ -920,31 +960,33 @@ function mkKey(name, label, el, opt) {
 
 function renderBezel() {
   const d = MFD_DEFS.find(x => x.key === mfdCur);
-  const K = pageOf(mfdPage[mfdCur]).k || {};
+  const K = pageOf(mfdPage[mfdCur]).k || {};                             // 上半区键位
+  const Klow = pageOf(mfdLow[mfdCur] || "DOWN_MainMenu").k || {};        // 下半区键位
   // Lua 里的 \n 是「竖排文字」（C\A\G\E），iPad 上挤成一列没法看，拼成一行
   const txt = s => s ? String(s).replace(/\\n/g, "") : s;
   // D3 / R8 的语义是全局固定的，页面没定义也给个提示
-  const fallback = n => n === "D3" ? "MENU" : n === "R8" ? "小菜单" : "";
+  const fallback = (n, low) => n === "D3" ? "MENU" : n === "R8" ? (low ? "RTN" : "小菜单") : "";
   // 实体 MFD 分区：上面 U + LR1-5 管上半块画面，下面 D + LR6-8 管下半块
   // （L6 = base+8+5，R6 = base+16+5；D 排在最底部单独一行）
   const unknown = mfdPage[mfdCur] === MFD_UNKNOWN;
   const seq = (pre, from, count, elOf) =>
     Array.from({ length: count }, (_, k) => [pre + (from + k), elOf(from + k)]);
-  const put = (id, keys) => {
+  const put = (id, keys, km, low) => {
     const box = $(id);
     box.innerHTML = "";
     keys.forEach(([name, el]) => {
       // D3 是固定的「回上半区菜单」，也就是撤销键，给个暗色边框好找
       const undo = name === "D3" ? "undo" : "";
-      box.appendChild(mkKey(name, unknown ? "?" : (txt(K[name]) || fallback(name)), el, { cls: undo }));
+      const label = unknown ? "?" : (txt(km[name]) || fallback(name, low));
+      box.appendChild(mkKey(name, label, el, { cls: undo }));
     });
   };
-  put("mfdU",  seq("U", 1, 5, n => d.base + 2 + n - 1));
-  put("mfdL",  seq("L", 1, 5, n => d.base + 8 + n - 1));
-  put("mfdR",  seq("R", 1, 5, n => d.base + 16 + n - 1));
-  put("mfdL2", seq("L", 6, 3, n => d.base + 8 + n - 1));
-  put("mfdR2", seq("R", 6, 3, n => d.base + 16 + n - 1));
-  put("mfdD",  seq("D", 1, 5, n => d.base + d.d0 + n - 1));
+  put("mfdU",  seq("U", 1, 5, n => d.base + 2 + n - 1), K, false);
+  put("mfdL",  seq("L", 1, 5, n => d.base + 8 + n - 1), K, false);
+  put("mfdR",  seq("R", 1, 5, n => d.base + 16 + n - 1), K, false);
+  put("mfdL2", seq("L", 6, 3, n => d.base + 8 + n - 1), Klow, true);
+  put("mfdR2", seq("R", 6, 3, n => d.base + 16 + n - 1), Klow, true);
+  put("mfdD",  seq("D", 1, 5, n => d.base + d.d0 + n - 1), K, false);
 
   const aux = $("mfdaux");
   aux.innerHTML = "";
@@ -983,7 +1025,7 @@ document.querySelectorAll("#mfds button").forEach(b => {
   b.addEventListener("click", () => {
     document.querySelectorAll("#mfds button").forEach(x => x.classList.toggle("on", x === b));
     mfdCur = b.dataset.mfd;
-    mfdBack = null;
+    mfdBackLow = null;
     $("mfdlast").textContent = "还没按过键";
     $("mfdack").textContent = "";
     paintPage();

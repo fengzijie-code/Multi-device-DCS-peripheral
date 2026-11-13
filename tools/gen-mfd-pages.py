@@ -84,6 +84,7 @@ TITLES = {
     "DOWN_EPI2": "下半区·应急程序 2",
     "DOWN_AFINFO": "下半区·机场信息",
     "DOWN_AG_DATA": "下半区·对地数据",
+    "DOWN_FUEL": "下半区·燃油",
     "DOWN_BLANK": "下半区·空白",
 }
 
@@ -99,6 +100,14 @@ DESC = {
     # 只能靠按键跳转或下拉框手动选 —— 说明里写清楚键位分布。
     "UP_R1_SMS_Load": "挂载管理：U1-U5 选挂点 2-6，L2 进挂载类型，D1 清除 / D2 复制 / D4 回外挂页。本页面板认不出，选一下下拉框即可。",
     "UP_R1_SMS_AA_Wpn": "选弹页：右列列出可用武器，选中的挂点会高亮。",
+    # 下半区页面（LR6-8 键控制，与上半区互不干扰）
+    "DOWN_MainMenu": "下半区小菜单：R6/R7 应急程序，L6 机场信息，L7 外挂摘要。R8 返回。",
+    "DOWN_SMS": "外挂摘要：各挂点当前挂的武器。上半区雷达页的下半区固定显示它。",
+    "DOWN_AFINFO": "起飞/降落机场信息。R6 下一页，R7 上一页，R8 返回。",
+    "DOWN_EPI1": "应急程序检查单第 1 页。L6 回下半区菜单。",
+    "DOWN_EPI2": "应急程序检查单第 2 页。L6 回下半区菜单。",
+    "DOWN_CLINK": "数据链状态。R8 返回。",
+    "DOWN_FUEL": "燃油/发动机监控（油量表、TOTAL FEED）。纯图形显示，面板认不出，可从下拉框手动选。",
 }
 
 # 代码里没有静态 value、但知道它是什么的键（屏幕上是运行时画的字）
@@ -234,6 +243,10 @@ def main():
             acc |= set(names.get(sub, []))
         if acc:
             names[pid] = sorted(acc)
+
+    # 燃油/发动机监控是纯图形下半区页面（LR6-8 里 R8 能回到它），没有可解析的
+    # 脚本内容，但不进数据的话下拉框里就没有、用户也没法手动标
+    pages.setdefault("DOWN_FUEL", {})
 
     for pid, ov in OVERRIDE.items():
         if pid in pages:
