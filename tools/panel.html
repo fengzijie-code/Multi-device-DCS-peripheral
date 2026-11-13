@@ -863,6 +863,13 @@ function applyScreenText(mfd, force) {
     const ur = scoreSeg(upper, force);
     let pid = ur.pid;
     if (!pid && upper.some(e => e.startsWith("osb_txt"))) pid = "UP_MainMenu";
+    // 旧版 Export 不回传文本 token，模式菜单浮层只剩三个元素名可认
+    // （rdr_frame_box_clip + rdr_tdc_sym + aa_exp_ref_box），与 AA/Contact 打分并列、
+    // 按键序总是输。这三个名字恰好凑齐且再无其它元素时是浮层独有的
+    // （Contact 页必带 rdr_aa_current_wpt 等更多元素），直接认成模式菜单。
+    if (upper.length <= 3 && upper.includes("rdr_frame_box_clip")
+        && upper.includes("rdr_tdc_sym") && upper.includes("aa_exp_ref_box"))
+      pid = "UP_U1_RDR_Mode";
 
     let lowPid = null;
     if (li < 0) {
