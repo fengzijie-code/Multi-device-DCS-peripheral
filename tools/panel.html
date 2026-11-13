@@ -538,6 +538,15 @@ function paint(st) {
     // 屏幕回传优先：它直接告诉我们每块屏现在是哪一页
     if (sys.mfd) { applyScreenText(sys.mfd, forceSync); forceSync = false; }
 
+    // UFCP 四窗文字回传（sys.ufcp = "窗1|窗2|窗3|窗4"），点 UFCP 标签页才看得见
+    if (sys.ufcp !== undefined) {
+      const w = String(sys.ufcp).split("|");
+      for (let i = 0; i < 4; i++) {
+        const el = $("ufcpwin" + (i + 1));
+        if (el) el.textContent = w[i] || "";
+      }
+    }
+
     // 座舱按键回传（Export 每帧扫 MFD 参数得到的）
     if (sys.bp) applyCockpitPresses(sys.bp);
 

@@ -419,11 +419,13 @@ local function mfd_tokens(id)
     local seen, list = {}, {}
     for line in v:gmatch("[^\r\n]+") do
         local s = line:gsub("^%s+", ""):gsub("%s+$", "")
-        if s:match("^[a-z][a-z0-9_]*$") and not s:find("osb_txt") then
+        local keep = s:match("^[a-z][a-z0-9_]*$")
+            or s == "UPPER_BASE" or s == "LOWER_BASE"   -- 上下半区分界，识别要靠它切
+        if keep and not (s:find("osb_txt") and seen[s:gsub("%d+$", "")]) then
             if not seen[s] then
                 seen[s] = true
                 list[#list + 1] = s
-                if #list >= 40 then break end
+                if #list >= 60 then break end
             end
         end
     end
@@ -434,6 +436,29 @@ local function mfd_text_report()
     local parts = {}
     for _, m in ipairs(MFD_IND) do
         parts[#parts + 1] = m[1] .. "=" .. mfd_tokens(m[2])
+    end
+    return table.concat(parts, "|")
+end
+
+-- ============================ UFCP 四窗文字 ============================
+--
+-- UFCP 的四个显示窗各自是独立指示器（2026-11-13 probe 实测）：
+--   3 = 窗口1（导航状态，如 "FP-A 01"）、4 = 窗口2（自动驾驶，如 "CAS MAN"）、
+--   5 = 窗口3（常空）、6 = 窗口4（无线电波道 COM1/COM2，如 "001 001"）。
+-- list_indication 返回字符串，窗口文本跟在 "txt_winN " 后面（后面可能跟 "children are {"）。
+local UFCP_IND = { 3, 4, 5, 6 }
+
+local function ufcp_win_text(id)
+    local ok, v = pcall(list_indication, id)
+    if not ok or type(v) ~= "string" or #v == 0 then return "" end
+    local t = v:match("txt_win%d+%s*(.-)%s*children") or v:match("txt_win%d+%s*(.-)$") or ""
+    return t:gsub("%s+", " ")
+end
+
+local function ufcp_text_report()
+    local parts = {}
+    for _, id in ipairs(UFCP_IND) do
+        parts[#parts + 1] = ufcp_win_text(id)
     end
     return table.concat(parts, "|")
 end
@@ -474,6 +499,8 @@ local function encode_sys(d, t)
         '"bp":'    .. stro(mfd_press_report()),
         -- MFD 画面文字（list_indication 抽出来的，页面状态靠它定，1Hz）
         '"mfd":'   .. stro(mfd_text_report()),
+        -- UFCP 四窗文字（窗口1导航 / 窗口2自驾 / 窗口4电台波道，1Hz）
+        '"ufcp":'  .. stro(ufcp_text_report()),
     }
     return '{"sys":{' .. table.concat(p, ",") .. '}}'
 end
