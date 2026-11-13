@@ -181,6 +181,14 @@ tools\start-usb.bat        # 开机后只跑这一个
 > 改动只在 `YokeController.kt`（阈值 55°→180°，同步更新类注释）。`versionName 1.3.5→1.3.6`、
 > `versionCode 9→10`；APK：`release/v1.3.6/DCS-Peripheral-Android-v1.3.6.apk`。
 
+> **v1.3.7（2026-11-14，同次会话）**：修复战斗页右下角 TDC 「下箭头」被截断/遮挡。
+> 根因：右侧整列（发射三键行 + 雷达 TDC 簇）纵向过高、被挤出屏底，把最底部的「↓」裁掉；
+> 同时脚舵 `fillMaxWidth` 横跨整屏、右端压在「↓」底下。修法：① 脚舵缩短**水平长度**
+> （`RudderBar` 由 `fillMaxWidth` 改为固定 `540.dp`、靠左放，约 6 成屏宽、仍是条像样的滑块而非残根）；
+> ② 发射三键行 `94.dp→58.dp`、TDC 四向箭头 `56.dp→58.dp`（字号 `22→24sp`）、雷达簇内边距 `12→10dp`，
+> 给「↓」腾出纵向空间；③ 脚舵高度保持 `34.dp` 不变。改动只在 `CombatScreen.kt`。
+> `versionName 1.3.6→1.3.7`、`versionCode 10→11`；APK：`release/v1.3.7/DCS-Peripheral-Android-v1.3.7.apk`。
+
 ---
 
 ## 文档索引

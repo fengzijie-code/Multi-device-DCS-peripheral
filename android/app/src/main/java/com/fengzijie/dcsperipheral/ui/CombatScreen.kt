@@ -166,7 +166,7 @@ fun CombatScreen(
                 // 发射三键：干扰弹(琥珀) | 机炮(红) | 武器(红)。用户要求干扰弹移到机炮左侧。
                 // 都是瞬时触发（guardMs=0）；机炮/武器是不可逆动作用红色警示，干扰弹用琥珀。
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(94.dp),
+                    modifier = Modifier.fillMaxWidth().height(58.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     GuardButton(
@@ -230,7 +230,7 @@ fun CombatScreen(
                             .weight(1f)
                             .fillMaxHeight()
                             .border(1.dp, Ink.Line, RoundedCornerShape(8.dp))
-                            .padding(12.dp),
+                            .padding(10.dp),
                     ) {
                         Column(
                             modifier = Modifier.fillMaxSize(),
@@ -244,8 +244,8 @@ fun CombatScreen(
                                     text = "↑", sub = null, enabled = st.armed, guardMs = 0,
                                     onDown = { onButtonDown(YokeBtn.TDC_UP) },
                                     onUp = { onButtonUp(YokeBtn.TDC_UP) },
-                                    textSp = 22f,
-                                    modifier = Modifier.size(56.dp),
+                                    textSp = 24f,
+                                    modifier = Modifier.size(58.dp),
                                 )
                             }
                             Row(
@@ -256,15 +256,15 @@ fun CombatScreen(
                                     text = "←", sub = null, enabled = st.armed, guardMs = 0,
                                     onDown = { onButtonDown(YokeBtn.TDC_LEFT) },
                                     onUp = { onButtonUp(YokeBtn.TDC_LEFT) },
-                                    textSp = 22f,
-                                    modifier = Modifier.size(56.dp),
+                                    textSp = 24f,
+                                    modifier = Modifier.size(58.dp),
                                 )
                                 GuardButton(
                                     text = "→", sub = null, enabled = st.armed, guardMs = 0,
                                     onDown = { onButtonDown(YokeBtn.TDC_RIGHT) },
                                     onUp = { onButtonUp(YokeBtn.TDC_RIGHT) },
-                                    textSp = 22f,
-                                    modifier = Modifier.size(56.dp),
+                                    textSp = 24f,
+                                    modifier = Modifier.size(58.dp),
                                 )
                             }
                             Row(
@@ -275,8 +275,8 @@ fun CombatScreen(
                                     text = "↓", sub = null, enabled = st.armed, guardMs = 0,
                                     onDown = { onButtonDown(YokeBtn.TDC_DOWN) },
                                     onUp = { onButtonUp(YokeBtn.TDC_DOWN) },
-                                    textSp = 22f,
-                                    modifier = Modifier.size(56.dp),
+                                    textSp = 24f,
+                                    modifier = Modifier.size(58.dp),
                                 )
                             }
                         }
@@ -288,9 +288,14 @@ fun CombatScreen(
             }
         }
 
-        // ---------------- 最底下：脚舵，跨整宽 ----------------
+        // ---------------- 最底下：脚舵，靠左、长度缩短 ----------------
         // 和起降页同一条实心滑块，能一直压住。按住时以它为准，
         // 松开交还给「拧手机」，两者不叠加。
+        // 用户的改法：缩短脚舵的**水平长度**（不是高度）——原本 fillMaxWidth 横跨整屏，
+        // 右端正好压在右下角 TDC 四向的「下箭头」底下把它挡住。现在固定 540dp、靠左放
+        // （约 6 成屏宽，仍是条像样的滑块而非残根），右端不延伸到右下角下箭头底下。
+        // 另外把发射行从 94→58dp、TDC 箭头 56→58dp（字号 22→24sp）、雷达簇内边距 12→10dp，
+        // 给右下角下箭头腾出纵向空间，确保整颗「↓」完整露出（之前右列整体过高被挤到屏底裁掉）。
         Row(
             modifier = Modifier.fillMaxWidth().height(34.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -308,7 +313,7 @@ fun CombatScreen(
                 enabled = st.armed,
                 onSet = onRudder,
                 onRelease = onRudderRelease,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.width(540.dp).fillMaxHeight(),
             )
         }
     }
