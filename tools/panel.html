@@ -114,11 +114,10 @@
   .bcol{display:grid;gap:6px;min-height:0}
   .bcol5{flex:5;grid-template-rows:repeat(5,minmax(0,1fr))}
   .bcol3{flex:3;grid-template-rows:repeat(3,minmax(0,1fr))}
-  /* 屏幕分成上下两个半区，中间一条分隔线 —— 对应实体 MFD 的上下两块画面。
-     LR1-5 键配上半区，LR6-8 键配下半区 */
-  .half{flex:1;width:100%;min-height:0;display:flex;flex-direction:column;
-        align-items:center;justify-content:center;gap:3px;padding:2px 0}
-  .half.lowhalf{border-top:2px solid #46505c;background:#04070b;border-radius:0 0 6px 6px}
+  /* 屏幕分成上下两个半区：比例 5:3，分隔线正好落在 LR5 与 LR6 键之间（和两侧键列对齐） */
+  .half{width:100%;min-height:0;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;gap:3px;padding:2px 0;flex:5}
+  .half.lowhalf{flex:3;border-top:2px solid #46505c;background:#04070b;border-radius:0 0 6px 6px}
   #mfdlow{font-size:15px;font-weight:600;color:#9fb0c0;letter-spacing:.02em}
   #mfdlowdesc{font-size:10px;color:#68737f;line-height:1.35;max-width:96%}
   .screen{
