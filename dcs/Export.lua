@@ -126,7 +126,10 @@ end
 -- 免得 CLSID 里的引号把整包 JSON 打断。
 local function stro(v)
     if type(v) ~= "string" or v == "" then return "null" end
-    local s = v:gsub('[^%w%-%._/ ]', '')
+    -- 只转义 JSON 必须转义的字符。以前这里是把「非字母数字」一律删掉，
+    -- 结果 : , | = 全被吃掉：回执 "47:3295:D" 到面板变成 "473295D"，
+    -- 面板按格式判断执行成功与否永远匹配不上，显示成「没执行」。
+    local s = v:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("[\r\n\t]", " ")
     if s == "" then return "null" end
     return '"' .. s .. '"'
 end
