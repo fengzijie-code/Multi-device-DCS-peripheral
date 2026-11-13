@@ -87,9 +87,19 @@
     -webkit-tap-highlight-color:transparent;touch-action:manipulation;
   }
   .tab.on{color:var(--fg);border-color:#3d444d;background:#161b22}
-  #mfdview{display:none}
-  body.tab-mfd #zones{display:none}
+  #mfdview,#ufcpview{display:none}
+  body.tab-mfd #zones,body.tab-ufcp #zones{display:none}
   body.tab-mfd #mfdview{display:block}
+  body.tab-ufcp #ufcpview{display:block}
+
+  /* ---------- UFCP ---------- */
+  #ufcpwrap{max-width:560px;margin:0 auto}
+  #ufcpwrap h2{font-size:15px;color:var(--fg);margin:6px 2px 10px}
+  #ufcpgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+  #ufcpgrid .mk{height:3rem}
+  #ufcpaux{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-top:8px}
+  #ufcpaux .mk{height:2.6rem;font-size:11px}
+  .ufcpnote{font-size:10.5px;color:#8b949e;line-height:1.45;margin:10px 2px}
 
   /* ---------- MFD ---------- */
   #mfdwrap{max-width:780px;margin:0 auto}
@@ -183,6 +193,7 @@
 <nav id="tabs">
   <button class="tab on" data-view="panel">仪表</button>
   <button class="tab" data-view="mfd">MFD</button>
+  <button class="tab" data-view="ufcp">UFCP</button>
 </nav>
 
 <main id="zones">
@@ -357,6 +368,18 @@
     </div>
 
     <div id="mfdaux"></div>
+  </div>
+</main>
+
+<!-- ============ UFCP（正前方控制板，dev 46） ============ -->
+<main id="ufcpview">
+  <div id="ufcpwrap">
+    <h2>UFCP 正前方控制板</h2>
+    <div id="ufcpgrid"></div>
+    <div id="ufcpaux"></div>
+    <p class="ufcpnote">双功能键（PFL/1 这种）：缺省显示下按 = 功能键；修改参数时光标出现后按 = 输入数字。
+      无线电波道（COM1/COM2）在第四窗口，改波道 = 先按参数旁边的窗口选择键，再按数字键。
+      塔康不在这输数字——MFD 塔康程序页里选 TCN01-10。</p>
   </div>
 </main>
 
@@ -597,7 +620,9 @@ document.querySelectorAll(".cbtn").forEach(btn => {
 document.querySelectorAll(".tab").forEach(t => {
   t.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
-    document.body.classList.toggle("tab-mfd", t.dataset.view === "mfd");
+    document.body.classList.remove("tab-mfd", "tab-ufcp");
+    if (t.dataset.view === "mfd") document.body.classList.add("tab-mfd");
+    if (t.dataset.view === "ufcp") { document.body.classList.add("tab-ufcp"); renderUFCP(); }
   });
 });
 
@@ -611,6 +636,7 @@ document.querySelectorAll(".tab").forEach(t => {
 //   PNT_734 = "Left MFCD Sym +"、PNT_762 = "Left MFCD D3" 这么一路写到 832。
 // 所以这里只记「基准 ID + 相对偏移」，三块屏只有 Cont 的位置不同。
 const MFCD_DEV = 47;
+const UFCP_DEV = 46;   // devices.lua：UFCP 是第 46 个，MFCD 是 47
 const MFD_DEFS = [
   { key: "left",   base: 734, d0: 26, c0: 24 },  // 左：Cont 排在 D 之前
   { key: "center", base: 767, d0: 24, c0: 29 },  // 中 / 右：Cont 排在 D 之后
@@ -923,6 +949,7 @@ function mkKey(name, label, el, opt) {
   opt = opt || {};
   const val = opt.val == null ? 1 : opt.val;
   const hold = opt.hold || 0;
+  const dev = opt.dev == null ? MFCD_DEV : opt.dev;   // 默认 MFCD，UFCP 等其它设备显式传
   const b = document.createElement("button");
   b.className = "mk" + (opt.cls ? " " + opt.cls : "") + (label ? "" : " blank");
   b.innerHTML = `<i>${name}</i><b>${label || "·"}</b>`;
@@ -947,12 +974,12 @@ function mkKey(name, label, el, opt) {
 
     const nx = nextPage(name);
     recentSent[el] = Date.now();
-    await sendCmd(MFCD_DEV, el + CMD_OFFSET, val);
+    await sendCmd(dev, el + CMD_OFFSET, val);
     // 瞬动按钮必须「按下 1 + 松开 0」两条消息：只发 1 的话参数会停在 1，
     // 设备等不到松开就不触发动作（实测：只发 1 时 D3 毫无反应，补 0 立刻生效）。
     // 两档开关（电源）不走这条，它们认 ±1 的位置值。
     if (opt.release !== false) {
-      setTimeout(() => sendCmd(MFCD_DEV, el + CMD_OFFSET, 0), 90);
+      setTimeout(() => sendCmd(dev, el + CMD_OFFSET, 0), 90);
     }
     if (nx) {
       if (isLowerKey(name)) {
@@ -981,6 +1008,64 @@ function mkKey(name, label, el, opt) {
       if (timer) { clearTimeout(timer); timer = null; b.classList.remove("holding"); }
     }));
   return b;
+}
+
+// ---- UFCP（正前方控制板）----
+// 键位表来自 command_defs.lua PNT_700-727（dev=46，命令号同样 = 元素号 + 2502），
+// 功能说明来自手册 1.10 节。全部是瞬动按钮（按下 1 + 90ms 后松开 0）。
+const UFCP_ROWS = [
+  // [印刷字, 元素号, 中文说明]
+  [["L1", 703, "窗口1左"],
+   ["PFL/1", 700, "故障列表/数字1"],
+   ["VRC/2", 701, "录像/数字2"],
+   ["3", 702, "数字3"],
+   ["OAP", 705, "偏移瞄准点"],
+   ["MRK", 706, "标记飞跃点"],
+   ["R1", 704, "窗口1右"]],
+  [["L2", 710, "窗口2左"],
+   ["DST/4", 707, "航点数据/数字4"],
+   ["TOT/5", 708, "目标时间/数字5"],
+   ["TOD/6", 709, "时间日期/数字6"],
+   ["P.U", 712, "位置修正"],
+   ["HNS", 713, "导航状态"],
+   ["R2", 711, "窗口2右"]],
+  [["L3", 717, "窗口3左"],
+   ["FUL/7", 714, "燃油/数字7"],
+   ["IFF/8", 715, "敌我识别/数字8"],
+   ["9", 716, "数字9"],
+   ["A/P", 719, "自动驾驶"],
+   ["FPM", 720, "偏流切除"],
+   ["R3", 718, "窗口3右"]],
+  [["L4", 724, "窗口4左·电台"],
+   ["0", 722, "数字0"],
+   ["RTN", 721, "退出功能"],
+   ["", 0, ""],
+   ["", 0, ""],
+   ["", 0, ""],
+   ["R4", 725, "窗口4右·电台"]],
+];
+
+function renderUFCP() {
+  const g = $("ufcpgrid");
+  if (g.childElementCount) return;   // 只建一次
+  for (const row of UFCP_ROWS) {
+    for (const [lb, el, hint] of row) {
+      if (!el) {
+        const s = document.createElement("span");
+        s.className = "mk blank";
+        g.appendChild(s);
+        continue;
+      }
+      const b = mkKey(lb, hint, el, { dev: UFCP_DEV });
+      b.title = lb + " · " + hint;
+      g.appendChild(b);
+    }
+  }
+  const aux = $("ufcpaux");
+  // +/- 是三档瞬态步进开关（PNT_730）：电台波道、导航目标点这类"可连续改变
+  // 参数"的光标停在最左位时，拨 +/− 数字连续增减（手册 1.10.1-c）
+  aux.appendChild(mkKey("+", "连续增（步进开关上档）", 730, { dev: UFCP_DEV, val: 1 }));
+  aux.appendChild(mkKey("−", "连续减（步进开关下档）", 730, { dev: UFCP_DEV, val: -1 }));
 }
 
 function renderBezel() {
