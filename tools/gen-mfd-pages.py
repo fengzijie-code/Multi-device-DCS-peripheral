@@ -168,6 +168,7 @@ def main():
 
     # 中文按页面顺序排，方便在 iPad 的下拉里找
     ordered = [k for k in ORDER if k in pages] + [k for k in pages if k not in ORDER]
+    data = {}
     out = []
     for pid in ordered:
         o = {"t": TITLES.get(pid, pid), "k": pages[pid]}
@@ -175,11 +176,16 @@ def main():
             o["d"] = DESC[pid]
         if pid in TRANS:
             o["n"] = {k: v for k, v in TRANS[pid].items() if not k.endswith("x") and v != pid}
+        data[pid] = o
         out.append(f'  {json.dumps(pid)}:' + json.dumps(o, ensure_ascii=False, separators=(",", ":")))
 
     block = ("// MFDPAGES:BEGIN —— 由 tools/gen-mfd-pages.py 生成，别手改\n"
              "const MFD_PAGES = {\n" + ",\n".join(out) + "\n};\n"
              "// MFDPAGES:END")
+
+    # 同一份数据也给读屏工具用（tools/mfd-read.py 靠它把 OCR 结果匹配成页面）
+    (ROOT / "tools" / "mfd-pages.json").write_text(
+        json.dumps(data, ensure_ascii=False, indent=0), encoding="utf-8")
 
     html = PANEL.read_text(encoding="utf-8")
     new, n = re.subn(r"// MFDPAGES:BEGIN.*?// MFDPAGES:END", lambda _: block, html, flags=re.S)
