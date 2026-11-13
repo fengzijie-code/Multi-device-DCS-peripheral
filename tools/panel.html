@@ -92,13 +92,29 @@
   body.tab-mfd #mfdview{display:block}
   body.tab-ufcp #ufcpview{display:block}
 
-  /* ---------- UFCP ---------- */
-  #ufcpwrap{max-width:560px;margin:0 auto}
+  /* ---------- UFCP：按实物照片排版 ----------
+     每行 = 左功能键组(3) + → + 液晶窗 + ← + 右专用键组(2)，四行四窗，底部旋钮排 */
+  #ufcpwrap{max-width:680px;margin:0 auto}
   #ufcpwrap h2{font-size:15px;color:var(--fg);margin:6px 2px 10px}
-  #ufcpgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
-  #ufcpgrid .mk{height:3rem}
-  #ufcpaux{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-top:8px}
-  #ufcpaux .mk{height:2.6rem;font-size:11px}
+  .ufcp-face{background:#171310;border:1px solid #2c2a26;border-radius:14px;padding:12px}
+  .ufcp-row{display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr)) 2.4rem minmax(0,2.6fr) 2.4rem repeat(2,minmax(0,1fr));
+    gap:6px;margin-bottom:6px;align-items:stretch}
+  .ufcp-row .mk{height:3.2rem}
+  .ufcp-win{background:#061508;border:2px solid #1c2b1f;border-radius:4px;
+    color:#54ff66;font-family:ui-monospace,Consolas,monospace;font-size:15px;
+    letter-spacing:.14em;display:flex;align-items:center;justify-content:center;
+    text-shadow:0 0 7px rgba(60,255,90,.55);min-height:3.2rem;padding:0 4px}
+  .ufcp-cap{font-size:9.5px;color:#a8b0b7;text-align:center;margin-top:3px;letter-spacing:.08em}
+  .ufcp-knobs{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;
+    margin-top:10px;align-items:center}
+  .uknob{text-align:center}
+  .uknob i{display:block;width:44px;height:44px;margin:0 auto 4px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#8f9299,#3a3d42 60%,#22252a);
+    border:2px solid #4a4e55;position:relative}
+  .uknob i::after{content:"";position:absolute;left:50%;top:3px;width:2px;height:14px;
+    background:#d5d9df;transform:translateX(-50%)}
+  .uknob b{font-size:9px;color:#c4cad1;font-weight:600;letter-spacing:.04em;display:block}
   .ufcpnote{font-size:10.5px;color:#8b949e;line-height:1.45;margin:10px 2px}
 
   /* ---------- MFD ---------- */
@@ -375,11 +391,20 @@
 <main id="ufcpview">
   <div id="ufcpwrap">
     <h2>UFCP 正前方控制板</h2>
-    <div id="ufcpgrid"></div>
-    <div id="ufcpaux"></div>
-    <p class="ufcpnote">双功能键（PFL/1 这种）：缺省显示下按 = 功能键；修改参数时光标出现后按 = 输入数字。
-      无线电波道（COM1/COM2）在第四窗口，改波道 = 先按参数旁边的窗口选择键，再按数字键。
-      塔康不在这输数字——MFD 塔康程序页里选 TCN01-10。</p>
+    <div class="ufcp-face">
+      <div id="ufcprows"></div>
+    </div>
+    <div class="ufcp-knobs">
+      <div class="uknob"><i></i><b>HUD CONT</b></div>
+      <div class="uknob"><i></i><b>HUD BRT</b></div>
+      <div id="ufcpstep"></div>
+      <div class="uknob"><i></i><b>STBY RET</b></div>
+      <div class="uknob"><i></i><b>UFCP BRT</b></div>
+    </div>
+    <p class="ufcpnote">→ ← 是窗口参数选择键（实体上就是窗边的箭头键）：按要改的参数旁边的箭头，
+      光标出现后用数字键输入。双功能键（PFL/1 这种）缺省按 = 功能，修改中按 = 数字。
+      无线电波道在第四窗口（COM1/COM2）；塔康不在这输数字——MFD 塔康程序页选 TCN01-10。
+      四个旋钮是 HUD/UFCP 亮度（连续可调），触屏做不了真实旋钮，仅示意。</p>
   </div>
 </main>
 
@@ -1013,59 +1038,72 @@ function mkKey(name, label, el, opt) {
 // ---- UFCP（正前方控制板）----
 // 键位表来自 command_defs.lua PNT_700-727（dev=46，命令号同样 = 元素号 + 2502），
 // 功能说明来自手册 1.10 节。全部是瞬动按钮（按下 1 + 90ms 后松开 0）。
+// ---- UFCP（正前方控制板）----
+// 排版按实物照片：每行 = 左功能键组(3) + →(L#) + 液晶窗 + ←(R#) + 右专用键组(2)。
+// 键位表来自 command_defs.lua PNT_700-727（dev=46，命令号 = 元素号 + 2502），
+// 功能说明来自手册 1.10。全部是瞬动按钮（按下 1 + 90ms 后松开 0）。
 const UFCP_ROWS = [
-  // [印刷字, 元素号, 中文说明]
-  [["L1", 703, "窗口1左"],
-   ["PFL/1", 700, "故障列表/数字1"],
-   ["VRC/2", 701, "录像/数字2"],
-   ["3", 702, "数字3"],
-   ["OAP", 705, "偏移瞄准点"],
-   ["MRK", 706, "标记飞跃点"],
-   ["R1", 704, "窗口1右"]],
-  [["L2", 710, "窗口2左"],
-   ["DST/4", 707, "航点数据/数字4"],
-   ["TOT/5", 708, "目标时间/数字5"],
-   ["TOD/6", 709, "时间日期/数字6"],
-   ["P.U", 712, "位置修正"],
-   ["HNS", 713, "导航状态"],
-   ["R2", 711, "窗口2右"]],
-  [["L3", 717, "窗口3左"],
-   ["FUL/7", 714, "燃油/数字7"],
-   ["IFF/8", 715, "敌我识别/数字8"],
-   ["9", 716, "数字9"],
-   ["A/P", 719, "自动驾驶"],
-   ["FPM", 720, "偏流切除"],
-   ["R3", 718, "窗口3右"]],
-  [["L4", 724, "窗口4左·电台"],
-   ["0", 722, "数字0"],
-   ["RTN", 721, "退出功能"],
-   ["", 0, ""],
-   ["", 0, ""],
-   ["", 0, ""],
-   ["R4", 725, "窗口4右·电台"]],
+  { fns: [["PFL/1", 700, "故障列表/数字1"], ["VRC/2", 701, "录像/数字2"], ["3", 702, "数字3"]],
+    win: 1, arrowL: 703, arrowR: 704,
+    specs: [["OAP", 705, "偏移瞄准点"], ["MRK", 706, "标记飞跃点"]] },
+  { fns: [["DST/4", 707, "航点数据/数字4"], ["TOT/5", 708, "目标时间/数字5"], ["TOD/6", 709, "时间日期/数字6"]],
+    win: 2, arrowL: 710, arrowR: 711,
+    specs: [["P.U", 712, "位置修正"], ["HNS", 713, "导航状态"]] },
+  { fns: [["FUL/7", 714, "燃油/数字7"], ["IFF/8", 715, "敌我识别/数字8"], ["9", 716, "数字9"]],
+    win: 3, arrowL: 717, arrowR: 718,
+    specs: [["A/P", 719, "自动驾驶"], ["FPM", 720, "偏流切除"]] },
+  { fns: [["RTN", 721, "退出功能"], ["0", 722, "数字0"]],
+    win: 4, arrowL: 724, arrowR: 725,
+    specs: [] },
 ];
 
 function renderUFCP() {
-  const g = $("ufcpgrid");
-  if (g.childElementCount) return;   // 只建一次
-  for (const row of UFCP_ROWS) {
-    for (const [lb, el, hint] of row) {
-      if (!el) {
-        const s = document.createElement("span");
-        s.className = "mk blank";
-        g.appendChild(s);
-        continue;
-      }
-      const b = mkKey(lb, hint, el, { dev: UFCP_DEV });
-      b.title = lb + " · " + hint;
-      g.appendChild(b);
+  const rows = $("ufcprows");
+  if (rows.childElementCount) return;   // 只建一次
+  for (const r of UFCP_ROWS) {
+    const div = document.createElement("div");
+    div.className = "ufcp-row";
+    for (const [lb, el, hint] of r.fns) {
+      div.appendChild(mkKey(lb, hint, el, { dev: UFCP_DEV }));
     }
+    div.appendChild(mkKey("→", "窗口" + r.win + "左参数", r.arrowL, { dev: UFCP_DEV }));
+    // 液晶窗：内容等 UFCP 指示器回传接通后填充，先给占位。
+    // 第四窗下面带 COM1/COM2 标注（和实物一样），装在同一个格子里不破坏行网格
+    const cell = document.createElement("div");
+    cell.style.cssText = "display:flex;flex-direction:column;min-width:0";
+    const win = document.createElement("div");
+    win.className = "ufcp-win";
+    win.id = "ufcpwin" + r.win;
+    win.style.flex = "1";
+    win.textContent = "···· ····";
+    cell.appendChild(win);
+    if (r.win === 4) {
+      const cap = document.createElement("div");
+      cap.className = "ufcp-cap";
+      cap.innerHTML = "COM1&nbsp;&nbsp;&nbsp;COM2";
+      cell.appendChild(cap);
+    }
+    div.appendChild(cell);
+    div.appendChild(mkKey("←", "窗口" + r.win + "右参数", r.arrowR, { dev: UFCP_DEV }));
+    for (const [lb, el, hint] of r.specs) {
+      div.appendChild(mkKey(lb, hint, el, { dev: UFCP_DEV }));
+    }
+    if (r.specs.length < 2) {
+      for (let i = r.specs.length; i < 2; i++) {
+        const s2 = document.createElement("span");
+        s2.className = "mk blank";
+        div.appendChild(s2);
+      }
+    }
+    rows.appendChild(div);
   }
-  const aux = $("ufcpaux");
-  // +/- 是三档瞬态步进开关（PNT_730）：电台波道、导航目标点这类"可连续改变
-  // 参数"的光标停在最左位时，拨 +/− 数字连续增减（手册 1.10.1-c）
-  aux.appendChild(mkKey("+", "连续增（步进开关上档）", 730, { dev: UFCP_DEV, val: 1 }));
-  aux.appendChild(mkKey("−", "连续减（步进开关下档）", 730, { dev: UFCP_DEV, val: -1 }));
+  // +/− 步进开关（PNT_730）：电台波道、导航目标点这类可连续参数快速增减（手册 1.10.1-c）
+  const step = $("ufcpstep");
+  step.style.display = "grid";
+  step.style.gridTemplateColumns = "1fr 1fr";
+  step.style.gap = "6px";
+  step.appendChild(mkKey("+", "连续增", 730, { dev: UFCP_DEV, val: 1 }));
+  step.appendChild(mkKey("−", "连续减", 730, { dev: UFCP_DEV, val: -1 }));
 }
 
 function renderBezel() {
