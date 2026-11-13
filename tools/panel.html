@@ -109,7 +109,17 @@
   }
   .brow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;height:2.6rem}
   .bmid{flex:1;display:grid;grid-template-columns:3.2rem minmax(0,1fr) 3.2rem;gap:6px;min-height:0}
-  .bcol{display:grid;grid-template-rows:repeat(8,minmax(0,1fr));gap:6px}
+  .bcolwrap{display:flex;flex-direction:column;gap:6px;min-height:0}
+  /* 上半区 5 个键 + 下半区 3 个键：和实体 MFD 一致（LR1-5 配上块画面，LR6-8 配下块） */
+  .bcol{display:grid;gap:6px;min-height:0}
+  .bcol5{flex:5;grid-template-rows:repeat(5,minmax(0,1fr))}
+  .bcol3{flex:3;grid-template-rows:repeat(3,minmax(0,1fr))}
+  .lowzone{
+    border:1px dashed #2a3340;border-radius:8px;padding:6px 8px;margin-top:4px;
+    background:#080b10;min-height:0;
+  }
+  #mfdlow{font-size:14px;font-weight:600;color:#9fb0c0}
+  #mfdlowdesc{font-size:10px;color:#68737f;line-height:1.35}
   .screen{
     min-height:0;background:#05080c;border:1px solid #1d242e;border-radius:8px;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
@@ -316,14 +326,24 @@
     <div class="bezel">
       <div class="brow" id="mfdU"></div>
       <div class="bmid">
-        <div class="bcol" id="mfdL"></div>
+        <div class="bcolwrap">
+          <div class="bcol bcol5" id="mfdL"></div>
+          <div class="bcol bcol3" id="mfdL2"></div>
+        </div>
         <div class="screen">
           <div id="mfdpage">--</div>
           <div id="mfddesc"></div>
+          <div class="lowzone" id="mfdlowbox">
+            <div id="mfdlow">--</div>
+            <div id="mfdlowdesc"></div>
+          </div>
           <div id="mfdlast">还没按过键</div>
           <div id="mfdack"></div>
         </div>
-        <div class="bcol" id="mfdR"></div>
+        <div class="bcolwrap">
+          <div class="bcol bcol5" id="mfdR"></div>
+          <div class="bcol bcol3" id="mfdR2"></div>
+        </div>
       </div>
       <div class="brow" id="mfdD"></div>
     </div>
@@ -802,10 +822,20 @@ function applyCockpitPresses(bp) {
 function paintPage() {
   const p = pageOf(mfdPage[mfdCur]);
   $("mfdpage").textContent = p.t;
-  let desc = p.d || "";
+  $("mfddesc").textContent = p.d || "";
+  // 下半区是独立的一块画面（雷达页下半区固定显示外挂/燃油那些），单独给个框
+  const box = $("mfdlowbox");
   const low = mfdLow[mfdCur];
-  if (low) desc += (desc ? " ｜ " : "") + "下半区：" + pageOf(low).t;
-  $("mfddesc").textContent = desc;
+  if (low) {
+    const lp = pageOf(low);
+    $("mfdlow").textContent = lp.t;
+    $("mfdlowdesc").textContent = lp.d || "";
+    box.style.display = "";
+  } else {
+    $("mfdlow").textContent = "下半区：无独立画面";
+    $("mfdlowdesc").textContent = "";
+    box.style.display = "";
+  }
   $("mfdsel").value = mfdPage[mfdCur];
 }
 
@@ -895,19 +925,26 @@ function renderBezel() {
   const txt = s => s ? String(s).replace(/\\n/g, "") : s;
   // D3 / R8 的语义是全局固定的，页面没定义也给个提示
   const fallback = n => n === "D3" ? "MENU" : n === "R8" ? "小菜单" : "";
-  [["mfdU", 5, "U", i => d.base + 2 + i], ["mfdL", 8, "L", i => d.base + 8 + i],
-   ["mfdR", 8, "R", i => d.base + 16 + i], ["mfdD", 5, "D", i => d.base + d.d0 + i]]
-    .forEach(([id, n, pre, fn]) => {
-      const box = $(id);
-      box.innerHTML = "";
-      for (let i = 0; i < n; i++) {
-        const name = pre + (i + 1);
-        // D3 是固定的「回上半区菜单」，也就是撤销键，给个暗色边框好找
-        const undo = name === "D3" ? "undo" : "";
-        const unknown = mfdPage[mfdCur] === MFD_UNKNOWN;
-        box.appendChild(mkKey(name, unknown ? "?" : (txt(K[name]) || fallback(name)), fn(i), { cls: undo }));
-      }
+  // 实体 MFD 分区：上面 U + LR1-5 管上半块画面，下面 D + LR6-8 管下半块
+  // （L6 = base+8+5，R6 = base+16+5；D 排在最底部单独一行）
+  const unknown = mfdPage[mfdCur] === MFD_UNKNOWN;
+  const seq = (pre, from, count, elOf) =>
+    Array.from({ length: count }, (_, k) => [pre + (from + k), elOf(from + k)]);
+  const put = (id, keys) => {
+    const box = $(id);
+    box.innerHTML = "";
+    keys.forEach(([name, el]) => {
+      // D3 是固定的「回上半区菜单」，也就是撤销键，给个暗色边框好找
+      const undo = name === "D3" ? "undo" : "";
+      box.appendChild(mkKey(name, unknown ? "?" : (txt(K[name]) || fallback(name)), el, { cls: undo }));
     });
+  };
+  put("mfdU",  seq("U", 1, 5, n => d.base + 2 + n - 1));
+  put("mfdL",  seq("L", 1, 5, n => d.base + 8 + n - 1));
+  put("mfdR",  seq("R", 1, 5, n => d.base + 16 + n - 1));
+  put("mfdL2", seq("L", 6, 3, n => d.base + 8 + n - 1));
+  put("mfdR2", seq("R", 6, 3, n => d.base + 16 + n - 1));
+  put("mfdD",  seq("D", 1, 5, n => d.base + d.d0 + n - 1));
 
   const aux = $("mfdaux");
   aux.innerHTML = "";
