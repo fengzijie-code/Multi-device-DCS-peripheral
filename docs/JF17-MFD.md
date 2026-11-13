@@ -269,6 +269,16 @@ L1 HSD  L2 EFIS  L3 CLNK  L4 DATA      R1 SMS  R2 CMBT  R3 BIT  R4 CHKLS  R5 PFL
 > **常用模式混排**：AA 三个 + AG 两个 + 对海/导航五个。手册里 SAM、DTT、FTT、DBS、SMTT
 > 这些模式不在这张菜单里，应该是在各自画面内用别的键进。
 
+### 机炮 180 发是满弹；地面可以开雷达（2026-11-13）
+
+- 机炮备弹 **180 发**就是满数（手册原话"相对于 180 发的备弹"）；卡弹后 `FEED`
+  再装填的火药弹只有 3 发。
+- 雷达从 **AAP（系统启动板）的雷达子系统通/断键**启动，地面可以开（进 STBY），
+  正常冷启动本来就在地面开。
+- SMS 主页（R1）默认显示 A/A1 站位 + 机炮详情（GUN 180 / GUN SIGHT / LIMITER），
+  `SAFE` = 保险未开。实测 dump 里的文字：`A/A PROG1 · A/A1 · LOAD · FEED · GUN ·
+  SAFE · WPN · LIMITER 0.5 · GUN SIGHT LCOS · CLR · CMBT · JET`。
+
 ### CNTL 菜单（2026-11-13 实测）
 
 中屏按 `U5`，右上角 CNTL 被框选，此时右列变成：
