@@ -50,7 +50,7 @@ tools\start-usb.bat        # 开机后只跑这一个
 装完按 [`docs/BINDING.md`](docs/BINDING.md) §2 在 DCS 里重绑 `BTN7` / `BTN12`，
 并清掉 `S3` / `S4` 的默认绑定冲突 —— 不然点襟翼可能顺带开火。
 
-**发布时已知的限制**（不阻塞 v1.00）：发射键 250ms 长按门槛、7–9 号仍是预留位
+**发布时已知的限制**（不阻塞 v1.00）：7–9 号仍是预留位（缺 ACM 格斗模式 / 目标解锁）
 （缺 ACM 格斗模式 / 目标解锁）→ 单次开火可行，不足以持续空战对抗；
 机炮需先在 iPad 的 SMS 页选 GUN + FEED 充弹；视角松手回中且与发射键同手。
 详见 [`docs/BINDING.md`](docs/BINDING.md) §9 与 `docs/TEST-REPORT.md` 第 8 节。
@@ -158,6 +158,11 @@ tools\start-usb.bat        # 开机后只跑这一个
 > （`WEAPON_SWITCH = 3` → `JOY_BTN4` → `S8: Change Weapons`，脉冲）。JF-17 只有单向循环、没有上/下两条命令，
 > 所以一个键就够，`JOY_BTN5` 释放。`versionName 1.3.1→1.3.2`、`versionCode 5→6`；
 > APK：`release/v1.3.2/DCS-Peripheral-Android-v1.3.2.apk`。
+
+> **v1.3.3（2026-11-14，同次会话）**：战斗页所有按钮改为瞬时触发，去掉 150/250ms 防误触延时
+> （`GuardButton` 的 `guardMs` 全部置 0）。武器切换 / 锁定 / 干扰弹 / 机炮 / 武器投放按下即生效，
+> 红框等视觉警示保留。`versionName 1.3.2→1.3.3`、`versionCode 6→7`；
+> APK：`release/v1.3.3/DCS-Peripheral-Android-v1.3.3.apk`。
 
 ---
 

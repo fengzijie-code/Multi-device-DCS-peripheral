@@ -121,11 +121,12 @@ fun CombatScreen(
 
                     // 武器切换：JF-17 只有 S8: Change Weapons 单向循环，没有上/下两条，
                     // 所以一个键就够（占 BTN4）。宽 270dp 与下面「锁定 / 干扰弹」行对齐。
+                    // guardMs=0 → 瞬时触发，无防误触延时（用户要求）。
                     GuardButton(
                         text = "武器切换",
                         sub = "S8",
                         enabled = st.armed,
-                        guardMs = 150,
+                        guardMs = 0,
                         onDown = { onButtonDown(YokeBtn.WEAPON_SWITCH) },
                         onUp = { onButtonUp(YokeBtn.WEAPON_SWITCH) },
                         modifier = Modifier.width(270.dp).height(60.dp),
@@ -137,7 +138,7 @@ fun CombatScreen(
                             text = "锁定",
                             sub = "雷达锁定目标",
                             enabled = st.armed,
-                            guardMs = 150,
+                            guardMs = 0,
                             onDown = { onButtonDown(YokeBtn.LOCK) },
                             onUp = { onButtonUp(YokeBtn.LOCK) },
                             modifier = Modifier.width(132.dp).height(60.dp),
@@ -146,7 +147,7 @@ fun CombatScreen(
                             text = "干扰弹",
                             sub = "投放",
                             enabled = st.armed,
-                            guardMs = 150,
+                            guardMs = 0,
                             onDown = { onButtonDown(YokeBtn.COUNTERMEASURE) },
                             onUp = { onButtonUp(YokeBtn.COUNTERMEASURE) },
                             modifier = Modifier.width(132.dp).height(60.dp),
@@ -176,7 +177,7 @@ fun CombatScreen(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 // 发射两键：左上机炮 / 右上武器投放。
-                // 两个都是不可逆动作，所以都吃 250ms 长按门槛、都用红色。
+                // 都是不可逆动作、都用红色作视觉警示；按用户要求瞬时触发，不再设长按门槛。
                 Row(
                     modifier = Modifier.fillMaxWidth().height(84.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -185,7 +186,7 @@ fun CombatScreen(
                         text = "机炮",
                         sub = "扳机",
                         enabled = st.armed,
-                        guardMs = 250,
+                        guardMs = 0,
                         danger = true,
                         textSp = 18f,
                         subSp = 12f,
@@ -197,7 +198,7 @@ fun CombatScreen(
                         text = "武器",
                         sub = "投放",
                         enabled = st.armed,
-                        guardMs = 250,
+                        guardMs = 0,
                         danger = true,
                         textSp = 18f,
                         subSp = 12f,
