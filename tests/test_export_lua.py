@@ -38,6 +38,9 @@ EXPECTED_SYS_FIELDS = [
     # 起落架收放进度。顺序必须稳定 —— 面板虽然按名字取值，但顺序固定
     # 能让报文肉眼可比对。
     "ac", "radar", "st", "wn", "wc", "wl", "cn", "gr", "ack", "acn", "dbg",
+    # MFD 按键回传：Export 每帧扫 734..832 这些座舱参数，抓 0→1 的跳变，
+    # 让 iPad 知道「谁按了哪颗键」，页面状态才跟得上（座舱里手按的也算）。
+    "bp",
 ]
 
 EXPECTED_FIELDS = [

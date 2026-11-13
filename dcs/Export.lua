@@ -351,6 +351,50 @@ local function collect_sys()
     }
 end
 
+-- ============================ MFD 按键回传 ============================
+--
+-- 为什么扫参数：DCS 不给读 MFD 画面，但**页面只会因为按键而变**。
+-- 每个周边键都是一个座舱参数（参数号 = 元素号，734..832），按下时 0 → 1。
+-- 每帧扫一遍、抓 0→1 的跳变，就知道「谁按了哪颗键」——iPad 发的、
+-- 座舱里用鼠标点的，都算。iPad 靠这个把页面状态跟上，不用读屏。
+--
+-- 60 Hz × 99 个参数 ≈ 6000 次/秒，实际就是读内存里的浮点，开销可忽略。
+-- 整段 pcall 兜底：这个能力不是所有机型都有，没有就静默关掉，绝不影响遥测。
+local MFD_EL_FIRST, MFD_EL_LAST = 734, 832
+local MFD_RING = 8
+local mfd_prev = {}
+local mfd_seq = 0
+local mfd_ring = {}
+local mfd_scan_ok = true
+
+local function scan_mfd_buttons()
+    if not mfd_scan_ok then return end
+    local ok = pcall(function()
+        local d0 = GetDevice(0)
+        if not d0 then return end
+        for el = MFD_EL_FIRST, MFD_EL_LAST do
+            local v = d0:get_argument_value(el)
+            local down = v ~= nil and v > 0.5
+            if down and not mfd_prev[el] then
+                mfd_seq = mfd_seq + 1
+                mfd_ring[(mfd_seq - 1) % MFD_RING + 1] = el
+            end
+            mfd_prev[el] = down
+        end
+    end)
+    if not ok then mfd_scan_ok = false end
+end
+
+-- 报文格式 "序号:元素号,元素号…"（新的在前），没有按键时是 "0:"
+local function mfd_press_report()
+    if mfd_seq == 0 then return "0:" end
+    local parts = {}
+    for k = 1, math.min(mfd_seq, MFD_RING) do
+        parts[#parts + 1] = tostring(mfd_ring[(mfd_seq - k) % MFD_RING + 1] or 0)
+    end
+    return tostring(mfd_seq) .. ":" .. table.concat(parts, ",")
+end
+
 local function encode_sys(d, t)
     local p = {
         '"t":'     .. num(t, "%.2f"),
@@ -383,6 +427,8 @@ local function encode_sys(d, t)
         '"ack":'   .. numo(d.ack, "%.0f"),
         '"acn":'   .. numo(d.acn, "%.0f"),
         '"dbg":'   .. stro(d.dbg),
+        -- MFD 按键回传（参数扫出来的，见上方 scan_mfd_buttons）
+        '"bp":'    .. stro(mfd_press_report()),
     }
     return '{"sys":{' .. table.concat(p, ",") .. '}}'
 end
@@ -596,6 +642,52 @@ local function apply_command(line)
         return false
     end
     local dnum, cnum, vnum = tonumber(dev), tonumber(cmd), tonumber(val)
+
+    -- 诊断专用：dev=0 不用来点座舱，改成两条只读探针。
+    --   cmd=0, val=<arg>   读座舱参数（GetDevice(0):get_argument_value）
+    --   cmd=1             扫一遍设备号，把有 performClickableAction 的写进日志
+    -- 有了读参数的能力，就能在没人看屏幕的情况下判断「这一下到底有没有生效」。
+    if dnum == 0 then
+        if cnum == 0 then
+            local a = math.floor(vnum)
+            local okv, v = pcall(function()
+                local d0 = GetDevice(0)
+                return d0:get_argument_value(a)
+            end)
+            last_dbg = okv and string.format("arg%d=%s", a, tostring(v)) or "argfail"
+            return okv
+        elseif cnum == 1 then
+            local hit = {}
+            for id = 1, 60 do
+                local okd, d = pcall(GetDevice, id)
+                if okd and d and type(d.performClickableAction) == "function" then
+                    local okg = pcall(function() return d:get_argument_value(0) end)
+                    hit[#hit + 1] = string.format("%d%s", id, okg and "*" or "")
+                end
+            end
+            local s = table.concat(hit, ",")
+            last_dbg = "devs=" .. s
+            log_info("设备扫描：" .. s)
+            return true
+        elseif cnum == 3 then
+            -- 批量快照 40 个参数：val 是起始号，回 "A<起>|v1,v2,…"
+            -- 用来做「切页前后对比」——如果切页会让某个参数动，那它就能当页面号用。
+            local start = math.floor(vnum)
+            local okd, d0 = pcall(GetDevice, 0)
+            if not okd or not d0 then
+                last_dbg = "noarg"
+                return false
+            end
+            local out = {}
+            for i = start, start + 39 do
+                local okv, v = pcall(function() return d0:get_argument_value(i) end)
+                out[#out + 1] = okv and string.format("%.2f", tonumber(v) or -1) or "x"
+            end
+            last_dbg = "A" .. start .. "|" .. table.concat(out, ",")
+            return true
+        end
+    end
+
 
     local okd, d = pcall(GetDevice, dnum)
     if not okd or not d then
@@ -832,6 +924,10 @@ end
 
 function LuaExportAfterNextFrame()
     frame_no = frame_no + 1
+
+    -- MFD 按键扫描放在最前面：它每帧都要跑（60Hz 才能抓住短按），
+    -- 而 send_frame 内部有令牌桶会提前 return，放进去会漏帧。
+    pcall(scan_mfd_buttons)
 
     -- 探针只在进座舱后跑一次（第 60 帧 ≈ 1 秒），见文件上方说明
     if frame_no == PROBE_AT_FRAME and probe_wanted() then
