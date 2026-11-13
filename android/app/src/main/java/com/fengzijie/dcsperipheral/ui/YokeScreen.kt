@@ -184,39 +184,6 @@ fun YokeScreen(
                 )
             }
 
-            Spacer(Modifier.height(5.dp))
-            // 减速板 + 机轮刹车：同为起降构型操作，和襟翼/起落架放一组。
-            // 减速板是「按下型」两键（开/收），机轮刹车是「保持型」按住=刹车。
-            Row(
-                Modifier.fillMaxWidth().height(46.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                HoldButton(
-                    text = "减速板开",
-                    sub = "展开",
-                    enabled = st.armed,
-                    onDown = { onButtonDown(YokeBtn.SPEED_BRAKE_OPEN) },
-                    onUp = { onButtonUp(YokeBtn.SPEED_BRAKE_OPEN) },
-                    modifier = Modifier.weight(1f),
-                )
-                HoldButton(
-                    text = "减速板收",
-                    sub = "收起",
-                    enabled = st.armed,
-                    onDown = { onButtonDown(YokeBtn.SPEED_BRAKE_CLOSE) },
-                    onUp = { onButtonUp(YokeBtn.SPEED_BRAKE_CLOSE) },
-                    modifier = Modifier.weight(1f),
-                )
-                HoldButton(
-                    text = "轮刹",
-                    sub = "按住刹车",
-                    enabled = st.armed,
-                    onDown = { onButtonDown(YokeBtn.WHEEL_BRAKE) },
-                    onUp = { onButtonUp(YokeBtn.WHEEL_BRAKE) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
         }
 
         // ---------------- 右：解锁 / 状态 / 视角 ----------------
@@ -250,6 +217,40 @@ fun YokeScreen(
             // 间距从 4dp 拉到 10dp：光靠长按还不够，手指从状态区滑出来时先
             // 撞到空白区域，比直接压在按钮上更容易「反应过来就松手」。
             Spacer(Modifier.height(10.dp))
+            // 减速板 + 机轮刹车：移到「校零」与「解锁」之间 —— 都是起降/地面整备类操作，
+            // 和右侧的解锁、校零放一组，比塞在中间杆位区更顺手。
+            // 减速板是「按下型」两键（开/收），机轮刹车是「保持型」按住=刹车。
+            Row(
+                Modifier.fillMaxWidth().height(46.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HoldButton(
+                    text = "减速板开",
+                    sub = "展开",
+                    enabled = st.armed,
+                    onDown = { onButtonDown(YokeBtn.SPEED_BRAKE_OPEN) },
+                    onUp = { onButtonUp(YokeBtn.SPEED_BRAKE_OPEN) },
+                    modifier = Modifier.weight(1f),
+                )
+                HoldButton(
+                    text = "减速板收",
+                    sub = "收起",
+                    enabled = st.armed,
+                    onDown = { onButtonDown(YokeBtn.SPEED_BRAKE_CLOSE) },
+                    onUp = { onButtonUp(YokeBtn.SPEED_BRAKE_CLOSE) },
+                    modifier = Modifier.weight(1f),
+                )
+                HoldButton(
+                    text = "轮刹",
+                    sub = "按住刹车",
+                    enabled = st.armed,
+                    onDown = { onButtonDown(YokeBtn.WHEEL_BRAKE) },
+                    onUp = { onButtonUp(YokeBtn.WHEEL_BRAKE) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth().height(36.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 LockChip(
                     text = if (st.hasNeutral) "长按·重新校零" else "长按·校零",

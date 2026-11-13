@@ -150,6 +150,10 @@ tools\start-usb.bat        # 开机后只跑这一个
 装完按 `BINDING.md` §2 把 `JOY_BTN13/14/15` 绑到减速板开 / 收、机轮刹车；
 头瞄视角仍按 v1.2.0 的方式绑 `Absolute Camera View`，不受本次改动影响。
 
+> **v1.3.1（2026-11-14，同次会话）**：把「减速板开/收 + 轮刹」这一行从中间杆位区移到右侧
+> 「校零」与「解锁」之间（同属起降/整备类操作，放在一起更顺手）。`versionName 1.3.0→1.3.1`、
+> `versionCode 4→5`；APK：`release/v1.3.1/DCS-Peripheral-Android-v1.3.1.apk`。功能与 DCS 绑键不变。
+
 ---
 
 ## 文档索引
