@@ -1,6 +1,8 @@
 package com.fengzijie.dcsperipheral.ui
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -26,18 +29,21 @@ import com.fengzijie.dcsperipheral.input.YokeState
  * 2026-11-14 改版：**视角已从手机端移除**（用户买了头瞄，看视角交给头瞄）。
  * 战斗页只剩交战必需项，版面：
  *
- *   油门 | 绿点盘(贴油门右侧) | 中间按钮区 | 机炮/武器(右上)
+ *   油门 | 绿点盘(贴油门右侧) | 中间按钮区 | 右上操作组(发射+雷达TDC)
  *        | 脚舵 ————————————————————— 跨整宽，压在最底下
  *
- * 右上角一整组是「机炮 / 武器投放」两个发射键，都在右手拇指下，
- * 不用横跨屏幕找键。
+ * 右上操作组（右手拇指区）从上到下：
+ *   ① 发射三键 —— 干扰弹 | 机炮 | 武器投放（用户要求干扰弹移到机炮左侧）；
+ *   ② 雷达簇 —— 雷达锁定(左) + TDC 四向菱形(右，方框内)。用户要求
+ *      雷达锁定放在四个移动键左侧，四向做成菱形方便拇指推。
  *
- * 绿点盘（杆位指示）留在油门右侧，雷达锁定 / 武器切换 / 干扰弹填进中间剩余空间。
+ * 中间按钮区只剩：解锁 + 武器切换（单向循环，一个键足够），下方状态条。
+ * 雷达锁定 / 干扰弹 / TDC 四向都挪到了右上操作组，中间留白更干净。
  *
  * 发射拆成**机炮 / 武器投放**两个键：DCS 里 `Trigger`(机炮扳机) 和
  * `Weapon Release`(投放) 本来就是两条独立命令，旧版一个 BTN7 把两者混绑。
- * 编号不重排：BTN7 (`FIRE = 6`) 留给武器投放，机炮新增 BTN12 (`GUN_FIRE = 11`)；
- * 7..9 的预留位继续空着。详见 docs/BINDING.md 的迁移说明。
+ * 编号不重排：BTN7 (`FIRE = 6`) 留给武器投放，机炮新增 BTN12 (`GUN_FIRE = 11`)。
+ * TDC 四向占 4/7/8/9 号（原预留位，详见 YokeScreen.kt 的 YokeBtn）。
  *
  * 脚舵放最底下并跨整宽：它只在落地修正和狗斗压偏航时用，屏幕最下沿
  * 是拇指自然落点，而且横条越长分辨率越高。
@@ -120,7 +126,7 @@ fun CombatScreen(
                     Spacer(Modifier.height(4.dp))
 
                     // 武器切换：JF-17 只有 S8: Change Weapons 单向循环，没有上/下两条，
-                    // 所以一个键就够（占 BTN4）。宽 270dp 与下面「锁定 / 干扰弹」行对齐。
+                    // 所以一个键就够（占 BTN4）。宽 270dp，居中即可。
                     // guardMs=0 → 瞬时触发，无防误触延时（用户要求）。
                     GuardButton(
                         text = "武器切换",
@@ -132,27 +138,8 @@ fun CombatScreen(
                         modifier = Modifier.width(270.dp).height(60.dp),
                     )
 
-                    // 雷达锁定 / 干扰弹并排。干扰弹保持琥珀，红色全给发射键。
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        GuardButton(
-                            text = "锁定",
-                            sub = "雷达锁定目标",
-                            enabled = st.armed,
-                            guardMs = 0,
-                            onDown = { onButtonDown(YokeBtn.LOCK) },
-                            onUp = { onButtonUp(YokeBtn.LOCK) },
-                            modifier = Modifier.width(132.dp).height(60.dp),
-                        )
-                        GuardButton(
-                            text = "干扰弹",
-                            sub = "投放",
-                            enabled = st.armed,
-                            guardMs = 0,
-                            onDown = { onButtonDown(YokeBtn.COUNTERMEASURE) },
-                            onUp = { onButtonUp(YokeBtn.COUNTERMEASURE) },
-                            modifier = Modifier.width(132.dp).height(60.dp),
-                        )
-                    }
+                    // 中心区到此为止：解锁 + 武器切换（见上）。雷达锁定 / 干扰弹 /
+                    // TDC 四向都已挪到右上操作组（见下），这里留白更干净。
                 }
                 // 状态条挪到这里：右列发射键占满后，中间留白处刚好够放一行小字。
                 // 中间这块有留白，合并成一行小字足够，也不抢任何触摸区。
@@ -170,26 +157,35 @@ fun CombatScreen(
                 )
             }
 
-            // ---- 右上角操作组：机炮 / 武器，全部在右手拇指下 ----
+            // ---- 右上操作组：发射三键 + 雷达簇，全部在右手拇指下 ----
             // 视角已移除：用户买了头瞄，看视角交给头瞄（见 docs/HANDOFF.md）。
             Column(
                 modifier = Modifier.width(220.dp).fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                // 发射两键：左上机炮 / 右上武器投放。
-                // 都是不可逆动作、都用红色作视觉警示；按用户要求瞬时触发，不再设长按门槛。
+                // 发射三键：干扰弹(琥珀) | 机炮(红) | 武器(红)。用户要求干扰弹移到机炮左侧。
+                // 都是瞬时触发（guardMs=0）；机炮/武器是不可逆动作用红色警示，干扰弹用琥珀。
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(84.dp),
+                    modifier = Modifier.fillMaxWidth().height(78.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
+                    GuardButton(
+                        text = "干扰弹",
+                        sub = "投放",
+                        enabled = st.armed,
+                        guardMs = 0,
+                        onDown = { onButtonDown(YokeBtn.COUNTERMEASURE) },
+                        onUp = { onButtonUp(YokeBtn.COUNTERMEASURE) },
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
                     GuardButton(
                         text = "机炮",
                         sub = "扳机",
                         enabled = st.armed,
                         guardMs = 0,
                         danger = true,
-                        textSp = 18f,
-                        subSp = 12f,
+                        textSp = 16f,
+                        subSp = 11f,
                         onDown = { onButtonDown(YokeBtn.GUN_FIRE) },
                         onUp = { onButtonUp(YokeBtn.GUN_FIRE) },
                         modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -200,16 +196,92 @@ fun CombatScreen(
                         enabled = st.armed,
                         guardMs = 0,
                         danger = true,
-                        textSp = 18f,
-                        subSp = 12f,
+                        textSp = 16f,
+                        subSp = 11f,
                         onDown = { onButtonDown(YokeBtn.FIRE) },
                         onUp = { onButtonUp(YokeBtn.FIRE) },
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
 
-                // 剩下的一点点高度留白：和脚舵隔开，免得拇指顺着发射键滑到脚舵。
-                // 状态条已挪到中间留白处（右列放大后这里塞不下两行字）。
+                // 雷达簇：雷达锁定(左) + TDC 四向菱形(右，方框内)。
+                // 用户要求：雷达锁定放在四个移动键左侧；四向做成菱形方便拇指推。
+                // TDC 四向 = JF-17 的 T5/TDC 帽，四个按钮按住即持续移动雷达光标。
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(158.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // 雷达锁定：贴着 TDC 菱形左侧，瞬时触发。
+                    GuardButton(
+                        text = "锁定",
+                        sub = "雷达",
+                        enabled = st.armed,
+                        guardMs = 0,
+                        onDown = { onButtonDown(YokeBtn.LOCK) },
+                        onUp = { onButtonUp(YokeBtn.LOCK) },
+                        modifier = Modifier.width(54.dp).fillMaxHeight(),
+                    )
+                    // 方框 + 菱形四向：上 / 左 右 / 下。
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .border(1.dp, Ink.Line, RoundedCornerShape(8.dp))
+                            .padding(8.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                            ) {
+                                GuardButton(
+                                    text = "↑", sub = null, enabled = st.armed, guardMs = 0,
+                                    onDown = { onButtonDown(YokeBtn.TDC_UP) },
+                                    onUp = { onButtonUp(YokeBtn.TDC_UP) },
+                                    textSp = 18f,
+                                    modifier = Modifier.size(46.dp),
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                GuardButton(
+                                    text = "←", sub = null, enabled = st.armed, guardMs = 0,
+                                    onDown = { onButtonDown(YokeBtn.TDC_LEFT) },
+                                    onUp = { onButtonUp(YokeBtn.TDC_LEFT) },
+                                    textSp = 18f,
+                                    modifier = Modifier.size(46.dp),
+                                )
+                                GuardButton(
+                                    text = "→", sub = null, enabled = st.armed, guardMs = 0,
+                                    onDown = { onButtonDown(YokeBtn.TDC_RIGHT) },
+                                    onUp = { onButtonUp(YokeBtn.TDC_RIGHT) },
+                                    textSp = 18f,
+                                    modifier = Modifier.size(46.dp),
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                            ) {
+                                GuardButton(
+                                    text = "↓", sub = null, enabled = st.armed, guardMs = 0,
+                                    onDown = { onButtonDown(YokeBtn.TDC_DOWN) },
+                                    onUp = { onButtonUp(YokeBtn.TDC_DOWN) },
+                                    textSp = 18f,
+                                    modifier = Modifier.size(46.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 底部留白：和脚舵隔开，免得拇指顺着发射键滑到脚舵。
                 Spacer(Modifier.weight(1f).fillMaxWidth())
             }
         }

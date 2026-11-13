@@ -41,19 +41,23 @@ object YokeBtn {
     const val GEAR = 2
 
     // 战斗页。编号必须和 vJoy 里配的按钮号对齐（1 起算），DCS 里绑的也是这个。
-    // 3,5,6 是当前用到的，7..9 先占位给以后的目标选择 / 雷达模式，避免到时候
-    // 重排编号 —— 一重排，DCS 里绑好的键全要重绑。4 号空着：JF-17 没有「上一个 /
-    // 下一个武器」，只有 S8: Change Weapons 单向循环，武器切换一个键（占 3 号）就够，
-    // 不需要第二个，所以 4 号留作空位。
+    // 3,5,6 是当前用到的。4 号空着留给 TDC 右（见下）；7..9 原本占给「目标选择 /
+    // 雷达模式」，现在直接拿来当 TDC 四向，不新增编号、不动已绑好的键。
     const val WEAPON_SWITCH = 3        // 武器切换 → DCS：S8: Change Weapons（单向循环）
-    const val LOCK = 5                 // 锁定目标
-    const val FIRE = 6                 // 发射
+    const val LOCK = 5                 // 雷达锁定目标（T5_Press: Lock Target）
+    const val FIRE = 6                 // 武器投放（S3: Weapon Launch）
 
-    const val RESERVED_TWS = 7
-    const val RESERVED_TARGET_PREV = 8
-    const val RESERVED_TARGET_NEXT = 9
+    // TDC 雷达光标四向（v1.3.4 新增）。JF-17 的 TDC 是节流阀上的 T5 四向帽，
+    // DCS 里把四个方向各绑到「TDC Slew Up / Down / Left / Right」。手机没有实体
+    // 四向帽，用四个瞬时按钮按住即持续移动光标（guardMs=0，按住就动）。
+    // 4 号是之前特意留空的武器槽，7..9 是原本占的雷达/目标位，正好拿来当 TDC
+    // 四向，全部落在已确认可用的 1..15 号范围内，无需改 vJoy 配置。
+    const val TDC_RIGHT = 4            // TDC 右 → DCS：TDC Slew Right
+    const val TDC_UP = 7              // TDC 上 → DCS：TDC Slew Up
+    const val TDC_DOWN = 8            // TDC 下 → DCS：TDC Slew Down
+    const val TDC_LEFT = 9            // TDC 左 → DCS：TDC Slew Left
 
-    // 10 而不是 7：7..9 是给雷达模式和目标选择占的位，干扰弹虽然后加，
+    // 10 而不是 7：7..9 现在给 TDC 四向占了，干扰弹虽然后加，
     // 但编号顺序一旦重排，DCS 里已经绑好的键就全废了。
     const val COUNTERMEASURE = 10      // 干扰弹投放
 

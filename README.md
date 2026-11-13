@@ -164,6 +164,12 @@ tools\start-usb.bat        # 开机后只跑这一个
 > 红框等视觉警示保留。`versionName 1.3.2→1.3.3`、`versionCode 6→7`；
 > APK：`release/v1.3.3/DCS-Peripheral-Android-v1.3.3.apk`。
 
+> **v1.3.4（2026-11-14，同次会话）**：战斗页重排 —— ① 干扰弹从中间挪到右上发射组最左（机炮左侧）；
+> ② 新增 **TDC 雷达光标四向**（上 / 下 / 左 / 右，菱形排布在方框内，按钮按住即持续移动雷达光标），
+> 占 `BTN5 / BTN8 / BTN9 / BTN10`（原预留位，不新增编号、不改 vJoy 按钮数）；③ 雷达锁定移到四向键左侧（组成「雷达簇」）。
+> 四个方向绑到 JF-17 的 `TDC Slew Up/Down/Left/Right`（见 `BINDING.md` §2）。
+> `versionName 1.3.3→1.3.4`、`versionCode 7→8`；APK：`release/v1.3.4/DCS-Peripheral-Android-v1.3.4.apk`。
+
 ---
 
 ## 文档索引

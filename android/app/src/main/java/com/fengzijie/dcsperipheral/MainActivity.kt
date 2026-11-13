@@ -474,7 +474,7 @@ private fun Header(
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text = "DCS 外设 · v1.3.3",
+                text = "DCS 外设 · v1.3.4",
                 color = Ink.Fg,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
