@@ -382,6 +382,7 @@ fun ViewPad(
     onChange: (Float, Float) -> Unit,
     onRelease: () -> Unit,
     modifier: Modifier = Modifier,
+    labelSp: Float = 10f,
 ) {
     var touching by remember { mutableStateOf(false) }
     // 点画在**手指相对按下点的位移**上，不画在映射后的 vx/vy 上：
@@ -461,7 +462,7 @@ fun ViewPad(
             Text(
                 "视角\n按住拖动",
                 color = Ink.Dim.copy(alpha = 0.55f),
-                fontSize = 10.sp,
+                fontSize = labelSp.sp,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
             )
         }
@@ -520,6 +521,8 @@ fun GuardButton(
     modifier: Modifier = Modifier,
     guardMs: Int = 200,
     danger: Boolean = false,
+    textSp: Float = 13f,
+    subSp: Float = 10f,
 ) {
     var holding by remember { mutableStateOf(false) }
     val prog = remember { Animatable(0f) }
@@ -580,7 +583,7 @@ fun GuardButton(
                     enabled -> Ink.Fg
                     else -> Ink.Dim
                 },
-                fontSize = 13.sp,
+                fontSize = textSp.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 softWrap = false,
@@ -589,7 +592,7 @@ fun GuardButton(
                 Text(
                     text = sub,
                     color = Ink.Dim,
-                    fontSize = 10.sp,
+                    fontSize = subSp.sp,
                     maxLines = 1,
                     softWrap = false,
                 )

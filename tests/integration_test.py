@@ -443,6 +443,60 @@ def static_numbers():
             "path = (u.path or '') + '/vjoy'，URL 带尾斜杠时变成 //vjoy → 404"
             if hb else "已归一化", "P3", "心跳 404 会让 /input 一直报 vjoy 未就绪")
 
+    # 战斗页曾经把脚舵滑块和视角区砍掉（脚舵只剩看不见的「拧手机」、
+    # 视角因为没接 onView 导致 vx/vy 恒 0）。守住这四个入口，防止再退化。
+    combat = read("android/app/src/main/java/com/fengzijie/dcsperipheral/ui/CombatScreen.kt")
+    main_act = read("android/app/src/main/java/com/fengzijie/dcsperipheral/MainActivity.kt")
+    m = re.search(r"CombatScreen\((.*?)\n\s*\)", main_act, re.S)
+    call = m.group(1) if m else ""
+    needed_params = ("onRudder", "onRudderRelease", "onView", "onViewRelease")
+    missing = [p for p in needed_params
+               if not (re.search(r"\b" + p + r"\s*:", combat)
+                       and re.search(r"\b" + p + r"\s*=", call))]
+    has_widgets = ("RudderBar(" in combat and "ViewPad(" in combat)
+    R.check("T-STAT-010", "战斗页脚舵/视角入口齐全且已接线",
+            not missing and has_widgets,
+            "CombatScreen 声明并调用 RudderBar/ViewPad，MainActivity 四个回调都传",
+            f"缺回调={missing} 控件存在={has_widgets}",
+            "P1", "缺 onView 会让战斗页 vx/vy 恒 0，视角完全转不动")
+
+    # 发射键拆分 + 版面顺序。机炮和武器投放在 DCS 里是两条独立命令
+    # （Trigger vs Weapon Release），一个 BTN7 混绑必然丢一条。
+    yoke = read("android/app/src/main/java/com/fengzijie/dcsperipheral/ui/YokeScreen.kt")
+    binding = read("docs/BINDING.md")
+    gun_num = re.search(r"GUN_FIRE\s*=\s*11", yoke) is not None
+    two_keys = ("YokeBtn.GUN_FIRE" in combat and "YokeBtn.FIRE" in combat)
+    # 源码里的调用顺序 == 版面从上到下：视角 → 两个发射键 → 最底下脚舵
+    i_view = combat.find("ViewPad(")
+    i_gun = combat.find("\"机炮\"")
+    i_rudder = combat.find("RudderBar(")
+    order_ok = 0 <= i_view < i_gun < i_rudder
+    right_top = "Alignment.CenterEnd" in combat
+    # Compose 源码顺序 == 版面从左到右：绿点盘在左，视角/发射那组在最右
+    right_of_green = 0 <= combat.find("StickPad(") < combat.find("ViewPad(")
+    # 20:57 用户嫌中间五个按钮太大：不许再回到 weight(1f) 撑满半屏
+    compact = ("Modifier.width(132.dp).height(60.dp)" in combat
+               and "height = 42.dp" in combat)
+    doc_ok = "BTN12" in binding and "GUN_FIRE = 11" in binding
+    all_ok = (gun_num and two_keys and order_ok and right_top
+              and right_of_green and compact and doc_ok)
+    R.check("T-STAT-011", "机炮/投放为两个独立按钮，视角+发射组在右上角、中间紧凑、脚舵最底",
+            all_ok,
+            "GUN_FIRE=11 且两键都被调用；源码顺序 绿点盘<视角<发射<脚舵；视角靠右；中间按钮固定小尺寸；BINDING.md 有 BTN12",
+            f"编号={gun_num} 两键={two_keys} 顺序={order_ok} 右上={right_top} 在绿点右侧={right_of_green} 紧凑={compact} 文档={doc_ok}",
+            "P1", "发射键重新混成一个会直接丢掉机炮或投放；20:53 用户更正过左右，位置错了要能挡住")
+
+    # 21:14 用户嫌右上角三个控件太小（尤其视角）：守住放大后的尺寸，
+    # 别再缩回 96dp 视角 / 60dp 发射键。
+    big_col = "Modifier.width(220.dp)" in combat
+    big_view = "Modifier.size(160.dp)" in combat and "labelSp = 13f" in combat
+    big_fire = "height(84.dp)" in combat and "textSp = 18f" in combat
+    R.check("T-STAT-012", "右上角视角/机炮/武器组已放大且文字同步",
+            big_col and big_view and big_fire,
+            "右列 220dp、视角 160dp 正方形 + 13sp 标签、发射键 84dp 高 + 18/12sp 文字",
+            f"右列={big_col} 视角={big_view} 发射={big_fire}",
+            "P2", "缩回 96dp 视角会重演「太小、尤其视角」的抱怨")
+
 
 # ---------------------------------------------------------------- 主流程
 

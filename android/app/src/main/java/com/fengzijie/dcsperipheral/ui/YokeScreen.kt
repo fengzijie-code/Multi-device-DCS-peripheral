@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fengzijie.dcsperipheral.input.YokeSettings
@@ -54,6 +55,11 @@ object YokeBtn {
     // 10 而不是 7：7..9 是给雷达模式和目标选择占的位，干扰弹虽然后加，
     // 但编号顺序一旦重排，DCS 里已经绑好的键就全废了。
     const val COUNTERMEASURE = 10      // 干扰弹投放
+
+    // 11 而不是「把 6 拆成两个」：BTN7 早就在 DCS 里绑过了，改它的含义等于
+    // 让所有机型配置悄悄失效。机炮另起一个新号，老绑定原样保留（只改语义，
+    // 见 BINDING.md 的迁移说明），7..9 的预留位继续不动。
+    const val GUN_FIRE = 11            // 机炮（扳机），与 FIRE 的「武器投放」分开
 }
 
 /**
@@ -246,8 +252,18 @@ private fun VjoyLine(state: Int) {
     }
 }
 
+/**
+ * 解锁开关。默认撑满父宽度、46dp 高（起降页用）；战斗页嫌它太占地方，
+ * 通过 [modifier] / [height] 收窄，不影响起降页的原有尺寸。
+ */
 @Composable
-fun ArmButton(armed: Boolean, ready: Boolean, onClick: () -> Unit) {
+fun ArmButton(
+    armed: Boolean,
+    ready: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    height: Dp = 46.dp,
+) {
     val bg = when {
         armed -> Ink.Red.copy(alpha = 0.18f)
         ready -> Ink.Teal.copy(alpha = 0.14f)
@@ -264,9 +280,9 @@ fun ArmButton(armed: Boolean, ready: Boolean, onClick: () -> Unit) {
         else -> Ink.Dim
     }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(46.dp)
+            .height(height)
             .clip(RoundedCornerShape(10.dp))
             .background(bg)
             .border(1.5.dp, line, RoundedCornerShape(10.dp))

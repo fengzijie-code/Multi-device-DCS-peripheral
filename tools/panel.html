@@ -93,21 +93,38 @@
   body.tab-ufcp #ufcpview{display:block}
 
   /* ---------- UFCP：按实物照片排版 ----------
-     每行 = 左功能键组(3) + → + 液晶窗 + ← + 右专用键组(2)，四行四窗，底部旋钮排 */
-  #ufcpwrap{max-width:680px;margin:0 auto}
-  #ufcpwrap h2{font-size:15px;color:var(--fg);margin:6px 2px 10px}
-  .ufcp-face{background:#171310;border:1px solid #2c2a26;border-radius:14px;padding:12px}
+     每行 = 左功能键组(3) + → + 液晶窗 + ← + 右专用键组(2)，四行四窗，底部旋钮排
+     iPad 横屏有 1024px 可用，以前写死 680px 把两侧全浪费了，每颗键只剩 ~70px，
+     中文说明（"故障列表/数字1"）必然被 ellipsis 砍掉斜杠后面的字。
+     现在放宽到 1080px + 功能键吃 1.25fr + 说明允许换行，双管齐下保证不截断。 */
+  #ufcpwrap{max-width:1080px;margin:0 auto}
+  #ufcpwrap h2{font-size:15px;color:var(--fg);margin:6px 2px 4px}
+  #ufcpstat{font-size:11.5px;line-height:1.45;margin:0 2px 9px;color:var(--dim)}
+  #ufcpstat.ok{color:var(--teal)} #ufcpstat.bad{color:var(--red)}
+  .ufcp-face{background:#171310;border:1px solid #2c2a26;border-radius:14px;padding:12px 14px}
   .ufcp-row{display:grid;
-    grid-template-columns:repeat(3,minmax(0,1fr)) 2.4rem minmax(0,2.6fr) 2.4rem repeat(2,minmax(0,1fr));
+    grid-template-columns:repeat(3,minmax(0,1.25fr)) 2.6rem minmax(0,2.4fr) 2.6rem repeat(2,minmax(0,1.25fr));
     gap:6px;margin-bottom:6px;align-items:stretch}
-  .ufcp-row .mk{height:3.2rem}
+  .ufcp-row .mk{min-height:3.4rem}
+  /* UFCP 键的说明一律完整显示：MFD 键很窄必须省略，UFCP 键不能照抄那套 */
+  .ufcp-face .mk{padding:3px 3px;gap:2px}
+  .ufcp-face .mk i{font-size:10px;color:#8b949e;white-space:nowrap}
+  .ufcp-face .mk b{font-size:11px;max-width:100%;white-space:normal;overflow:visible;
+    text-overflow:clip;text-align:center;line-height:1.15;word-break:break-word}
+  .ufcp-face .mk.blank{opacity:.35}
   .ufcp-win{background:#061508;border:2px solid #1c2b1f;border-radius:4px;
-    color:#54ff66;font-family:ui-monospace,Consolas,monospace;font-size:15px;
-    letter-spacing:.14em;display:flex;align-items:center;justify-content:center;
-    text-shadow:0 0 7px rgba(60,255,90,.55);min-height:3.2rem;padding:0 4px}
+    color:#54ff66;font-family:ui-monospace,Consolas,monospace;
+    font-size:clamp(12px,1.35vw,16px);letter-spacing:.09em;
+    white-space:nowrap;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    text-shadow:0 0 7px rgba(60,255,90,.55);min-height:3.4rem;padding:0 4px}
+  .ufcp-face.nodata .ufcp-win{opacity:.35}
   .ufcp-cap{font-size:9.5px;color:#a8b0b7;text-align:center;margin-top:3px;letter-spacing:.08em}
   .ufcp-knobs{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;
     margin-top:10px;align-items:center}
+  /* +/− 两颗键共占两列，不然挤在 1/7 宽度里连"连续增"都放不下 */
+  #ufcpstep{grid-column:span 2}
+  .ufcp-knobs .mk{min-height:2.4rem}
   .uknob{text-align:center}
   .uknob i{display:block;width:44px;height:44px;margin:0 auto 4px;border-radius:50%;
     background:radial-gradient(circle at 35% 30%,#8f9299,#3a3d42 60%,#22252a);
@@ -115,7 +132,28 @@
   .uknob i::after{content:"";position:absolute;left:50%;top:3px;width:2px;height:14px;
     background:#d5d9df;transform:translateX(-50%)}
   .uknob b{font-size:9px;color:#c4cad1;font-weight:600;letter-spacing:.04em;display:block}
+  #ufcpfb{display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;margin:10px 2px 0;line-height:1.4}
+  #ufcplast{color:var(--fg)} #ufcpack{color:var(--dim)}
+  #ufcpraw{font-size:10.5px;color:#6e7681;margin:6px 2px 0;line-height:1.45;word-break:break-all}
+  #ufcpraw summary{cursor:pointer;color:#8b949e}
+  #ufcpraw code{color:#9fb0c0}
   .ufcpnote{font-size:10.5px;color:#8b949e;line-height:1.45;margin:10px 2px}
+  /* 窄屏（竖屏 iPad / 手机）：一行八列会挤成纸条，改成「键一排 + 窗一排」 */
+  @media (max-width:700px){
+    .ufcp-row{
+      grid-template-columns:repeat(3,minmax(0,1fr)) 2.4rem 2.4rem repeat(2,minmax(0,1fr));
+      grid-template-areas:
+        "f1 f2 f3 al ar s1 s2"
+        "w  w  w  w  w  w  w";
+      gap:5px;
+    }
+    .u-f1{grid-area:f1} .u-f2{grid-area:f2} .u-f3{grid-area:f3}
+    .u-al{grid-area:al} .u-ar{grid-area:ar}
+    .u-s1{grid-area:s1} .u-s2{grid-area:s2}
+    .u-w{grid-area:w}
+    .ufcp-knobs{grid-template-columns:repeat(4,minmax(0,1fr))}
+    #ufcpstep{grid-column:span 2}
+  }
 
   /* ---------- MFD ---------- */
   #mfdwrap{max-width:780px;margin:0 auto}
@@ -391,7 +429,8 @@
 <main id="ufcpview">
   <div id="ufcpwrap">
     <h2>UFCP 正前方控制板</h2>
-    <div class="ufcp-face">
+    <div id="ufcpstat">等待数据…</div>
+    <div class="ufcp-face" id="ufcpface">
       <div id="ufcprows"></div>
     </div>
     <div class="ufcp-knobs">
@@ -401,10 +440,16 @@
       <div class="uknob"><i></i><b>STBY RET</b></div>
       <div class="uknob"><i></i><b>UFCP BRT</b></div>
     </div>
+    <div id="ufcpfb"><span id="ufcplast">还没按过键</span><span id="ufcpack"></span></div>
+    <details id="ufcpraw">
+      <summary>回传诊断（四窗为什么不变，看这里）</summary>
+      <code id="ufcprawtext">—</code>
+    </details>
     <p class="ufcpnote">→ ← 是窗口参数选择键（实体上就是窗边的箭头键）：按要改的参数旁边的箭头，
       光标出现后用数字键输入。双功能键（PFL/1 这种）缺省按 = 功能，修改中按 = 数字。
       无线电波道在第四窗口（COM1/COM2）；塔康不在这输数字——MFD 塔康程序页选 TCN01-10。
-      四个旋钮是 HUD/UFCP 亮度（连续可调），触屏做不了真实旋钮，仅示意。</p>
+      <b>+/− 步进键必须先用箭头选中某个参数</b>（光标停在最左一位、3 秒内拨动）才有反应，
+      单独按它不会改数。四个旋钮是 HUD/UFCP 亮度（连续可调），触屏做不了真实旋钮，仅示意。</p>
   </div>
 </main>
 
@@ -538,15 +583,6 @@ function paint(st) {
     // 屏幕回传优先：它直接告诉我们每块屏现在是哪一页
     if (sys.mfd) { applyScreenText(sys.mfd, forceSync); forceSync = false; }
 
-    // UFCP 四窗文字回传（sys.ufcp = "窗1|窗2|窗3|窗4"），点 UFCP 标签页才看得见
-    if (sys.ufcp !== undefined) {
-      const w = String(sys.ufcp).split("|");
-      for (let i = 0; i < 4; i++) {
-        const el = $("ufcpwin" + (i + 1));
-        if (el) el.textContent = w[i] || "";
-      }
-    }
-
     // 座舱按键回传（Export 每帧扫 MFD 参数得到的）
     if (sys.bp) applyCockpitPresses(sys.bp);
 
@@ -559,8 +595,16 @@ function paint(st) {
     if (sys.dbg && /^\d+:\d+:(?:D0?|N|M|X)$/.test(sys.dbg) && ackKey !== lastAckKey) {
       lastAckKey = ackKey;
       const ok = /:D0?$/.test(sys.dbg);
-      $("mfdack").textContent = (ok ? "已执行 · " : "没执行 · ") + sys.dbg;
-      $("mfdack").style.color = ok ? "var(--teal)" : "var(--red)";
+      const line = (ok ? "已执行 · " : "没执行 · ") + sys.dbg;
+      const col = ok ? "var(--teal)" : "var(--red)";
+      $("mfdack").textContent = line;
+      $("mfdack").style.color = col;
+      // UFCP 键的回执也要显示在本页 —— 以前只写 MFD 页里那个隐藏元素，
+      // 在 UFCP 页按完键什么都看不到，容易被当成「按键没反应 / 屏幕不变」。
+      if (/^46:/.test(sys.dbg)) {
+        $("ufcpack").textContent = line;
+        $("ufcpack").style.color = col;
+      }
     }
   }
 
@@ -578,6 +622,57 @@ function paint(st) {
     setText("flaps", num(f.flaps == null ? null : f.flaps * 100, 0));
     setText("sbrk", num(f.sbrk == null ? null : f.sbrk * 100, 0));
   }
+
+  paintUFCP(live, sys);
+}
+
+// ---- UFCP 四窗 + 数据链路诊断 ----
+// 以前四窗只在 sys.ufcp 存在时才写，sys 断了就永远停在 "···· ····" 占位符，
+// 页面本身又没有任何状态提示 —— 看起来就像「屏幕坏了、不会变」。
+// 现在无论有没有数据都给一句明确结论，并把原始回传串摊开给人看。
+function paintUFCP(live, sys) {
+  const hasField = !!sys && sys.ufcp !== undefined;
+  const raw = hasField ? String(sys.ufcp) : "";
+  const w = raw.split("|");
+  const any = w.some(x => x && x.trim());
+  const show = hasField && any;
+
+  let cls = "ok", msg = "";
+  if (!live) {
+    cls = "bad";
+    msg = "数据冻结 —— DCS 没在发（不在任务里？）。四窗现在是占位符，按什么都不会变。";
+  } else if (!sys) {
+    cls = "bad";
+    msg = "遥测在线但桥接没收到慢变量包 —— Export.lua 是旧版？四窗不会变。";
+  } else if (!hasField) {
+    cls = "bad";
+    msg = "Export.lua 没回传 ufcp 字段（旧版）—— 四窗不会变，需重新部署 Export.lua 并重进任务。";
+  } else if (!any) {
+    cls = "bad";
+    msg = "四窗回传为空 —— UFCP 可能没上电 / 座舱还没加载，也可能 DCS 不在 JF-17 里。";
+  } else {
+    msg = "四窗实时回传中 · 1Hz · 按 DST/4、FUL/7 等功能键会换内容，RTN 回常态。";
+  }
+  const stat = $("ufcpstat");
+  stat.textContent = msg;
+  stat.className = cls;
+  $("ufcpface").classList.toggle("nodata", !(live && show));
+  setText("ufcprawtext", hasField
+    ? "sys.ufcp = " + JSON.stringify(raw)
+    : "sys.ufcp 不存在（/state 里没有这个字段）");
+
+  for (let i = 0; i < 4; i++) {
+    const el = $("ufcpwin" + (i + 1));
+    if (!el) continue;                      // 还没点过 UFCP 标签，DOM 未建
+    if (!show) { el.textContent = "···· ····"; el.title = ""; continue; }
+    let v = (w[i] || "").trim();
+    // 编辑态 list_indication 会出现 txt_winN_fill，旧版提取器会把后面整段 dump
+    // 当成窗文本送回来。宁可空着也别把一坨结构名糊到液晶窗上。
+    if (/_fill|children|_BASE/i.test(v)) v = "";
+    if (v.length > 20) v = v.slice(0, 20);
+    el.textContent = v;                     // 第三窗常态就是空的，保持空
+    el.title = v;
+  }
 }
 
 async function tick() {
@@ -593,6 +688,9 @@ async function tick() {
 
 tick();
 setInterval(tick, 1000);
+// iPad 切后台时 Safari 会冻结 1Hz 轮询：低头看座舱再抬头，四窗可能还停在旧内容。
+// 回到前台立刻补拉一次，别让人以为屏幕不刷新。
+document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
 
 // ---- 座舱操作按钮 ----
 //
@@ -1024,14 +1122,26 @@ function mkKey(name, label, el, opt) {
     b.classList.remove("holding");
     b.classList.add("done");
     setTimeout(() => b.classList.remove("done"), 350);
-    $("mfdlast").textContent = label ? `${name} · ${label}` : name;
+    const isUFCP = opt.dev === UFCP_DEV;
+    const what = label ? `${name} · ${label}` : name;
+    $("mfdlast").textContent = what;
     $("mfdack").textContent = "已发送 · 等回执…";
     $("mfdack").style.color = "var(--dim)";
+    // UFCP 页和 MFD 页是两个互斥视图，反馈必须写在本页，否则按完啥也看不见
+    if (isUFCP) {
+      setText("ufcplast", "已按 " + what);
+      $("ufcpack").textContent = "已发送 · 等回执…";
+      $("ufcpack").style.color = "var(--dim)";
+    }
     // 1.2 秒还没等来回执就别让人干等 —— 多半是 DCS 不在任务里或 Export.lua 没加载
     setTimeout(() => {
       if ($("mfdack").textContent === "已发送 · 等回执…") {
         $("mfdack").textContent = "没有回执 · DCS 那边没在收";
         $("mfdack").style.color = "var(--amber)";
+      }
+      if (isUFCP && $("ufcpack").textContent === "已发送 · 等回执…") {
+        $("ufcpack").textContent = "没有回执 · DCS 那边没在收";
+        $("ufcpack").style.color = "var(--amber)";
       }
     }, 1200);
 
@@ -1101,13 +1211,25 @@ function renderUFCP() {
   for (const r of UFCP_ROWS) {
     const div = document.createElement("div");
     div.className = "ufcp-row";
-    for (const [lb, el, hint] of r.fns) {
-      div.appendChild(mkKey(lb, hint, el, { dev: UFCP_DEV }));
+    for (let i = 0; i < r.fns.length; i++) {
+      const [lb, el, hint] = r.fns[i];
+      div.appendChild(mkKey(lb, hint, el, { dev: UFCP_DEV, cls: "u-f" + (i + 1) }));
     }
-    div.appendChild(mkKey("→", "窗口" + r.win + "左参数", r.arrowL, { dev: UFCP_DEV }));
+    // 第四行左组只有 RTN / 0 两颗键。不补这一格，整行只有 7 个元素，
+    // 窗口和右组会整体左移一列，跟前三行对不齐（实物面板上是三颗位）。
+    if (r.fns.length < 3) {
+      for (let i = r.fns.length; i < 3; i++) {
+        const ph = document.createElement("span");
+        ph.className = "mk blank u-f" + (i + 1);
+        div.appendChild(ph);
+      }
+    }
+    div.appendChild(mkKey("→", "窗口" + r.win + "左参数", r.arrowL,
+                          { dev: UFCP_DEV, cls: "u-al" }));
     // 液晶窗：内容等 UFCP 指示器回传接通后填充，先给占位。
     // 第四窗下面带 COM1/COM2 标注（和实物一样），装在同一个格子里不破坏行网格
     const cell = document.createElement("div");
+    cell.className = "u-w";
     cell.style.cssText = "display:flex;flex-direction:column;min-width:0";
     const win = document.createElement("div");
     win.className = "ufcp-win";
@@ -1122,14 +1244,16 @@ function renderUFCP() {
       cell.appendChild(cap);
     }
     div.appendChild(cell);
-    div.appendChild(mkKey("←", "窗口" + r.win + "右参数", r.arrowR, { dev: UFCP_DEV }));
-    for (const [lb, el, hint] of r.specs) {
-      div.appendChild(mkKey(lb, hint, el, { dev: UFCP_DEV }));
+    div.appendChild(mkKey("←", "窗口" + r.win + "右参数", r.arrowR,
+                          { dev: UFCP_DEV, cls: "u-ar" }));
+    for (let i = 0; i < r.specs.length; i++) {
+      const [lb, el, hint] = r.specs[i];
+      div.appendChild(mkKey(lb, hint, el, { dev: UFCP_DEV, cls: "u-s" + (i + 1) }));
     }
     if (r.specs.length < 2) {
       for (let i = r.specs.length; i < 2; i++) {
         const s2 = document.createElement("span");
-        s2.className = "mk blank";
+        s2.className = "mk blank u-s" + (i + 1);
         div.appendChild(s2);
       }
     }

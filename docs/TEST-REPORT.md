@@ -179,3 +179,192 @@ python tests/live_features_test.py --allow-input     # 额外测武器切换
 # MFD 页面识别准确性（纯离线，不需要 DCS）
 python tests/mfd_recognition_test.py
 ```
+
+---
+
+## 7. 手机端战斗页补脚舵 / 视角（20:15）
+
+用户指出战斗页两个问题：**没有脚舵、不能转视角**。定位结果：
+
+- 脚舵：`YokeController` 每帧都在算 `rPos`（滑块优先、否则「拧手机」）并发送，
+  但 `CombatScreen` 没有 `RudderBar`，屏幕上没有可压住的入口。
+- 视角：`viewX/viewY` 只能由 `setView()` 写入，而 `MainActivity` 只把 `onView`
+  传给了 `YokeScreen`；战斗页既没有 `ViewPad` 也没接回调 → `vx/vy` 恒 **0**。
+- `docs/YOKE.md` 原写「战斗页只留交战要用的」，属于刻意取舍，不是漏写。
+
+改动（右列盲操按钮一个都没挪）：
+
+| 文件 | 改动 |
+|---|---|
+| `android/.../ui/CombatScreen.kt` | 中间列改成「杆位（`BoxWithConstraints` 自适应尺寸）+ 脚舵滑块 + 视角区」；新增 4 个回调参数；复用 `RudderBar`/`ViewPad`，死区/反转/横纵互换全部沿用起降页 |
+| `android/.../MainActivity.kt` | 给 `CombatScreen` 接上 `onRudder`/`onRudderRelease`/`onView`/`onViewRelease` |
+| `docs/YOKE.md`、`docs/HANDOFF.md` | 战斗页说明与能力表同步 |
+| `tests/integration_test.py` | 新增 **T-STAT-010**：静态守住四个回调 + 两个控件，防止再退化 |
+
+验证：
+
+- `gradlew :app:compileDebugKotlin --offline` → **BUILD SUCCESSFUL**（JBR OpenJDK 25 / Gradle 9.9.0）
+- `gradlew :app:assembleDebug --offline` → **BUILD SUCCESSFUL**，
+  APK `android/app/build/outputs/apk/debug/app-debug.apk`（11.9 MB，20:15）
+- 全量离线回归 → **83/83 通过，0 失败**（比之前多一项 T-STAT-010）
+- 42/42 单测、11/11 真机链路、功能层 VERIFY 5/5 均未受影响
+
+### 真机触屏验证（20:17，Pixel 6a USB 已连）
+
+用户把 Pixel 用 USB 接上后，`python tools/install-apk.py` 装好新 APK
+（设备 `35311JEGR07ZVC`，`adb reverse tcp:8080` 隧道已在），
+用 `adb shell input tap/swipe` 打真实触摸，PC 侧轮询 `/input` 校验：
+
+| 操作 | 读到的状态量 | 判定 |
+|---|---|---|
+| 战斗页截图 | 中间列出现「脚舵」滑块 + 「视角 按住拖动」区，右列按钮位置不变、无溢出 | ✅ |
+| 校准页点「校零」→ 战斗页点「解锁」 | 按钮变「已解锁 · 点此上锁」 | ✅ |
+| 脚舵滑块按住左→右拖 1.5s | `r` 连续 0.12→0.43、**峰值 0.729**；期间 `vx/vy` 恒 0 | ✅ |
+| 视角区按住拖到右上 1.5s | `vx=1.0`、`vy=0.833`；期间 `r` 恒 0 | ✅ |
+| 松手 | `r=0, vx=0, vy=0`（回中） | ✅ |
+| 收尾点「上锁」 | 按钮变回「点击解锁」，`/input.axes` 全 0 | ✅ |
+
+**两路互不串扰**，这正是本次修复要验证的对应关系。截图证据 `.tmp/pixel-combat0.png`。
+
+#### 微调（20:25）：视角区改正方形
+
+用户反馈「视角太大，跟绿点指示一致就行」。原来 `ViewPad` 是
+`fillMaxWidth().height(96.dp)` 的扁宽横条，里面的圆形底盘指示只占中间一小块。
+改成 **96dp 正方形居中**（外面套 `Box` 保持这一行高度），圆正好内切容器。
+映射半径仍是 `min(宽,高)/2-10 = 38dp`，**手感完全不变**。
+
+重新编译 / 打包 / 安装后复验：截图确认小方块居中、脚舵条与右列按钮无重叠；
+触摸拖 100px / 80px 得到 `vx=0.847`、`vy=0.678`（正好 100/116、80/116），
+松手全回中，收尾上锁。截图 `.tmp/pixel-viewpad-square.png`。
+
+> 视角在 DCS 里仍要绑 **Absolute** 相机水平/垂直轴，见 `docs/BINDING.md`。
+> 这次只验证到「手机 → 桥接 → vJoy 输入」这一跳；DCS 里视角/脚舵实际动没动，
+> 还要在座舱里肉眼确认（本次 PC 侧 `has_data=false`，DCS 不在任务里）。
+
+---
+
+## 8. 战斗页重排 + 机炮/投放拆键（20:50，20:53 / 20:57 两次更正）
+
+原始要求：「视角放左上角，下面放发射，发射分左右两个键（机炮和武器），脚舵最底下；
+绿点指示不要独占一横行，贴在油门右侧；雷达、武器、干扰弹等放到绿点旁边 / 中间剩余空间。」
+
+- **20:53 更正**：「我说错了，是把武器、机炮、和视角都放在右上角」→ 视角 + 两个发射键
+  当成一整组镜像到最右列顶部，绿点盘留在油门右侧，中间按钮区不变。
+- **20:57 更正**：「校准，还有剩下的在中间的那 4 个太大了。你都得改小一点」→
+  中间顶部的「校零 / 解锁」按钮和武器↑↓ / 锁定 / 干扰弹四个按钮全部收成固定小尺寸、
+  2×2 居中，不再用 `weight(1f)` 撑满半屏。
+
+**以下记录的是最终版（右上角 + 紧凑中间组 + 21:14 放大右上角三个控件）。**
+
+### 按键 markdown 核查结果
+
+`docs/BINDING.md` 原本**只有一个发射键**：
+
+```md
+| **BTN7** | `FIRE = 6` | 发射 | 战斗页 · 发射（最下，红） | `Trigger` / `Release` / `Fire` | 已有 |
+```
+
+`Trigger`（机炮扳机）和 `Weapon Release`（挂架投放 / Pickle）在 DCS 里是**两条独立命令**，
+一个按钮只能绑一条，旧写法确实把两者混了。按「不重排已有编号」原则：
+
+| vJoy | 常量 | 语义 | DCS 里绑 |
+|---|---|---|---|
+| `JOY_BTN7` | `FIRE = 6` | **武器投放**（原「发射」，语义收窄） | `Weapon Release` / `Pickle` / `Bomb Release` |
+| `JOY_BTN12` | `GUN_FIRE = 11` | **机炮**（新增） | `Gun` / `Cannon` / `Trigger` / `Weapon Fire` |
+
+7–9 的预留位（`RESERVED_TWS` / `TARGET_PREV` / `TARGET_NEXT`）**没动**。
+`BINDING.md` 补了迁移步骤：vJoy 按钮数 ≥ 12 → 重启 DCS → 把原来绑在 `BTN7` 的
+Trigger 改绑 `BTN12` → `BTN7` 改绑 Weapon Release。`YOKE.md` / `LAYOUT.md` 同步。
+
+### 最终版面
+
+| 位置 | 放什么 |
+|---|---|
+| 最左全高 | 油门竖条 |
+| 紧贴油门右侧 | 绿点盘 `StickPad`，`BoxWithConstraints` 自适应 ≤140dp，只看不碰 |
+| 中间（垂直居中） | 解锁键 220×42dp + 武器↑/↓、锁定、干扰弹各 132×60dp 的 2×2 紧凑组 |
+| **右上角**（列宽 220dp） | `ViewPad` **160dp 正方形**，`Alignment.CenterEnd` 靠右边缘，标签 13sp |
+| **右上角 · 视角正下方** | 左「机炮」/ 右「武器」两个红色 `GuardButton`，**84dp 高、18/12sp 文字**，各 250ms 长按 |
+| 中间留白处底部 | 一行只读状态字（链路 ms / Hz / vJoy） |
+| 最底下 | `RudderBar` 跨整宽 |
+
+旧版 `ViewPad` 是 `fillMaxWidth().height(96.dp)` —— 96dp 方块独占一整行、两侧全空；
+`StickPad` 用 `weight(1f)` 独占中间一大块；中间 4 个按钮又各撑到约 300×130dp。
+横屏只有约 411dp 高，这三处是主要浪费。为此给共享的 `ArmButton` 加了可选
+`modifier` / `height` 参数（默认 46dp 不变，起降页尺寸不受影响）。
+
+### 真机验证（Pixel 6a，`35311JEGR07ZVC`，USB 隧道在）
+
+四个版本都各自 `assembleDebug --offline` BUILD SUCCESSFUL（15–26s）→ `install-apk.py`
+装机 → 截图 → `uiautomator dump` 取坐标 → 真实触摸 + PC 侧 20ms 轮询 `/input`：
+
+| 版本 | 截图 | 版面 |
+|---|---|---|
+| 20:50 左上角版 | `.tmp/pixel-combat-relayout.png` | 已被 20:53 更正取代 |
+| 20:53 右上角版 | `.tmp/pixel-combat-rightgroup.png` | 视角 + 双发射键移到右上角 |
+| 20:57 紧凑版 | `.tmp/pixel-combat-compact.png` | 中间五个按钮缩小并居中 |
+| **21:14 放大版（最终）** | `.tmp/pixel-combat-bigview-final.png` | 右上角三个控件放大 |
+
+20:57 紧凑版触摸 → `/input`（校零 → 解锁 → 触摸 → 上锁）：
+
+| 触摸 | `/input` 读到的量 | 判定 |
+|---|---|---|
+| 视角区右 100px / 上 80px | `vx=0.834`、`vy=0.668`；`r=0`、`buttons=0` | ✅ |
+| 脚舵条左→右 | `r=0.480`；`vx/vy=0` | ✅ |
+| **机炮**长按 900ms | `buttons=2048`，**只有 bit11** | ✅ 与投放完全分离 |
+| **武器投放**长按 900ms | `buttons=64`，**只有 bit6** | ✅ 与机炮完全分离 |
+| 武器 ↑ / ↓ | bit3 / bit4 | ✅ |
+| 锁定 / 干扰弹 | bit5 / bit10 | ✅ |
+| 松手 + 点上锁 | 五轴全 0、`buttons=0`，vJoy `alive/ok=true` | ✅ |
+
+右上角版另测一轮（`vx=0.843/vy=0.674`、`r=0.470`、机炮 bit11、投放 bit6），
+说明多次重排都没碰坏输入接线。除 168dp 试错版（右下角状态字被挤没，见 21:14 补充）
+外，各版截图均无重叠、无文字截断。
+
+`tests/test_export_lua.py` **42/42**；`tests/integration_test.py` 全量离线闭环回归
+**85/85 通过、0 失败**（21:14 又加了 T-STAT-012）。**T-STAT-011** 现在同时守：`GUN_FIRE=11`、两个键都被调用、
+源码顺序 绿点盘<视角<发射<脚舵、视角靠右（`Alignment.CenterEnd`）、
+中间按钮为固定小尺寸、`BINDING.md` 有 BTN12 —— 左右位置或尺寸再被改回去都会挡住。
+11/11 真机链路、功能层 VERIFY 5/5 未受本次手机端改动影响。
+
+> 这次仍只验到「手机 → 桥接 → vJoy 输入」这一跳。`BTN7` 语义改了以后，
+> **各机型在 DCS 里的绑定要按 `BINDING.md` §2 重绑一次**，否则打出去的还可能是机炮。
+
+### 21:14 补充：右上角三个控件放大（最终交付版）
+
+用户：「机炮，武器，视角太小了，尤其是视角」。
+
+| 项 | 之前 | 现在 |
+|---|---|---|
+| 右列宽 | 150dp | **220dp** |
+| 视角 `ViewPad` | 96dp 正方形，标签 10sp | **160dp 正方形，标签 13sp** |
+| 机炮 / 武器键 | 约 72×60dp，13/10sp | 约 107×**84dp**，**18/12sp** |
+| 视角映射半径 | 38dp | **70dp**（`min(宽,高)/2-10` 自动跟随尺寸） |
+| 状态条 | 右下角两行 | 中间留白处**一行** |
+
+**试错记录**：先做了 168dp 视角，真机截图 `.tmp/pixel-combat-bigview.png` 发现
+右下角两行状态字被挤成 0 高 —— 右列 168+5+84 = 257dp 超过主体约 256dp。
+改成 160dp，把状态合并成一行、挪到中间 `Box` 的 `Alignment.BottomCenter`，
+右列底部只留 `Spacer(weight(1f))` 和脚舵隔开。最终截图
+`.tmp/pixel-combat-bigview-final.png`：三个控件明显放大、状态字完整、无重叠无截断。
+
+给共享控件加了可选参数（默认值不变，起降页与中间按钮不受影响）：
+`ViewPad(labelSp)`、`GuardButton(textSp, subSp)`；映射半径随尺寸自动变，
+拖满舵行程变长、控制更细，松手回中不变。
+
+真机 `/input`（校零 → 解锁 → 触摸 → 上锁，20ms 轮询）：
+
+| 触摸 | 读到的量 | 判定 |
+|---|---|---|
+| 视角区右 165px / 上 120px | `vx=0.825`、`vy=0.600`；`r=0`、`buttons=0` | ✅ |
+| 脚舵条左→右 | `r=0.480`；`vx/vy=0` | ✅ |
+| 机炮长按 900ms | `buttons=2048`，**仅 bit11** | ✅ |
+| 武器投放长按 900ms | `buttons=64`，**仅 bit6** | ✅ |
+| 武器 ↑/↓、锁定、干扰弹 | bit3/4、bit5、bit10 | ✅ |
+| 松手 + 点上锁 | `vx/vy/r=0`、`buttons=0`；上锁后五轴全 0，vJoy `alive/ok=true` | ✅ |
+
+> 松手瞬间读到 `x=0.182 / y=-1.0` 是手机姿态轴（测试过程中手机被摆动的残留），
+> 不是视角 / 按钮串扰；上锁后归零，与本次改动无关。
+
+新增 **T-STAT-012** 守「右列 220dp / 视角 160dp + 13sp / 发射键 84dp + 18sp」，
+防止以后又缩回 96dp。全量离线回归 **85/85 通过、0 失败**，`test_export_lua.py` **42/42**。

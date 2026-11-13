@@ -16,7 +16,8 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "0.1.0-p0"
+        // v1.00：第一个正式 release。保留视角功能的最后一版（之后用户换头瞄要移除）。
+        versionName = "1.00"
     }
 
     buildTypes {
@@ -25,6 +26,10 @@ android {
         }
         release {
             isMinifyEnabled = false
+            // v1.00 自用发布：沿用 AGP 自带的 debug 签名（~/.android/debug.keystore）。
+            // 好处是 release 包能直接覆盖安装到已有 debug 版，不用先卸载。
+            // 将来要对外分发时换成正式 keystore，密码走环境变量，别写进这个文件。
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -44,6 +49,10 @@ android {
     lint {
         // P0 阶段先不因为缺无障碍描述之类的问题中断构建
         abortOnError = false
+        // assembleRelease 默认挂 lintVital，它会去联网拉
+        // com.android.tools.lint:lint-gradle，本机 --offline 没有这个缓存 → 构建失败。
+        // v1.00 是自用离线发布，行为由 85 项回归覆盖，lint 需要时单独跑即可。
+        checkReleaseBuilds = false
     }
 }
 

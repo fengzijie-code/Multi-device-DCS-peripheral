@@ -212,6 +212,10 @@ private fun Root() {
                     st = yokeSt,
                     rangeDeg = yset.rangeDeg,
                     onThrottle = { ctl?.nudgeThrottle(it) },
+                    onRudder = { ctl?.setRudder(it) },
+                    onRudderRelease = { ctl?.releaseRudder() },
+                    onView = { x, y -> ctl?.setView(x, y) },
+                    onViewRelease = { ctl?.releaseView() },
                     onButtonDown = { ctl?.pressButton(it) },
                     onButtonUp = { ctl?.releaseButton(it) },
                     onToggleArm = { ctl?.toggleArmed() },
@@ -471,7 +475,7 @@ private fun Header(
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text = "DCS 外设 · P0",
+                text = "DCS 外设 · v1.00",
                 color = Ink.Fg,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
