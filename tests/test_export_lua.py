@@ -41,6 +41,8 @@ EXPECTED_SYS_FIELDS = [
     # MFD 按键回传：Export 每帧扫 734..832 这些座舱参数，抓 0→1 的跳变，
     # 让 iPad 知道「谁按了哪颗键」，页面状态才跟得上（座舱里手按的也算）。
     "bp",
+    # MFD 画面文字：list_indication(8/9/10) 抽出来的标签，页面状态以它为准。
+    "mfd",
 ]
 
 EXPECTED_FIELDS = [

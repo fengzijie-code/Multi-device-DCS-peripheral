@@ -79,7 +79,10 @@
 "t": "下半区·外挂",
 "k": {
 "R8": "RTN"
-}
+},
+"e": [
+"sms_down_pilon"
+]
 },
 "UP_DATA_AS": {
 "t": "DATA·大气",
@@ -203,6 +206,40 @@
 "k": {
 "U5": "TRU"
 },
+"e": [
+"af_dot_sym",
+"airspace_a_line",
+"airspace_b_line",
+"airspace_c_line",
+"airspace_d_line",
+"apr_route_line",
+"apr_rwy_id",
+"dl_tgt_line_dashed",
+"dst_id_node",
+"dst_sym_diam",
+"dst_sym_node",
+"faf_cir",
+"faf_dot_sym",
+"faf_rwy_line",
+"flight_tgt_assign_line",
+"msl_env_line",
+"nav_hdg_box_value",
+"oap_line",
+"oap_sym_node",
+"rdr_env_line",
+"route_text_poly",
+"skr_sym_node",
+"tcn_text_poly",
+"tgt_cca",
+"tgt_dlz_imp_az_dashed",
+"tgt_dlz_imp_az_solid",
+"tgt_line_dashed",
+"tgt_line_solid",
+"tgt_sym_node",
+"wpt_id_",
+"wpt_route_line",
+"wpt_sym_"
+],
 "n": {}
 },
 "UP_L2_EFIS": {
@@ -211,6 +248,42 @@
 "L5": "NORM",
 "R5": "ILS"
 },
+"e": [
+"adi_",
+"adi_alt_box_value",
+"adi_alt_scale_idx_0",
+"adi_alt_scale_long_0",
+"adi_altbar_base",
+"adi_altbar_clip",
+"adi_ball_ground",
+"adi_ball_sky",
+"adi_cdi_h_",
+"adi_cdi_mark_h",
+"adi_cdi_v_",
+"adi_hdg_box_value",
+"adi_hdg_scale_idx_0",
+"adi_hdg_scale_long_0",
+"adi_hdgbar_base",
+"adi_hdgbar_clip",
+"adi_ils_gs",
+"adi_ils_loc",
+"adi_spd_box_value",
+"adi_spd_scale_idx_0",
+"adi_spd_scale_long_0",
+"adi_spdbar_base",
+"adi_spdbar_clip",
+"adi_vvs_scale_idx_0",
+"adi_vvs_scale_long_0",
+"adi_vvsbar_base",
+"adi_vvsbar_clip",
+"efis_aoa_value",
+"efis_hgin_value",
+"efis_ils_osb",
+"efis_mach_value",
+"idx_",
+"long_",
+"short_"
+],
 "n": {}
 },
 "UP_L3_CLINK": {
@@ -224,7 +297,10 @@
 "t": "数据链·列表",
 "k": {
 "U1": "RTN"
-}
+},
+"e": [
+"clink_group_list_"
+]
 },
 "UP_L4_DATA": {
 "t": "数据 DATA",
@@ -264,6 +340,10 @@
 "U3": "NORM",
 "R2": "MSL STATE"
 },
+"e": [
+"sms_aa_feed_osb",
+"sms_aa_gun_osb"
+],
 "d": "空对空外挂。L3 机炮准心、L4 限数、U5 进挂载页。",
 "n": {
 "U5": "UP_R1_SMS_Load",
@@ -310,6 +390,9 @@
 "D4": "JET",
 "R2": "MSL STATE"
 },
+"e": [
+"sms_pilon_prog_mark_"
+],
 "n": {
 "U5": "UP_R1_SMS_Load",
 "L1": "UP_R1_SMS_AG_Mode"
@@ -452,6 +535,11 @@
 "R4": "TYPE1",
 "R5": "F+B"
 },
+"e": [
+"sms_aa_feed_osb",
+"sms_aa_gun_osb",
+"split_green_line"
+],
 "d": "战斗页：干扰弹与投放程序。"
 },
 "UP_R3_BIT": {
@@ -478,7 +566,10 @@
 "k": {
 "U1": "CHLST",
 "U3": "COLD"
-}
+},
+"e": [
+"list_txt_"
+]
 },
 "UP_R5_PFL": {
 "t": "PFL",
@@ -508,6 +599,15 @@
 "U1": "模式",
 "R5": "PRF"
 },
+"e": [
+"rdr_aa_ase_circle",
+"rdr_aa_az_sym",
+"rdr_aa_beam_az_hpt_bar",
+"rdr_aa_beam_az_spt_bar",
+"rdr_aa_el_sym",
+"rdr_beam_el_range",
+"rdr_tdc_sym"
+],
 "d": "左列是搜索参数：方位角 60 / 天线稳定 NOR / 扫描行数 4BR。U1 进模式菜单，U5 进控制菜单。",
 "n": {
 "U1": "UP_U1_RDR_Mode",
@@ -535,6 +635,14 @@
 "U1": "模式",
 "R5": "PRF"
 },
+"e": [
+"rdr_ag_az_sym",
+"rdr_ag_el_sym",
+"rdr_ag_tdc_combo",
+"rdr_ag_tdc_line_hori",
+"rdr_ag_tdc_line_vert",
+"rdr_beam_el_range"
+],
 "n": {
 "U1": "UP_U1_RDR_Mode",
 "U5": "UP_U1_RDR_AG_CNTL",
@@ -566,6 +674,13 @@
 "R4": "9",
 "R5": "10"
 },
+"e": [
+"rdr_aa_beam_az_hpt_bar",
+"rdr_aa_beam_az_spt_bar",
+"rdr_ag_tdc_line_hori",
+"rdr_ag_tdc_line_vert",
+"rdr_tdc_sym"
+],
 "d": "雷达模式列表：左 1–5、右 6–10。选完自动回雷达页。",
 "n": {
 "L1": "UP_U1_RDR_AA",
@@ -625,14 +740,6 @@
 "R1": "W\\nM\\nD\\n7",
 "R4": "M\\nI\\nL",
 "L1": "T\\nV\\nI\\nR"
-}
-},
-"FULL_BASE": {
-"t": "FULL_BASE",
-"k": {
-"D2": "D2",
-"D3": "SOI",
-"D4": "D4"
 }
 },
 "UP_POD_MIL": {

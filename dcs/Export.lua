@@ -395,6 +395,46 @@ local function mfd_press_report()
     return tostring(mfd_seq) .. ":" .. table.concat(parts, ",")
 end
 
+-- ============================ MFD 画面文字 ============================
+--
+-- list_indication(indicator_id) 是 DCS 官方的指示器接口，返回该指示器**当前页**
+-- 的全部元素文本。实测 JF-17 的三块 MFD 是 8 / 9 / 10 号：
+--   8 = 左（主菜单那页能看到 CMBT/SMS/EFIS/ILS）
+--   9 = 中（雷达页能看到 RDR/RWS/IFF/CNTL）
+--   10 = 右（HSD 页能看到 HSD/CLNK/TRU）
+-- 所以页面状态根本不用猜、也不用截图/OCR —— 直接问 DCS 就行。
+--
+-- 但整份 dump 有 20 KB，1Hz 发出去太重，也不必要：只留「屏幕上的字」——
+-- 短、带字母、不带下划线（结构名都有下划线）、不是 GUID、不是 #N# 元素号。
+local MFD_IND = { { "L", 8 }, { "C", 9 }, { "R", 10 } }
+
+local function mfd_tokens(id)
+    local ok, v = pcall(list_indication, id)
+    if not ok or type(v) ~= "string" or #v == 0 then return "" end
+    -- 只留元素名（小写+下划线那种），它们是页面脚本里静态定义的，
+    -- 比文字可靠：文字会带着上一页的残留，元素名只属于当前页。
+    local seen, list = {}, {}
+    for line in v:gmatch("[^\r\n]+") do
+        local s = line:gsub("^%s+", ""):gsub("%s+$", "")
+        if s:match("^[a-z][a-z0-9_]*$") and not s:find("osb_txt") then
+            if not seen[s] then
+                seen[s] = true
+                list[#list + 1] = s
+                if #list >= 40 then break end
+            end
+        end
+    end
+    return table.concat(list, ",")
+end
+
+local function mfd_text_report()
+    local parts = {}
+    for _, m in ipairs(MFD_IND) do
+        parts[#parts + 1] = m[1] .. "=" .. mfd_tokens(m[2])
+    end
+    return table.concat(parts, "|")
+end
+
 local function encode_sys(d, t)
     local p = {
         '"t":'     .. num(t, "%.2f"),
@@ -429,6 +469,8 @@ local function encode_sys(d, t)
         '"dbg":'   .. stro(d.dbg),
         -- MFD 按键回传（参数扫出来的，见上方 scan_mfd_buttons）
         '"bp":'    .. stro(mfd_press_report()),
+        -- MFD 画面文字（list_indication 抽出来的，页面状态靠它定，1Hz）
+        '"mfd":'   .. stro(mfd_text_report()),
     }
     return '{"sys":{' .. table.concat(p, ",") .. '}}'
 end
@@ -668,6 +710,140 @@ local function apply_command(line)
             local s = table.concat(hit, ",")
             last_dbg = "devs=" .. s
             log_info("设备扫描：" .. s)
+            return true
+        elseif cnum == 2 then
+            -- 把某个设备能调的方法名全倒出来：val 是设备号。
+            -- 目的：确认设备对象上有没有读状态的 getter（页面、参数、indication）。
+            local id = math.floor(vnum)
+            local okd, d = pcall(GetDevice, id)
+            if not okd or not d then
+                last_dbg = "nodev" .. id
+                return false
+            end
+            local names, seen = {}, {}
+            local function add(t)
+                if type(t) ~= "table" then return end
+                for k in pairs(t) do
+                    local s = tostring(k)
+                    if not seen[s] then seen[s] = true; names[#names + 1] = s end
+                end
+            end
+            local mt = getmetatable(d)
+            if type(mt) == "table" then
+                add(mt)
+                add(mt.__index)
+            end
+            table.sort(names)
+            last_dbg = "m" .. id .. "(" .. #names .. ")=" .. table.concat(names, ",")
+            log_info("设备方法 " .. id .. ": " .. table.concat(names, ","))
+            return true
+        elseif cnum == 5 then
+            -- 指示器 API 普查。
+            -- 官方 Export.lua 模板里写着 list_indication(indicator_id) 能「dump 当前页的
+            -- 指示文本」，但又注明只在座舱 Lua 环境可用。到底能不能从 Export 调到、
+            -- JF-17 的 MFD 有没有 indication 文本，只能实测。全部结果写日志。
+            local function say(s) log_info("指示器普查 " .. s) end
+            say("list_indication=" .. type(list_indication))
+                     say("GetIndicator=" .. type(GetIndicator))
+            say("c_indication_txt_equal_to=" .. type(c_indication_txt_equal_to))
+            say("a_cockpit_perform_clickable_action=" .. type(a_cockpit_perform_clickable_action))
+            say("LoGetAircraftDrawArgumentValue=" .. type(LoGetAircraftDrawArgumentValue))
+
+            if type(list_indication) == "function" then
+                for i = 0, 5 do
+                    local ok, v = pcall(list_indication, i)
+                    say(string.format("list_indication(%d) -> %s %s", i, ok and "ok" or "err",
+                         tostring(v):sub(1, 300)))
+                end
+            end
+
+            if type(GetIndicator) == "function" then
+                for i = 0, 5 do
+                    local ok, g = pcall(GetIndicator, i)
+                    if ok and g then
+                        local ms, seen = {}, {}
+                        local mt = getmetatable(g)
+                        if type(mt) == "table" then
+                            for k in pairs(mt) do
+                                local s = tostring(k); if not seen[s] then seen[s] = true; ms[#ms + 1] = s end
+                            end
+                            if type(mt.__index) == "table" then
+                                for k in pairs(mt.__index) do
+                                    local s = tostring(k); if not seen[s] then seen[s] = true; ms[#ms + 1] = s end
+                                end
+                            end
+                        end
+                        table.sort(ms)
+                        say(string.format("GetIndicator(%d) -> %s 方法[%s]", i, tostring(g), table.concat(ms, ",")))
+                    else
+                        say(string.format("GetIndicator(%d) -> %s %s", i, ok and "nil" or "err", tostring(g)))
+                    end
+                end
+            end
+
+            if type(LoGetAircraftDrawArgumentValue) == "function" then
+                local ok, v = pcall(LoGetAircraftDrawArgumentValue, 793)
+                say("DrawArg(793) -> " .. (ok and tostring(v) or "err"))
+            end
+
+            last_dbg = "survey5"
+            return true
+        elseif cnum == 6 then
+            -- 把每个指示器的完整文本 dump 成文件（日志里会被截断，文件不会）。
+            -- 这是关键一步：如果 JF-17 的 MFD 有 indication 文本，就能直接读页面，
+            -- 不需要截图和 OCR。
+            local dir = (os.getenv("USERPROFILE") or "C:/Users/lenovo") .. "/Saved Games/DCS/Logs/"
+            local n = 0
+            for i = 0, 8 do
+                local ok, v = pcall(list_indication, i)
+                if ok and type(v) == "string" and #v > 0 then
+                    local f = io.open(dir .. "ind_" .. i .. ".txt", "w")
+                    if f then
+                        f:write(v)
+                        f:close()
+                        n = n + 1
+                    end
+                end
+            end
+            -- 顺便把指示器对象上的非函数字段也倒出来（页面号也许就藏在字段里）
+            local fields = {}
+            for i = 0, 8 do
+                local ok, g = pcall(GetIndicator, i)
+                if ok and type(g) == "table" then
+                    for k, v in pairs(g) do
+                        if type(v) ~= "function" then
+                            fields[#fields + 1] = string.format("ind%d.%s=%s", i, tostring(k), tostring(v))
+                        end
+                    end
+                end
+            end
+            log_info("指示器 dump：写了 " .. n .. " 个文件；字段：" .. table.concat(fields, " "):sub(1, 500))
+            last_dbg = "dump6=" .. n
+            return true
+        elseif cnum == 7 then
+            -- 跑 Logs/probe.lua 里的任意 Lua 片段（本机回环触发）。
+            -- 有了这个，后面查接口不用每次重启任务：改文件、发一条命令就行。
+            local path = (os.getenv("USERPROFILE") or "C:/Users/lenovo") .. "/Saved Games/DCS/Logs/probe.lua"
+            local f = io.open(path, "r")
+            if not f then
+                last_dbg = "noprobe"
+                return false
+            end
+            local src = f:read("*a")
+            f:close()
+            local chunk, err = loadstring(src, "probe")
+            if not chunk then
+                log_error("probe 语法错误：" .. tostring(err))
+                last_dbg = "probe_syntax"
+                return false
+            end
+            local ok, r = pcall(chunk)
+            if not ok then
+                log_error("probe 运行出错：" .. tostring(r))
+                last_dbg = "probe_err"
+                return false
+            end
+            last_dbg = "probe_ok:" .. tostring(r):sub(1, 120)
             return true
         elseif cnum == 3 then
             -- 批量快照 40 个参数：val 是起始号，回 "A<起>|v1,v2,…"

@@ -142,12 +142,25 @@ TRANS = {
 ORDER = ["UP_MainMenu"] + sorted(k for k in TITLES if k != "UP_MainMenu")
 
 
+NAME_RE = re.compile(r'name\s*=\s*"([a-z][a-z0-9_]*)"')
+
+
+def elem_names(path):
+    """页面里 CreateElement 的 name 字段 —— 这就是该页的元素名指纹。"""
+    text = _dump.strip_comments(path.read_text(encoding="utf-8", errors="replace"))
+    return sorted(set(NAME_RE.findall(text)))
+
+
 def main():
     pages = {}
+    names = {}
     for f in sorted(_dump.IND.glob("*.lua")):
         d = _dump.parse(f)
         if d:
             pages[f.stem] = d
+        nm = elem_names(f)
+        if nm:
+            names[f.stem] = nm
 
     # *_Base.lua 是子页 dofile 进来的基础层，不是独立画面：把它的键并进子页，
     # 自己不进下拉框（否则下拉里会出现一堆永远显示不出来的"页"）。
@@ -155,6 +168,8 @@ def main():
         if pid.endswith("_Base"):
             continue
         base = pages.get(pid + "_Base")
+        if names.get(pid + "_Base"):
+            names[pid] = sorted(set(names.get(pid, [])) | set(names[pid + "_Base"]))
         # 雷达四个子页共用 UP_U1_RDR_Base.lua（U5=CNTL 就写在那一层）
         if pid.startswith("UP_U1_RDR_") and pages.get("UP_U1_RDR_Base"):
             base = {**pages["UP_U1_RDR_Base"], **(base or {})}
@@ -162,6 +177,23 @@ def main():
             pages[pid] = {**base, **pages[pid]}
     for pid in [k for k in pages if k.endswith("_Base")]:
         del pages[pid]
+    # FULL_BASE 是所有页共享的底图（带 D2/D3/D4 那几个通用元素），不是一页画面。
+    # 留着会让识别打分时「谁都能匹配上一堆元素」，必须踢掉。
+    pages.pop("FULL_BASE", None)
+    names.pop("FULL_BASE", None)
+    # HSD 的显示内容分散在 _NAV/_SA/_TGT 三个子页里，但物理上就是同一块屏的
+    # 不同模式，识别时应该合起来看，否则光看两三个元素名认不出来。
+    for pid, family in {"UP_L1_HSD": ("UP_L1_HSD_NAV", "UP_L1_HSD_SA", "UP_L1_HSD_TGT")}.items():
+        acc = set(names.get(pid, []))
+        for sub in family:
+            acc |= set(names.get(sub, []))
+        if acc:
+            names[pid] = sorted(acc)
+
+    # osb_txt 是每个页面都用的通用键标签元素，不带页面信息，剔除
+    for pid in list(names):
+        names[pid] = [n for n in names[pid] if not n.startswith("osb_txt")]
+
     for pid, ov in OVERRIDE.items():
         if pid in pages:
             pages[pid] = {**pages[pid], **ov}
@@ -172,6 +204,8 @@ def main():
     out = []
     for pid in ordered:
         o = {"t": TITLES.get(pid, pid), "k": pages[pid]}
+        if names.get(pid):
+            o["e"] = names[pid]
         if pid in DESC:
             o["d"] = DESC[pid]
         if pid in TRANS:

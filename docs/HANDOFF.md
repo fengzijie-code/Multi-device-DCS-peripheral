@@ -122,6 +122,34 @@ curl -X POST -d '{"dev":32,"cmd":3007,"val":0}' http://127.0.0.1:8080/cmd
 
 ## 七、下一步该做什么
 
+
+### 0. 【已解决】MFD 页面状态可以直接读 —— 不用截图、不用 OCR
+
+DCS 有官方的指示器接口，Export.lua 里直接能调：
+
+```lua
+list_indication(indicator_id) -> string   -- 该指示器当前页的全部元素文本
+```
+
+JF-17 三块 MFD 的指示器编号是 **8 / 9 / 10**（左 / 中 / 右）。实测 dump 里能直接看到
+`RDR`、`RWS`、`IFF`、`CNTL`（中屏雷达页）、`HSD`、`CLNK`、`TRU`（右屏）、`adi_*` 元素名（左屏 EFIS）。
+
+**页面识别靠元素名而不是文字**：文字会带上一页的残留，元素名（`rdr_aa_*` / `adi_*` / `wpt_*`）
+是页面脚本里静态定义的，只属于当前页。`tools/gen-mfd-pages.py` 会把每个页面的元素名
+抽出来写进 `tools/mfd-pages.json`（字段 `e`），面板按「元素名前缀命中数 / √(页元素数)」打分选页。
+
+Export 每秒调一次 `list_indication(8/9/10)`，只留元素名（≤40 个，去掉 `osb_txt`），
+放进 sys 包的 `mfd` 字段（`L=…|C=…|R=…`）。**这是权威来源** —— 键盘快捷键切页也能跟上，
+因为它读的是屏幕内容，不是按键动作。
+
+顺带记下同一次普查里确认可用的接口：
+`GetIndicator(i)`（方法：`set_page` / `assign_dedicated_viewport` / `get_dedicated_viewport`）、
+`c_indication_txt_equal_to`、`a_cockpit_perform_clickable_action`、`LoGetAircraftDrawArgumentValue`。
+
+**踩过的弯路（别再走）**：`LoGet*` 45 个函数里没有任何 MFD 相关；50 个设备没有一个支持
+`get_argument_value`（只有 `GetDevice(0)` 有座舱参数）；截屏 + OCR 虽然可行（`tools/mfd-read.py`
+已实现、`MFD_tap.lua` 视口配置也写了），但它是**兜底方案**，不是首选。
+
 ### 1. MFD 操作 —— 键位和页面标签都已从代码挖出，只剩「进座舱核对一遍」
 
 **两条关键线索，都是代码里明写的，别再靠试：**
