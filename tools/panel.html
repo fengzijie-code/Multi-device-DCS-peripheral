@@ -755,7 +755,10 @@ const mfdPage = Object.assign(
   (() => { try { return JSON.parse(localStorage.getItem(MFD_STORE) || "{}"); } catch (e) { return {}; } })()
 );
 let mfdCur = "center";
-let mfdSeq = 0;            // 座舱回传的按键序号（Export 的 sys.bp）
+// 座舱回传的按键序号（Export 的 sys.bp）。null = 还没收到过第一包：
+// 首包只用来对齐序号，绝不重放里面的历史按键 —— 否则每次刷新页面都会把
+// 载入前发生过的最后 8 次按键重演一遍，把刚选好的页面冲掉。
+let mfdSeq = null;
 let forceSync = false;     // 点了「刷新」后，下一次轮询放宽识别门槛
 // 一块 MFD = 上下两个独立画面：U+LR1-5+D 管上半，LR6-8 管下半。
 // mfdPage 是上半区页面，mfdLow 是下半区页面 —— 各走各的跳转，互不干扰。
@@ -886,8 +889,18 @@ function applyScreenText(mfd, force) {
       else if (!pid && lr.pid) pid = lr.pid;   // 有的画面只有下半区有内容
     }
 
+    // 上半区永远只能是 UP_ / 未同步。scoreSeg 会遍历全部页面（含 DOWN_），
+    // RTN + osb_txt_ 这类 token 凑齐时 DOWN_MainMenu 可能赢过所有 UP 页；
+    // 一旦写进 mfdPage，上半区整排键标签变空、按键全失灵（和 setPage() 里
+    // 已有的防御是同一条规则，这里漏了）。
+    if (pid && pid.startsWith("DOWN_")) {
+      if (!lowPid) lowPid = pid;
+      pid = null;
+    }
+
     if (pid && mfdPage[screen] !== pid) { mfdPage[screen] = pid; touched = true; }
-    if (mfdLow[screen] !== lowPid) { mfdLow[screen] = lowPid; if (screen === mfdCur) touched = true; }
+    // 非当前屏的下半区变化也要落盘，否则刷新后三块屏的状态对不上
+    if (mfdLow[screen] !== lowPid) { mfdLow[screen] = lowPid; touched = true; }
   }
   if (touched) { savePages(); paintPage(); renderBezel(); }
 }
@@ -896,11 +909,13 @@ function applyScreenText(mfd, force) {
 function applyCockpitPresses(bp) {
   const [seqStr, ids] = String(bp).split(":");
   const seq = parseInt(seqStr, 10) || 0;
+  if (mfdSeq === null) { mfdSeq = seq; return; }   // 首包只对齐，不重放历史
   if (seq <= mfdSeq) return;
   const list = (ids || "").split(",").map(Number).filter(Boolean);
   // 报文是「新的在前」，回放要按时间顺序（旧→新）
   const fresh = list.slice(0, Math.min(seq - mfdSeq, list.length)).reverse();
   mfdSeq = seq;
+  let changed = false;
   fresh.forEach(el => {
     const k = keyFromEl(el);
     if (!k) return;
@@ -912,6 +927,7 @@ function applyCockpitPresses(bp) {
     if (nx) {
       if (isLowerKey(k.name)) mfdLow[k.screen] = nx;   // 座舱按的下半区键只动下半区
       else mfdPage[k.screen] = nx;
+      changed = true;
     }
     if (k.screen === mfdCur) {
       $("mfdlast").textContent = "座舱按 " + k.name;
@@ -919,6 +935,8 @@ function applyCockpitPresses(bp) {
       renderBezel();
     }
   });
+  // 座舱里手按的键改变了页面状态，必须和 iPad 自己按的键一样落盘
+  if (changed) savePages();
 }
 
 function paintPage() {

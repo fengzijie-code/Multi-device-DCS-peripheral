@@ -154,6 +154,34 @@ local function val(t, k)
     return nil
 end
 
+-- 三层下钻。deepget 只收 k1/k2 两个键，写 deepget(t,"gear","nose","rod")
+-- 时第 4 个参数会被 Lua 直接忽略，取回来的是 nose 那张表而不是 rod 数值 ——
+-- numo() 遇到 table 就发 null，于是起落架收放进度永远是空。
+local function deepget3(t, k1, k2, k3)
+    if type(t) ~= "table" then return nil end
+    local a = t[k1]
+    if type(a) ~= "table" then return nil end
+    local b = a[k2]
+    if type(b) == "table" then return b[k3] end
+    -- 旧版本/部分机型里 k2 直接就是标量（单元测试夹具就是 nose = 0），
+    -- 这时它本身就是进度值，不要再往下一层钻
+    if type(b) == "number" then return b end
+    return nil
+end
+
+-- 舵面偏度在真机上是 {left=…, right=…} 表（见 dcsprobe.json 的
+-- controlsurfaces.elevator），旧夹具里却是裸标量。三种形态都认，
+-- 优先 left，与 rpm_l / temp_l 的口径保持一致。
+local function surface(v)
+    if type(v) == "number" then return v end
+    if type(v) == "table" then
+        if type(v.value) == "number" then return v.value end
+        if type(v.left) == "number" then return v.left end
+        if type(v.right) == "number" then return v.right end
+    end
+    return nil
+end
+
 local function safe_call(fn, ...)
     local ok, a, b, c = pcall(fn, ...)
     if ok then return a, b, c end
@@ -329,9 +357,9 @@ local function collect_sys()
         wbrake = val(mech, "wheelbrakes"),
         -- 舵面实际偏度。注意这是「配平 + 杆量」的合成，不是配平本身：
         -- DCS 的 Export API 不提供配平位置（见 docs/PANEL.md）。
-        cs_a   = deepget(mech, "controlsurfaces", "eleron"),
-        cs_e   = deepget(mech, "controlsurfaces", "elevator"),
-        cs_r   = deepget(mech, "controlsurfaces", "rudder"),
+        cs_a   = surface(deepget(mech, "controlsurfaces", "eleron")),
+        cs_e   = surface(deepget(mech, "controlsurfaces", "elevator")),
+        cs_r   = surface(deepget(mech, "controlsurfaces", "rudder")),
 
         -- 机型名（如 "JF-17"）。面板靠它做机型自适应 —— 同样是
         -- 「有这个字段」和「值是 0」的区别，不同机型差别很大。
@@ -345,8 +373,9 @@ local function collect_sys()
         -- 挂载清单（一进任务就有）与机炮余弹
         wl     = payload_summary(pay),
         cn     = tonumber(deepget(pay, "Cannon", "shells")),
-        -- 起落架收放进度 0–1，做「正在收起」用
-        gr     = deepget(mech, "gear", "nose", "rod"),
+        -- 起落架收放进度 0–1，做「正在收起」用。真机结构是 gear.nose.rod，
+        -- 必须下钻三层；旧夹具的 nose = 0 标量形态也兼容。
+        gr     = deepget3(mech, "gear", "nose", "rod"),
         -- 反向通道回执：最近执行成功的命令号 + 累计条数 + 诊断串
         ack    = last_ack,
         acn    = ack_count,
@@ -939,12 +968,16 @@ local function apply_command(line)
         return true
     end
 
-    -- 退一步：有些机型要求在 0 号主设备上点
+    -- 退一步：有些机型要求在 0 号主设备上点。
+    -- 必须真的调到方法才算成功：以前这里写的是「有方法才调、没有就什么都不做」，
+    -- pcall 照样返回 true，于是设备明明没动作却记成 "D0" 成功回执，
+    -- iPad 显示「已执行」而座舱纹丝不动，排查方向直接被带偏。
     local ok2 = pcall(function()
         local d0 = GetDevice(0)
-        if d0 and d0.performClickableAction then
-            d0:performClickableAction(cnum, vnum)
+        if not d0 or type(d0.performClickableAction) ~= "function" then
+            error("no fallback device")
         end
+        d0:performClickableAction(cnum, vnum)
     end)
     if ok2 then
         last_ack = cnum

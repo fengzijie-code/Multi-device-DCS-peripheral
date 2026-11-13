@@ -48,8 +48,9 @@ with sync_playwright() as p:
         for f in FIELDS:
             el = pg.query_selector(f"#{f}")
             vals[f] = el.inner_text() if el else "<缺失>"
+        # 配平卡在改成三栏布局后已移除，缺了不算失败，只如实记录
         note = pg.query_selector("#trimnote")
-        vals["trimnote"] = note.inner_text() if note else "<缺失>"
+        vals["trimnote"] = note.inner_text() if note else "（当前布局无配平卡）"
         frozen = pg.query_selector("#frozen")
         vals["_frozen_visible"] = bool(frozen and frozen.is_visible())
         # 卡片有没有横向溢出（移动端最常见的排版事故）
@@ -57,7 +58,7 @@ with sync_playwright() as p:
             const out = [];
             document.querySelectorAll('.card').forEach((c, i) => {
                 if (c.scrollWidth > c.clientWidth + 1)
-                    out.push({i, title: c.querySelector('h2').textContent,
+                    out.push({i, title: (c.querySelector('h3') || {}).textContent || '(card)',
                               scroll: c.scrollWidth, client: c.clientWidth});
             });
             return {cards: out, bodyScroll: document.body.scrollWidth,

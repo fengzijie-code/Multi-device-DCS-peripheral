@@ -191,3 +191,29 @@ Export 每秒调一次 `list_indication(8/9/10)`，只留元素名（≤40 个�
 - 热点连不上时：**把热点频段钉到 2.4GHz**（校园网在 DFS 信道上时 iPad 会拒绝关联）
 
 **沟通要点**：给结论、给证据、别解释太多。他问「为什么」，要能从原理讲到数字。
+
+---
+
+## 九、2026-11-13 全量回归（本次改动，接手先看这条）
+
+跑了一遍脱离真机的完整闭环测试：`tests/integration_test.py`（Chrome 模拟 iPad + 嵌入 Lua 跑真实 `Export.lua` + 隔离的 beacon）。
+首轮 66/82，定位 12 个缺陷，修完 **82/82 全绿**；`tests/test_export_lua.py` **42/42**。
+计划 / 结果 / bug / 修改计划分别在 `docs/TEST-PLAN-CURRENT.md`、`TEST-REPORT.md`、`BUG-LIST.md`、`FIX-PLAN.md`。
+
+**这次改了什么（都影响行为，别当普通重构）**：
+
+- `tools/beacon.py`：拒收 NaN/Inf 与畸形慢变量（以前一个坏包就能打死 UDP 监听线程）；
+  `/cmd` 校验 dev/cmd/val 并改成定点小数；命令文件加「等上一个被消费」的单槽锁，连发两条不再丢。
+- `dcs/Export.lua`：**真机结构下 `gr`（gear.nose.rod）和 `cs_a/cs_e/cs_r`（`{left,right}`）以前全是 null**，
+  现在能读到；设备调用失败不再伪报 `D0` 成功回执。→ **改了 Export.lua，真机必须重启任务才生效。**
+- `tools/panel.html`：屏幕回传不再把 `DOWN_` 页写进上半区；座舱按键跳页会落盘；
+  页面刷新不再重放历史按键（以前一刷新页面就跳）。
+- 工具链：`mfd-audit.py` 的 D3 双重偏移、`check-panel.py` 取 `h2`、`vjoy_out.py` 心跳 `//vjoy`、单测缺 `ufcp` 字段，全部修掉。
+
+复现就一条：`python tests/integration_test.py`（约 1 分钟，自动起隔离端口 8091/5091，不碰 8080/5010，不写真实 Saved Games）。
+
+**真机也验过了（14:44 用户重启 USB + 任务后）**：`python tests/live_dcs_test.py --probe-version` → **11/11**。
+新版 `Export.lua` 已备份部署到 `Saved Games/DCS/Scripts/`（备份 `Export.lua.bak-20261113-144040`）。
+真机上 `sys.gr` 从 `null` 变成 `0.0`、`sys.cs_e` 有实时数值（这就是 BUG-04 修好的直接证据），
+`POST /cmd val=NaN` 返回 400（BUG-05 修好）。报告在 `docs/TEST-REPORT-LIVE.md`。
+以后再改这三个文件，记得「改完 ≠ 生效」：Export 要重进任务、beacon 要重启桥接、panel 刷新即可。

@@ -43,6 +43,9 @@ EXPECTED_SYS_FIELDS = [
     "bp",
     # MFD 画面文字：list_indication(8/9/10) 抽出来的标签，页面状态以它为准。
     "mfd",
+    # UFCP 四个液晶窗的文字：list_indication(3/4/5/6) 抽出来，用 | 分隔。
+    # 2026-11-13 加进 encode_sys 时漏改了这份期望清单，导致套件长期 40/41。
+    "ufcp",
 ]
 
 EXPECTED_FIELDS = [
@@ -340,6 +343,8 @@ def main() -> int:
             r.check("舵面取自 controlsurfaces.elevator",
                     abs(s_obj["cs_e"] - 0.012) < 1e-4, str(s_obj["cs_e"]))
             r.check("慢变量包里没有主帧字段", "alt" not in s_obj, "混进了 alt")
+            r.check("UFCP 四窗文本字段存在", "ufcp" in s_obj,
+                    str(list(s_obj.keys())[-3:]))
         except json.JSONDecodeError as e:
             r.check("可被 JSON 解析", False, str(e))
 

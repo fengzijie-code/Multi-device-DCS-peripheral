@@ -331,7 +331,9 @@ def heartbeat_loop(url: str, info: dict, stop: threading.Event, dev) -> None:
     u = urlparse(url)
     host = u.hostname or "127.0.0.1"
     port = u.port or 80
-    path = (u.path or "") + "/vjoy"
+    # URL 可能带尾斜杠（http://host:8080/），不归一就会拼成 //vjoy → 404，
+    # 心跳永远发不出去，面板会一直报「vjoy_out.py 没在跑」。
+    path = (u.path or "").rstrip("/") + "/vjoy"
 
     conn = None
     while not stop.is_set():

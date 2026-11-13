@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import collections
 import json
+import math
 import socket
 import socketserver
 import sys
@@ -54,11 +55,49 @@ CMD_UDP_PORT = 5020
 # 路径必须和 dcs/Export.lua 里的 CMD_FILE 一致。
 CMD_FILE = Path.home() / "Saved Games" / "DCS" / "Logs" / "dcs_cmd.txt"
 
+# 命令文件是**单槽**通道：Export.lua 每帧读一条、读完就删。
+# 两次 POST 落在同一帧窗口里，后一次会把前一次直接覆盖掉 —— 实测连点
+# 两个按钮 / 瞬动键的「按下 1 + 松开 0」都会丢命令。
+# 解决办法：写之前等上一个文件被消费掉，正常 60Hz 下约 16ms；
+# DCS 没在跑时最多等 0.3s 就覆盖（此时本来也没人收），不让请求挂死。
+# 用锁串行化，多台设备同时点也不会互相踩。
+CMD_LOCK = threading.Lock()
+CMD_SLOT_TIMEOUT = 0.30
+
+
+def write_cmd_file(line: str) -> tuple[bool, str]:
+    """把一条命令放进单槽文件，返回 (是否写出成功, 错误串)。"""
+    with CMD_LOCK:
+        deadline = time.monotonic() + CMD_SLOT_TIMEOUT
+        while CMD_FILE.exists() and time.monotonic() < deadline:
+            time.sleep(0.002)
+        try:
+            CMD_FILE.parent.mkdir(parents=True, exist_ok=True)
+            CMD_FILE.write_text(line, encoding="utf-8")
+        except OSError as e:
+            return False, str(e)
+        return True, ""
+
 for _s in (sys.stdout, sys.stderr):
     try:
         _s.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+
+
+def _reject_constant(s: str):
+    """Python 的 json 默认接受 NaN/Infinity，但 JSON 标准里它们是非法的。
+
+    DCS 侧 Export.lua 已经把 NaN 清成 0；这里再挡一道，是为了不让任何
+    异常上游（mock 注入、版本漂移、串包）把非法 JSON 送到浏览器 ——
+    fetch().json() 一旦抛异常，面板会误报「连不上桥接」。
+    """
+    raise ValueError("non-finite JSON constant: " + s)
+
+
+def json_bytes(obj, **kw) -> bytes:
+    """对外一律输出严格合法 JSON：allow_nan=False。"""
+    return json.dumps(obj, ensure_ascii=False, allow_nan=False, **kw).encode()
 
 
 GREEN, YELLOW, RED, DIM, BOLD, RESET = (
@@ -320,6 +359,21 @@ class TelemetryHub:
         self._last_rx = 0.0
         self._times: collections.deque = collections.deque(maxlen=window)
 
+    @staticmethod
+    def _nonfinite(v) -> bool:
+        """递归找非有限数。1e400 这种会被 json 解析成 inf，也要挡住。"""
+        if isinstance(v, float) and not math.isfinite(v):
+            return True
+        if isinstance(v, dict):
+            return any(TelemetryHub._nonfinite(x) for x in v.values())
+        if isinstance(v, (list, tuple)):
+            return any(TelemetryHub._nonfinite(x) for x in v)
+        return False
+
+    def note_bad(self) -> None:
+        with self._lock:
+            self._bad += 1
+
     def feed(self, data: bytes) -> dict | None:
         """喂一帧。返回解析后的对象，解析失败返回 None。
 
@@ -328,11 +382,16 @@ class TelemetryHub:
           慢变量   {"sys":{...}}                 1Hz，燃油/温度/液压/舵面
         靠顶层有没有 "sys" 区分。慢变量不参与 hz / age 的统计 —— 它一秒
         才来一次，混进去会把「上游到底活没活」这个判断带偏。
+
+        脏帧（非法 JSON / 非对象 / NaN / Inf）一律拒收并计入 bad，
+        保留上一帧好数据 —— 输出非法 JSON 比丢一帧严重得多。
         """
         try:
-            obj = json.loads(data.decode("utf-8"))
+            obj = json.loads(data.decode("utf-8"), parse_constant=_reject_constant)
             if not isinstance(obj, dict):
                 raise ValueError("not an object")
+            if self._nonfinite(obj):
+                raise ValueError("non-finite number in frame")
         except Exception:
             with self._lock:
                 self._bad += 1
@@ -340,15 +399,25 @@ class TelemetryHub:
 
         sys_obj = obj.get("sys")
         if isinstance(sys_obj, dict):
+            fuel = sys_obj.get("fuel")
+            fuelx = sys_obj.get("fuelx")
+            # 油量字段类型不对就整包拒收：之前直接 float(fuelx) 会让一个脏包
+            # 把 UDP 监听线程打死，而把脏字符串存进 _sys 又会让面板算出 NaN。
+            # 宁可这一秒慢变量保持上一包，也不给假数。
+            for v in (fuel, fuelx):
+                if v is not None and not (isinstance(v, (int, float))
+                                          and not isinstance(v, bool)):
+                    with self._lock:
+                        self._bad += 1
+                    return None
             now = time.time()
             with self._lock:
                 self._sys = sys_obj
                 self._sys_at = now
                 self._rx += 1
-                fuel = sys_obj.get("fuel")
-                fuelx = sys_obj.get("fuelx") or 0
                 if isinstance(fuel, (int, float)) and not isinstance(fuel, bool):
-                    total = float(fuel) + float(fuelx or 0)
+                    fx = fuelx if isinstance(fuelx, (int, float)) else 0
+                    total = float(fuel) + float(fx)
                     # 油量**上升**只可能是加油、重新开始任务、换飞机 —— 都不
                     # 是「在燃烧」，旧历史留着会把斜率算成一个假的小数字，
                     # 续航跟着乱报。遇到就清空重算，宁可前几秒没有读数。
@@ -661,7 +730,14 @@ def udp_listener(port: int, hub: TelemetryHub, stop: threading.Event,
                 continue
             except OSError:
                 break
-            frame = hub.feed(data)
+            try:
+                frame = hub.feed(data)
+            except Exception as e:
+                # 单个坏包不许结束监听线程：线程一死，后面所有遥测都收不到，
+                # /state 会永久冻结，而且从外面看不出原因。
+                hub.note_bad()
+                print(f"  [!] 遥测帧处理异常（已跳过）：{e}")
+                continue
             if frame is not None and recorder is not None:
                 recorder.write(frame)
     finally:
@@ -729,12 +805,12 @@ class Handler(BaseHTTPRequestHandler):
         local_ip = self.connection.getsockname()[0]
 
         if path == "/ping":
-            body = json.dumps({
+            body = json_bytes({
                 "now": time.time(),
                 "server_ms": int(time.time() * 1000),
                 "uptime_s": round(time.time() - START_TIME, 1),
                 "peer": self.client_address[0],
-            }).encode()
+            })
             self._send(200, body, "application/json")
             return
 
@@ -743,22 +819,22 @@ class Handler(BaseHTTPRequestHandler):
             # 面板要靠操纵量判断「杆是否回中」才能反推配平，所以一并带上。
             # 控制器没连时也无害，只是个 live=false 的小对象。
             st["input"] = INPUT.brief()
-            body = json.dumps(st, ensure_ascii=False).encode()
+            body = json_bytes(st)
             self._send(200, body, "application/json")
             return
 
         if path == "/input":
             # 只读快照，用来确认手机端的操纵量有没有真的到桥接、转发有没有开
-            body = json.dumps(INPUT.snapshot(), ensure_ascii=False).encode()
+            body = json_bytes(INPUT.snapshot())
             self._send(200, body, "application/json")
             return
 
         if path == "/info":
-            body = json.dumps({
+            body = json_bytes({
                 "ipv4": enumerate_ipv4(),
                 "ipv6": global_ipv6_addresses(),
                 "uptime_s": round(time.time() - START_TIME, 1),
-            }, ensure_ascii=False, indent=2).encode()
+            }, indent=2)
             self._send(200, body, "application/json")
             return
 
@@ -818,11 +894,10 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/cmd":
             # 座舱操作转发：{dev, cmd, val} → UDP 127.0.0.1:5020（Export.lua 收）
             #
-            # 为什么这里不校验范围：dev/cmd 是 DCS 内部的设备号和命令号，
-            # 我们只是搬运工，具体含义由飞机决定。乱发最多是点了不存在的
-            # 控件（DCS 自己会忽略），不会崩。
-            #
-            # 但也正因为它能直接操作飞机，这条路由只监听回环 —— 见启动参数。
+            # dev/cmd 的具体含义由飞机决定，我们不解释，但**格式必须校验**：
+            # Export.lua 只认 ^(%d+):(%d+):(%-?[%d%.]+)$。NaN / Inf /
+            # 科学计数法（1e+300）/ 负设备号都会变成永远等不到回执的废命令，
+            # 而旧实现还照样回 ok:1。宁可在这里 400，也别让 iPad 干等。
             try:
                 dev = int(obj.get("dev"))
                 cmd = int(obj.get("cmd"))
@@ -830,19 +905,26 @@ class Handler(BaseHTTPRequestHandler):
             except (TypeError, ValueError):
                 self._send(400, b'{"ok":0,"err":"bad fields"}', "application/json")
                 return
-            line = f"{dev}:{cmd}:{val:g}".encode()
+            if not (0 <= dev <= 999999 and 0 <= cmd <= 999999) \
+                    or not math.isfinite(val) or abs(val) > 1e6:
+                self._send(400, b'{"ok":0,"err":"out of range"}', "application/json")
+                return
+            # 定点小数，去掉尾随 0 和小数点；绝不用 :g（会产生 1e+300）
+            val_s = ("%.4f" % val).rstrip("0").rstrip(".")
+            if val_s in ("", "-0"):
+                val_s = "0"
+            line = f"{dev}:{cmd}:{val_s}"
+            raw = line.encode("ascii")
             # 双通道：UDP（实测 DCS 那边收不到，先留着）+ 文件（确定能用）。
             # 文件是兜底，不能省 —— 没有它这条链路目前是断的。
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-                    s.sendto(line, ("127.0.0.1", CMD_UDP_PORT))
+                    s.sendto(raw, ("127.0.0.1", CMD_UDP_PORT))
             except OSError:
                 pass
-            try:
-                CMD_FILE.write_text(line.decode("ascii"), encoding="utf-8")
-            except OSError as e:
-                self._send(500, json.dumps({"ok": 0, "err": str(e)}).encode(),
-                           "application/json")
+            ok, err = write_cmd_file(line)
+            if not ok:
+                self._send(500, json_bytes({"ok": 0, "err": err}), "application/json")
                 return
             self._send(200, b'{"ok":1}', "application/json")
             return
