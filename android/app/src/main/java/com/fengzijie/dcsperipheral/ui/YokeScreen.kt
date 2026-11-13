@@ -60,6 +60,12 @@ object YokeBtn {
     // 让所有机型配置悄悄失效。机炮另起一个新号，老绑定原样保留（只改语义，
     // 见 BINDING.md 的迁移说明），7..9 的预留位继续不动。
     const val GUN_FIRE = 11            // 机炮（扳机），与 FIRE 的「武器投放」分开
+
+    // 12..14：起降页的减速板 / 机轮刹车（v1.3.0 新增）。继续往后排、不插队，
+    // 以免和战斗页已用的 7..11 打架，DCS 里绑好的键不废。
+    const val SPEED_BRAKE_OPEN = 12    // 减速板开  → DCS：Speed Brake Extend
+    const val SPEED_BRAKE_CLOSE = 13   // 减速板收  → DCS：Speed Brake Retract
+    const val WHEEL_BRAKE = 14         // 机轮刹车（按住=刹车，松手=释放）→ DCS：Wheel Brake
 }
 
 /**
@@ -174,6 +180,40 @@ fun YokeScreen(
                     enabled = st.armed,
                     onDown = { onButtonDown(YokeBtn.GEAR) },
                     onUp = { onButtonUp(YokeBtn.GEAR) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Spacer(Modifier.height(5.dp))
+            // 减速板 + 机轮刹车：同为起降构型操作，和襟翼/起落架放一组。
+            // 减速板是「按下型」两键（开/收），机轮刹车是「保持型」按住=刹车。
+            Row(
+                Modifier.fillMaxWidth().height(46.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HoldButton(
+                    text = "减速板开",
+                    sub = "展开",
+                    enabled = st.armed,
+                    onDown = { onButtonDown(YokeBtn.SPEED_BRAKE_OPEN) },
+                    onUp = { onButtonUp(YokeBtn.SPEED_BRAKE_OPEN) },
+                    modifier = Modifier.weight(1f),
+                )
+                HoldButton(
+                    text = "减速板收",
+                    sub = "收起",
+                    enabled = st.armed,
+                    onDown = { onButtonDown(YokeBtn.SPEED_BRAKE_CLOSE) },
+                    onUp = { onButtonUp(YokeBtn.SPEED_BRAKE_CLOSE) },
+                    modifier = Modifier.weight(1f),
+                )
+                HoldButton(
+                    text = "轮刹",
+                    sub = "按住刹车",
+                    enabled = st.armed,
+                    onDown = { onButtonDown(YokeBtn.WHEEL_BRAKE) },
+                    onUp = { onButtonUp(YokeBtn.WHEEL_BRAKE) },
                     modifier = Modifier.weight(1f),
                 )
             }

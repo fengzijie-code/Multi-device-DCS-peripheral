@@ -126,6 +126,32 @@ tools\start-usb.bat        # 开机后只跑这一个
 
 ---
 
+## v1.3.0 —— 起降页新增减速板与机轮刹车（2026-11-14）
+
+> **触发**：用户要在手机起降页直接控制减速板和机轮刹车，不必再伸手动座舱开关。
+> 这两个都是起降构型操作，延续「襟翼↑↓ / 起落架」的两键 + 保持型按钮模式，
+> 按钮位直接透传到 vJoy，控制器 / 桥接端无需改动。
+
+| 项 | 值 |
+|---|---|
+| Git tag | `v1.3.0` |
+| `versionName` / `versionCode` | `1.3.0` / `4` |
+| Android APK | `release/v1.3.0/DCS-Peripheral-Android-v1.3.0.apk`（构建后生成） |
+
+**这一版包含**：
+- **Android 端**：起降页在「襟翼 / 起落架」那一行下方新增一行三个按钮 ——
+  **减速板开 / 减速板收**（按下型两键，对应 DCS `Speed Brake Extend` / `Retract`）、
+  **轮刹**（保持型，按住=刹车、松手=释放，对应 DCS `Wheel Brake`）。
+- **按钮编号**：沿用不重排原则，新增 `BTN13 / BTN14 / BTN15`（代码 `YokeBtn` 常量
+  `SPEED_BRAKE_OPEN=12` / `SPEED_BRAKE_CLOSE=13` / `WHEEL_BRAKE=14`）。
+- **DCS 绑键**：按 [`docs/BINDING.md`](docs/BINDING.md) §2 新增三行，vJoy 按钮数需 ≥ **15**（Configure vJoy 里改，重启 DCS 生效）。
+
+**安装**：`adb install -r release/v1.3.0/DCS-Peripheral-Android-v1.3.0.apk`（旧版直接覆盖）。
+装完按 `BINDING.md` §2 把 `JOY_BTN13/14/15` 绑到减速板开 / 收、机轮刹车；
+头瞄视角仍按 v1.2.0 的方式绑 `Absolute Camera View`，不受本次改动影响。
+
+---
+
 ## 文档索引
 
 | 文档 | 内容 |

@@ -220,6 +220,9 @@ v1.2.0 起视角已移除，右列只留两个发射键）。
 | 襟翼收起 | `FLAPS_UP = 0` | `JOY_BTN1` | Flaps Up | 按下型 |
 | 襟翼放下 | `FLAPS_DOWN = 1` | `JOY_BTN2` | Flaps Down | 按下型 |
 | 起落架 | `GEAR = 2` | `JOY_BTN3` | Landing Gear | 按下型 |
+| 减速板开 | `SPEED_BRAKE_OPEN = 12` | `JOY_BTN13` | `Speed Brake Extend` | 按下型 |
+| 减速板收 | `SPEED_BRAKE_CLOSE = 13` | `JOY_BTN14` | `Speed Brake Retract` | 按下型 |
+| 机轮刹车 | `WHEEL_BRAKE = 14` | `JOY_BTN15` | `Wheel Brake`（按住=刹车） | 保持 |
 | 循环选武器 | `WEAPON_PREV = 3` | `JOY_BTN4` | `S8: Change Weapons` | 脉冲 |
 | 循环选武器 | `WEAPON_NEXT = 4` | `JOY_BTN5` | `S8: Change Weapons`（JF-17 只有单向循环，没有上/下两条） | 脉冲 |
 | 锁定 | `LOCK = 5` | `JOY_BTN6` | `T5_Press: Lock Target` | 保持 |
@@ -236,7 +239,7 @@ vJoy 按钮是状态型，两类都能带，手机端不用转换。
 
 7–9 号预留给以后的目标选择 / 雷达模式，先别占。机炮用 11 号而不是占用预留位，
 理由和干扰弹用 10 号一样：**不重排已有编号**，否则各机型绑好的键全废。
-代价是 vJoy 按钮数要从 ≥ 11 提到 **≥ 12**，并按 `BINDING.md` §2 迁移 `BTN7`。
+代价是 vJoy 按钮数要从 ≥ 11 提到 **≥ 15**，并按 `BINDING.md` §2 迁移 `BTN7`。
 
 **改完 vJoy 的按钮数量必须重启 DCS。** DCS 在启动时枚举设备，vJoy 从 10 个按钮改成
 20 个之后，不重启游戏的话它只认前 10 个，新按钮在 DCS 的绑定界面里根本不会出现。
@@ -275,6 +278,9 @@ vJoy 按钮是状态型，两类都能带，手机端不用转换。
    | 襟翼↑ 收起 | **Btn 1** | `JOY_BTN1` |
    | 襟翼↓ 放下 | **Btn 2** | `JOY_BTN2` |
    | 起落架 收放 | **Btn 3** | `JOY_BTN3` |
+| 减速板 开 | **Btn 13** | `JOY_BTN13` |
+| 减速板 收 | **Btn 14** | `JOY_BTN14` |
+| 机轮刹车（按住） | **Btn 15** | `JOY_BTN15` |
 
 ### 视角轴（头瞄）要认准「Absolute」
 
