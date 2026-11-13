@@ -60,6 +60,46 @@ tools\start-usb.bat        # 开机后只跑这一个
 
 ---
 
+## v1.1.0 —— 补上 iPad 端，双端齐全（2026-11-14）
+
+> **回答「iPad 端上传了没」**：v1.00 的 git tag 里其实**已经包含** iPad 端源码
+> （`tools/panel.html`、`dcs/Export.lua`、`tools/beacon.py` 等都在仓库里），
+> 但 `release/v1.00/` 只打了 Android APK，没有把 iPad 端作为发布产物打包。
+> 本版把 iPad 端做成可直接部署的包，补齐双端。
+
+| 项 | 值 |
+|---|---|
+| Git tag | `v1.1.0` |
+| `versionName` / `versionCode` | `1.1.0` / `2`（仅版本号变更，Android 功能与 v1.00 一致） |
+| Android APK | [`release/v1.1.0/DCS-Peripheral-Android-v1.1.0.apk`](release/v1.1.0/DCS-Peripheral-Android-v1.1.0.apk)（8.1 MB） |
+| APK SHA-256 | `ffa4d4309298865ffb9b62d7691cd2e2c904d422c85aa4b77ded489cea45fd1f` |
+| **iPad 端部署包** | [`release/v1.1.0/DCS-Peripheral-iPad-v1.1.0.zip`](release/v1.1.0/DCS-Peripheral-iPad-v1.1.0.zip)（95 KB） |
+| iPad 包 SHA-256 | `e5f243d8b2583181f4d328ee536572e187fc553557e9ee571d7056a3b1cddb0f` |
+| 签名 | 同 v1.00：APK Signature Scheme v2，AGP 自带 debug keystore |
+| 构建 | `gradlew :app:assembleRelease --offline`（JDK `D:\Android Studio\jbr`） |
+| 验收 | **iPad 端本地冒烟通过**：`run-all --no-usb --no-vjoy --mock` 起 3 个服务，`/state` 返回合法 JSON、`/panel` 返回 65 KB HTML 页面；Android 与 v1.00 功能一致（仅版本串变更） |
+
+**这一版包含**：
+- **Android 端**：同 v1.00 全部功能，仅 `versionName` 升到 `1.1.0`、`versionCode` 升到 `2`、App 标题改「DCS 外设 · v1.1.0」。
+- **iPad 端部署包**（解压即用）：`tools/panel.html`（单文件页面）+ PC 桥接三件套
+  （`beacon.py` HTTP:8080、`vjoy_out.py` 虚拟摇杆、`usb-watchdog.py` USB 隧道看守）+
+  `start-usb.bat` 一键启动 + `mock_export.py` 假遥测 + `dcs/Export.lua`（DCS 侧导出脚本）+
+  部署说明 `DEPLOY.txt`。
+
+**iPad 端安装**（详见包内 `DEPLOY.txt`）：① 把 `dcs/Export.lua` 复制到
+`C:\Users\<你>\Saved Games\DCS\Scripts\Export.lua` 并重进任务；② 双击 `tools\start-usb.bat`；
+③ iPad 连同一局域网，Safari 打开 `http://<PC局域网IP>:8080/panel`。
+没有 DCS 时跑 `start-usb.bat mock` 看假数据。
+
+**Android 端安装**：`adb install -r release/v1.1.0/DCS-Peripheral-Android-v1.1.0.apk`
+（旧 v1.00 可直接覆盖）。装完同样按 [`docs/BINDING.md`](docs/BINDING.md) §2 重绑。
+
+> **本版验收说明**：发布时 Pixel 未连接（`adb devices` 起服务卡死），故未对 v1.1.0 的 APK
+> 重跑真机安装验收；但 Android 代码相对 v1.00 仅改版本串、功能零变动，v1.00 的真机验收结论
+> 仍然有效。iPad 端则在本机完成了端到端冒烟（beacon 服务 + mock 遥测 + 页面可达）。
+
+---
+
 ## 文档索引
 
 | 文档 | 内容 |

@@ -315,3 +315,29 @@ Rx / Ry 两根轴（`YokeController` 发送、`vjoy_out.py` 映射、`BINDING.md
 `ViewPad` 控件与战斗页视角区、`YokeSettings` 的视角横纵互换 / 两个反转开关、
 `YOKE.md` 相关段落，以及 `T-STAT-010`（守 ViewPad + onView 回调）和
 `T-STAT-012`（守 160dp 视角尺寸）两条静态检查。
+
+---
+
+### 十·补 v1.1.0 —— 补上 iPad 端，双端齐全（2026-11-14）
+
+用户问「iPad 端和 Pixel 端都上传了没」：核查发现 v1.00 的 **git tag 里已含** iPad 端源码
+（`tools/panel.html`、`dcs/Export.lua`、`tools/beacon.py` 等），但 `release/v1.00/`
+只打了 Android APK，**没把 iPad 端作为发布产物打包**。本版补齐：
+
+- `versionName` 升到 `1.1.0`、`versionCode` 升到 `2`、App 标题改「DCS 外设 · v1.1.0」
+  （`android/app/build.gradle.kts`、`MainActivity.kt`）。Android 功能相对 v1.00 零变动。
+- 新增 **iPad 端部署包** `release/v1.1.0/DCS-Peripheral-iPad-v1.1.0.zip`（95 KB，
+  SHA-256 `e5f243d8b2583181f4d328ee536572e187fc553557e9ee571d7056a3b1cddb0f`）：
+  含 `tools/`（panel.html + beacon/vjoy_out/usb-watchdog/run-all/mock_export + start-usb.bat
+  + open-firewall.bat + mfd-pages.json）、`dcs/Export.lua`、部署说明 `DEPLOY.txt`
+  （zip 根另置一份，解压第一眼可见）。
+- Android APK `release/v1.1.0/DCS-Peripheral-Android-v1.1.0.apk`（8.1 MB，
+  SHA-256 `ffa4d4309298865ffb9b62d7691cd2e2c904d422c85aa4b77ded489cea45fd1f`），
+  同 v1.00 签名（v2 debug keystore）。
+
+**验收**：iPad 端在本机做了端到端冒烟——`run-all --no-usb --no-vjoy --mock` 拉起 beacon +
+watch + mock 三服务，`http://127.0.0.1:8080/state` 返回合法 JSON、`/panel` 返回 65 KB HTML
+页面。Android 这边因为发布时 Pixel 没连上（`adb devices` 起服务卡死），**没对 v1.1.0 重跑真机
+安装验收**；但代码仅改版本串，功能与已验收的 v1.00 完全一致，v1.00 结论仍有效。
+
+**tag 仍只打在本地，没有 push。** 详见 `README.md` 的 v1.1.0 章节与包内 `DEPLOY.txt`。

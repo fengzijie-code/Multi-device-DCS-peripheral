@@ -1,0 +1,53 @@
+DCS 外设 · v1.1.0 — iPad 端部署说明
+==========================================
+
+这个包是「iPad 端页面 + 它依赖的 PC 服务 + DCS 导出脚本」。
+Android 端 APK 单独放在 release/v1.1.0/DCS-Peripheral-Android-v1.1.0.apk。
+
+【目录结构】解压后请保持原样（run-all.py 用的是 tools/ 相对路径）：
+
+  dcs/Export.lua              DCS 侧导出脚本（遥测 / 屏幕文本 / 座舱反向控制）
+  tools/panel.html            iPad 上打开的页面，单文件、无外部 CSS/JS 依赖
+  tools/beacon.py             HTTP 桥接 :8080，提供 /panel /state /cmd /input
+  tools/vjoy_out.py           手机操纵量 -> vJoy 驱动
+  tools/usb-watchdog.py       USB 隧道看门狗
+  tools/run-all.py            启动器本体
+  tools/start-usb.bat         一键启动（双击这个）
+  tools/mock_export.py        假遥测，仅联调用（start-usb.bat mock）
+  tools/open-firewall.bat     8080 被防火墙拦时跑一次（管理员）
+  tools/mfd-pages.json        MFD 页面指纹数据（工具链用）
+
+【1. DCS 侧】
+把 dcs/Export.lua 复制到 DCS 用户目录：
+  C:\Users\<你的用户名>\Saved Games\DCS\Scripts\Export.lua
+（用 DCS.openbeta 就换成对应目录；先备份原文件。）
+**改完 Export.lua 必须重新进入任务才生效**，只刷新 iPad 页面没用。
+
+【2. PC 侧】
+把 tools/ 放到项目位置，双击 tools\start-usb.bat。
+它会启动三个进程：beacon.py、usb-watchdog.py、vjoy_out.py。
+窗口看到 [3/3] 服务启动 即可。开机后也只需要重跑这一个。
+
+【3. iPad 侧】
+让 iPad 和 PC 在同一局域网里（本机实测可行的路径：PC 开移动热点、iPad 连它；
+校园网有客户端隔离，直连不通）。Safari 打开：
+
+  http://<PC 的局域网 IP>:8080/panel
+
+页面包含仪表五张卡片 + MFD / UFCP 标签页，1Hz 轮询。
+没有 DCS 时可以跑 `start-usb.bat mock` 看假数据。
+
+【4. 验收】
+  PC 上  curl http://127.0.0.1:8080/state   -> 合法 JSON
+  iPad 上 页面显示「已连接」且读数在动
+  MFD 页 键位标签随页面变化、按 UFCP 键四窗文本会变
+
+【5. 已知注意点】
+- 本版仍带视角功能；用户已购头瞄，下一版会移除。
+- DCS 里的按钮绑定见仓库 docs/BINDING.md §2：JF-17 用
+  S3: Weapon Launch / S4: Fire Main Gun / S8: Change Weapons /
+  T2_Backward: Countermeasures Dispense / T5_Press: Lock Target，
+  不是通用的 Weapon Release / Trigger。
+- 装完 v1.1.0 的 Android APK 后，各机型仍要按 BINDING.md §2 重绑
+  BTN7 / BTN12，并清掉 S3/S4 的默认绑定冲突。
+- 完整文档在仓库 docs/PANEL.md、docs/YOKE.md、docs/HANDOFF.md。
