@@ -1,0 +1,2284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JF-17 座舱虚拟按键训练 · 手册交叉核对版</title>
+<style>
+:root{
+  --bg:#0a0d12; --bg2:#0e131b; --card:#141b25; --card2:#1a2331; --card3:#202b3b;
+  --line:#2a3749; --line2:#3a4a60; --fg:#e9f0f8; --dim:#a1b2c7; --faint:#7488a0;
+  --acc:#58a6ff; --acc-bg:rgba(88,166,255,.12); --ok:#3fb950; --ok-bg:rgba(63,185,80,.12);
+  --bad:#f85149; --bad-bg:rgba(248,81,73,.12); --warn:#e3b341; --warn-bg:rgba(227,179,65,.12);
+  --shadow:0 10px 30px rgba(0,0,0,.5); --mono:ui-monospace,Consolas,"Cascadia Mono",monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg)}
+body{font:14px/1.65 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;padding-bottom:60px}
+a{color:var(--acc)}
+button,select{font:inherit;color:inherit}
+h2{font-size:20px;margin:0 0 4px;letter-spacing:.3px}
+h3{font-size:15px;margin:0 0 10px;color:var(--fg)}
+h4{font-size:13px;margin:14px 0 6px;color:var(--acc)}
+p{margin:8px 0}
+.muted{color:var(--dim)}
+.faint{color:var(--faint);font-size:12px}
+.mono{font-family:var(--mono)}
+.tag{display:inline-block;padding:1px 7px;border:1px solid var(--line2);border-radius:20px;font-size:11px;color:var(--dim);background:var(--card2);white-space:nowrap}
+.tag.m{color:#9fd0ff;border-color:#31567c}
+.tag.d{color:#e6c07b;border-color:#6b5730}
+.tag.s{color:#d2a8ff;border-color:#5c447c}
+
+/* ---------- 顶栏 ---------- */
+.top{position:sticky;top:0;z-index:30;background:rgba(10,13,18,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+.top-in{max-width:1400px;margin:auto;padding:10px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.brand{font-size:17px;font-weight:700;letter-spacing:.5px}
+.brand small{display:block;font-size:11px;font-weight:400;color:var(--faint);letter-spacing:0}
+.stats{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.stat{min-width:68px;text-align:center;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3px 9px}
+.stat b{display:block;font:700 17px/1.3 var(--mono);color:var(--acc)}
+.stat span{font-size:10px;color:var(--faint)}
+.stat.ok b{color:var(--ok)} .stat.bad b{color:var(--bad)} .stat.warn b{color:var(--warn)}
+.tabs{max-width:1400px;margin:auto;padding:0 12px;display:flex;gap:2px;overflow-x:auto}
+.tab{padding:8px 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--dim);cursor:pointer;white-space:nowrap;font-size:13px}
+.tab:hover{color:var(--fg);background:var(--card)}
+.tab.on{color:var(--acc);border-bottom-color:var(--acc);background:var(--acc-bg)}
+
+main{max-width:1400px;margin:0 auto;padding:18px}
+.view{display:none} .view.on{display:block}
+section.view>h2{margin-top:2px}
+.lead{color:var(--dim);margin:0 0 16px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.hr{height:1px;background:var(--line);margin:14px 0}
+details{background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin:10px 0}
+details[open]{background:var(--card)}
+summary{cursor:pointer;color:var(--acc);font-size:13px;font-weight:600;outline:none}
+summary::marker{color:var(--faint)}
+details p,details li{font-size:13px;color:var(--dim)}
+ul,ol{padding-left:20px;margin:6px 0}
+li{margin:3px 0}
+
+/* ---------- 控件按钮 ---------- */
+.bay{--zc:var(--acc);background:var(--card);border:1px solid var(--line);border-left:3px solid var(--zc);border-radius:9px;padding:10px 12px;margin-bottom:12px}
+.bay>.spread{margin-bottom:8px}
+.bay h3{margin:0;color:var(--zc)}
+.bay .where{font-size:11px;color:var(--faint)}
+.btns{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:7px}
+.key{min-height:52px;text-align:left;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--card2);cursor:pointer;position:relative;transition:border-color .12s,background .12s,transform .08s;overflow:hidden}
+.key:hover{border-color:var(--zc);background:var(--card3);transform:translateY(-1px)}
+.key:active{transform:translateY(1px)}
+.key .ab{display:block;font:700 12px/1.3 var(--mono);letter-spacing:.2px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.key .cn{display:block;font-size:10px;line-height:1.35;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.key .kk{position:absolute;right:5px;top:4px;font-size:9px;color:var(--faint)}
+.key.soft{border-style:dashed}
+.key.hit{background:var(--ok-bg);border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset}
+.key.miss{background:var(--bad-bg);border-color:var(--bad);box-shadow:0 0 0 1px var(--bad) inset}
+.key.flash{animation:fl .5s ease 2}
+@keyframes fl{50%{background:var(--acc-bg)}}
+.board[data-diff="normal"] .key .cn{display:none}
+.board[data-diff="blind"] .key .cn,
+.board[data-diff="blind"] .key .ab{visibility:hidden}
+.board[data-diff="blind"] .key::after{content:"· · ·";position:absolute;left:9px;top:16px;color:var(--faint);font-family:var(--mono)}
+.board[data-diff="blind"] .key:hover .ab,.board[data-diff="blind"] .key:hover .cn{visibility:visible}
+.board[data-diff="blind"] .key:hover::after{display:none}
+.board .key.dimmed{opacity:.16;pointer-events:none}
+.z-front{--zc:#58a6ff} .z-left{--zc:#d2a8ff} .z-leftrear{--zc:#f778ba}
+.z-right{--zc:#7ee787} .z-rightrear{--zc:#ffa657} .z-hotas{--zc:#79c0ff} .z-seat{--zc:#a5b4c4}
+
+/* ---------- 题目 / 反馈 ---------- */
+.qbox{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line2);border-radius:10px;padding:16px;margin-bottom:12px}
+.qnum{font:700 11px var(--mono);color:var(--acc);letter-spacing:1px}
+.qtext{font-size:19px;font-weight:650;line-height:1.5;margin:6px 0 10px}
+.qmeta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.feedback{border-radius:8px;padding:10px 13px;margin:10px 0;border:1px solid var(--line);background:var(--card2);display:none}
+.feedback.show{display:block}
+.feedback.ok{background:var(--ok-bg);border-color:var(--ok)}
+.feedback.bad{background:var(--bad-bg);border-color:var(--bad)}
+.feedback b{font-size:14px}
+.feedback .why{font-size:12.5px;color:var(--dim);margin-top:4px}
+.ctl{display:inline-flex;gap:6px;align-items:center;background:var(--card3);border:1px solid var(--line2);border-radius:6px;padding:3px 8px;margin:3px 4px 0 0;cursor:pointer;font-size:12px}
+.ctl:hover{border-color:var(--acc)}
+.ctl .ab{font:700 11px var(--mono);color:var(--acc)}
+select,button.act{background:var(--card2);border:1px solid var(--line2);border-radius:7px;padding:5px 10px;cursor:pointer}
+button.act:hover{border-color:var(--acc);background:var(--acc-bg)}
+button.act.primary{background:var(--acc-bg);border-color:var(--acc);color:#cfe6ff;font-weight:600}
+button.act.danger{border-color:#6b3232;color:#ffb4b0}
+button.act:disabled{opacity:.4;cursor:not-allowed}
+label.lbl{font-size:12px;color:var(--dim);display:inline-flex;gap:5px;align-items:center}
+.bar{height:5px;background:var(--card2);border-radius:5px;overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .25s}
+
+/* ---------- 表格 ---------- */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
+th{color:var(--acc);font-weight:600;background:var(--card2);position:sticky;top:0}
+tr:hover td{background:var(--card2)}
+td .ref{font:11px var(--mono);color:var(--faint);white-space:nowrap}
+.tblwrap{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:8px}
+
+/* ---------- 座舱总览 ---------- */
+.cockpit{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px}
+.zonebox{border:1px dashed var(--line2);border-left:3px solid var(--zc);border-radius:8px;padding:10px;background:var(--card);cursor:pointer;min-height:96px}
+.zonebox:hover{background:var(--card2)}
+.zonebox.sel{outline:1px solid var(--zc)}
+.zonebox b{display:block;color:var(--zc);font-size:13px}
+.zonebox .n{font:700 22px var(--mono);color:var(--fg);margin:2px 0}
+.zonebox small{color:var(--faint);font-size:11px;line-height:1.45;display:block}
+.zonebox.wide{grid-column:span 2}
+.zonenote{grid-column:1/-1;text-align:center;color:var(--faint);font-size:11px;border-top:1px dashed var(--line);padding-top:8px}
+
+/* ---------- 流程 ---------- */
+.steps{list-style:none;padding:0;margin:8px 0 0;counter-reset:s}
+.steps li{counter-increment:s;display:flex;gap:9px;align-items:flex-start;padding:6px 8px;border-radius:6px;border:1px solid transparent;font-size:13px}
+.steps li::before{content:counter(s);font:700 11px var(--mono);color:var(--faint);min-width:20px;height:20px;border:1px solid var(--line2);border-radius:50%;display:grid;place-items:center;margin-top:1px}
+.steps li.done{color:var(--faint);text-decoration:line-through}
+.steps li.done::before{content:"✓";color:var(--ok);border-color:var(--ok)}
+.steps li.cur{background:var(--acc-bg);border-color:var(--acc);color:var(--fg);font-weight:600}
+.steps li.cur::before{color:var(--acc);border-color:var(--acc)}
+.steps li .ref{margin-left:auto;font:10px var(--mono);color:var(--faint);white-space:nowrap}
+
+/* ---------- 浮层 ---------- */
+#pop{position:fixed;z-index:60;max-width:290px;background:#1b2533;border:1px solid var(--line2);border-radius:8px;box-shadow:var(--shadow);padding:9px 11px;font-size:12px;color:var(--dim);display:none}
+#pop b{color:var(--fg);font-size:12.5px}
+#pop .ref{display:block;margin-top:5px;font:10px var(--mono);color:var(--faint)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1b2533;border:1px solid var(--line2);border-radius:8px;padding:8px 14px;box-shadow:var(--shadow);z-index:70;font-size:12.5px;display:none}
+
+@media(max-width:760px){
+  .cockpit{grid-template-columns:1fr 1fr} .zonebox.wide{grid-column:span 2}
+  .btns{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+  .qtext{font-size:16px} .stats{width:100%;margin-left:0}
+}
+@media print{
+  .top,.tabs,.toast,#pop,.noprint{display:none!important}
+  .view{display:block!important;page-break-before:always} .view:first-child{page-break-before:auto}
+  body{background:var(--bg);color:var(--fg);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .card,.bay,.qbox,.zonebox,.key{break-inside:avoid}
+  details,details>*{display:block!important}
+  .tblwrap{max-height:none;overflow:visible}
+}
+
+/* ==================== 简易座舱（可点击模拟） ==================== */
+.sim-layout{display:grid;grid-template-columns:minmax(0,1fr) 326px;gap:13px;align-items:start}
+.sim-main{min-width:0}
+.sim-side{position:sticky;top:106px;min-width:0}
+.sim-statusbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:7px;margin-bottom:9px}
+.sim-chip{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line2);border-radius:8px;padding:5px 9px;min-width:0}
+.sim-chip b{display:block;font-size:10px;color:var(--faint);font-weight:500;letter-spacing:.2px}
+.sim-chip span{display:block;font:700 12px/1.45 var(--mono);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sim-chip.on{border-left-color:var(--ok)} .sim-chip.on span{color:var(--ok)}
+.sim-chip.warn{border-left-color:var(--warn)} .sim-chip.warn span{color:var(--warn)}
+.sim-chip.bad{border-left-color:var(--bad)} .sim-chip.bad span{color:var(--bad)}
+.sim-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:9px}
+.sim-cockpit{display:grid;grid-template-columns:minmax(196px,1fr) minmax(300px,1.5fr) minmax(196px,1fr);gap:8px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:9px}
+.sim-col{min-width:0;display:flex;flex-direction:column;gap:8px;max-height:840px;overflow-y:auto;padding-right:3px}
+.sim-col::-webkit-scrollbar,.sim-log::-webkit-scrollbar{width:7px}
+.sim-col::-webkit-scrollbar-thumb,.sim-log::-webkit-scrollbar-thumb{background:var(--line2);border-radius:6px}
+.sim-bay{--zc:var(--acc);background:linear-gradient(180deg,#182130,#121a25);border:1px solid var(--line2);border-radius:8px;padding:8px;box-shadow:inset 0 1px 0 rgba(160,190,230,.05)}
+.sim-bay.z-front{--zc:#58a6ff} .sim-bay.z-left{--zc:#d2a8ff} .sim-bay.z-leftrear{--zc:#f778ba}
+.sim-bay.z-right{--zc:#7ee787} .sim-bay.z-rightrear{--zc:#ffa657} .sim-bay.z-hotas{--zc:#79c0ff} .sim-bay.z-seat{--zc:#a5b4c4}
+.sim-bay>h3{font-size:10.5px;letter-spacing:.5px;color:var(--zc);margin:0 0 7px;border-bottom:1px dashed var(--line);padding-bottom:5px;text-transform:uppercase}
+.sim-bay>h3 small{color:var(--faint);font-weight:400;letter-spacing:0;text-transform:none;margin-left:5px}
+.sim-devs{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:5px}
+.dev{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 3px;background:var(--card2);border:1px solid var(--line);border-radius:6px;cursor:pointer;min-height:62px;text-align:center;min-width:0;transition:border-color .12s,background .12s}
+.dev:hover{border-color:var(--zc);background:var(--card3)}
+.dev:active{transform:translateY(1px)}
+.dev .face{width:32px;height:19px;border-radius:3px;background:#080d14;border:1px solid #3a4a60;display:grid;place-items:center;flex:0 0 auto}
+.dev .face i{display:block;width:9px;height:13px;border-radius:2px;background:linear-gradient(180deg,#a7b9cd,#576c86);transform:translateY(-3px);transition:transform .16s,background .16s;box-shadow:0 1px 2px #000}
+.dev[data-on="1"] .face i{transform:translateY(3px);background:linear-gradient(180deg,#8ce899,#2f9e46);box-shadow:0 0 8px rgba(63,185,80,.5)}
+.dev[data-on="2"] .face i{transform:translateY(0);background:linear-gradient(180deg,#f0c662,#a8801b);box-shadow:0 0 8px rgba(227,179,65,.45)}
+.dev[data-on="3"] .face i,.dev[data-on="4"] .face i{transform:translateY(0) rotate(24deg);background:linear-gradient(180deg,#8fc4ff,#356ba8)}
+.dev.kn .face{width:25px;height:25px;border-radius:50%}
+.dev.kn .face i{width:2px;height:9px;border-radius:1px;background:var(--acc);transform:rotate(var(--rot,0deg)) translateY(-4px);box-shadow:none}
+.dev.btn .face{width:24px;height:19px;border-radius:50%}
+.dev.btn .face i{width:13px;height:13px;border-radius:50%;transform:none;background:radial-gradient(circle at 35% 30%,#d3e0ee,#5b708b);box-shadow:0 1px 2px #000}
+.dev.btn.pulse .face,.dev.btn[data-on="1"] .face{box-shadow:0 0 9px rgba(227,179,65,.55);border-color:var(--warn)}
+.dev.btn[data-on="1"] .face i{background:radial-gradient(circle at 35% 30%,#ffe0a8,#c9911f)}
+.dev.hat .face{width:28px;height:24px;border-radius:5px}
+.dev.hat .face i{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:9px solid var(--acc);background:none;transform:rotate(var(--rot,0deg));box-shadow:none}
+.dev.lv .face{width:28px;height:16px;border-radius:2px}
+.dev.lv .face i{width:21px;height:5px;border-radius:2px;transform:none;background:repeating-linear-gradient(45deg,#d3a82a,#d3a82a 3px,#6b5518 3px,#6b5518 6px)}
+.dev.ind{cursor:default;opacity:.92}
+.dev.ind .face{width:16px;height:16px;border-radius:50%;background:#080d14}
+.dev.ind .face i{width:10px;height:10px;border-radius:50%;background:#25303e;transform:none;box-shadow:none}
+.dev.ind.lit .face i{background:var(--lamp,var(--ok));box-shadow:0 0 9px var(--lamp,var(--ok))}
+.dev b{font:700 9.5px/1.25 var(--mono);color:var(--fg);letter-spacing:.1px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dev small{font-size:9px;line-height:1.2;color:var(--dim);display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dev .val{font:700 9px var(--mono);color:var(--acc);line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dev.flash-ok{box-shadow:0 0 0 2px var(--ok) inset}
+.dev.flash-bad{box-shadow:0 0 0 2px var(--bad) inset}
+.dev.guide{outline:2px dashed var(--warn);outline-offset:1px;animation:simPulse 1.6s ease-in-out infinite}
+@keyframes simPulse{0%,100%{box-shadow:0 0 0 0 rgba(227,179,65,.35)}50%{box-shadow:0 0 10px 2px rgba(227,179,65,.35)}}
+
+/* HUD */
+.sim-hud{height:106px;background:radial-gradient(ellipse at 50% 130%,#0b2418,#050a0c);border:1px solid #2d4a3a;border-radius:8px;position:relative;overflow:hidden;color:#7ee787;font-family:var(--mono);flex:0 0 auto}
+.sim-hud .hud-mode{position:absolute;top:7px;left:11px;font-size:12px;font-weight:700;letter-spacing:1px}
+.sim-hud .hud-spd{position:absolute;left:11px;top:34px;font-size:10.5px;line-height:1.6;white-space:pre-line}
+.sim-hud .hud-alt{position:absolute;right:11px;top:34px;font-size:10.5px;line-height:1.6;text-align:right;white-space:pre-line}
+.sim-hud .hud-reticle{position:absolute;left:50%;top:53%;transform:translate(-50%,-50%);width:52px;height:52px;border:1px solid rgba(126,231,135,.5);border-radius:50%}
+.sim-hud .hud-reticle::before{content:"";position:absolute;left:-14px;right:-14px;top:50%;height:1px;background:rgba(126,231,135,.55)}
+.sim-hud .hud-reticle::after{content:"";position:absolute;top:-14px;bottom:-14px;left:50%;width:1px;background:rgba(126,231,135,.55)}
+.sim-hud .hud-msg{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:10.5px;color:var(--warn);letter-spacing:.5px}
+.sim-hud.off{background:#080c12;border-color:#22303f;color:#4a5c70}
+.sim-hud.off .hud-reticle{border-color:rgba(120,140,160,.22)}
+.sim-hud.off .hud-reticle::before,.sim-hud.off .hud-reticle::after{background:rgba(120,140,160,.22)}
+
+/* MFD */
+.sim-mfds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:7px}
+.sim-screen{background:#050a08;border:1px solid #2f4239;border-radius:6px;padding:4px;display:grid;grid-template-columns:15px minmax(0,1fr) 15px;grid-template-rows:13px 104px 13px;gap:2px;min-width:0}
+.sim-screen.off{border-color:#2a3749;background:#080c12}
+.sim-screen .su{grid-column:2;grid-row:1;display:grid;grid-template-columns:repeat(5,1fr);gap:2px}
+.sim-screen .sd{grid-column:2;grid-row:3;display:grid;grid-template-columns:repeat(5,1fr);gap:2px}
+.sim-screen .sl{grid-column:1;grid-row:2;display:grid;grid-template-rows:repeat(8,1fr);gap:2px}
+.sim-screen .sr{grid-column:3;grid-row:2;display:grid;grid-template-rows:repeat(8,1fr);gap:2px}
+.scr-key{background:#1b2836;border:1px solid #33465c;border-radius:2px;font:7px var(--mono);color:#93a9c0;cursor:pointer;padding:0;min-width:0}
+.scr-key:hover{border-color:var(--acc);color:var(--acc);background:#24374d}
+.scr-key.hi{border-color:var(--warn);color:var(--warn)}
+.scr-body{grid-column:2;grid-row:2;background:#04120c;border:1px solid #1c3a2a;border-radius:3px;padding:5px;color:#7ee787;font:9.5px/1.5 var(--mono);text-align:center;display:flex;flex-direction:column;justify-content:center;gap:2px;overflow:hidden;min-width:0}
+.scr-body b{font-size:11px;letter-spacing:.6px;word-break:break-word}
+.scr-body em{font-style:normal;color:#4fbf74;font-size:9px}
+.sim-screen.off .scr-body{background:#080c12;border-color:#22303f;color:#4d5f73}
+.sim-screen.off .scr-body b,.sim-screen.off .scr-body em{color:#4d5f73}
+.sim-screen .scr-tag{grid-column:1/-1;grid-row:1;display:none}
+.screen-label{font:9px var(--mono);color:var(--faint);text-align:center;margin-top:2px}
+
+/* UFCP */
+.sim-ufcp{background:linear-gradient(180deg,#1a2432,#111823);border:1px solid var(--line2);border-radius:8px;padding:8px;margin-top:7px}
+.ufcp-wins{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.ufcp-win{background:#05130d;border:1px solid #2a4a37;border-radius:3px;padding:4px 2px;text-align:center;color:#7ee787;font:9px var(--mono);min-height:30px;overflow:hidden}
+.ufcp-win b{display:block;font-size:10px;letter-spacing:.3px}
+.ufcp-win.off{background:#080c12;border-color:#22303f;color:#4a5c70}
+.ufcp-keys{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-top:6px}
+.ufcp-key{background:var(--card2);border:1px solid var(--line2);border-radius:4px;padding:4px 1px;font:700 8.5px var(--mono);color:var(--dim);cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ufcp-key:hover{border-color:var(--acc);color:var(--acc)}
+.ufcp-key.hi{border-color:var(--ok);color:var(--ok);background:var(--ok-bg)}
+.ufcp-knobs{display:flex;gap:5px;justify-content:space-between;margin-top:7px;flex-wrap:wrap}
+.ufcp-knob{width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3b4b60,#17202c);border:1px solid #44566e;position:relative;cursor:pointer;flex:0 0 auto}
+.ufcp-knob i{position:absolute;left:50%;top:5px;width:2px;height:11px;background:var(--acc);transform-origin:50% 13px;transform:translateX(-50%) rotate(var(--rot,0deg))}
+.ufcp-knob small{position:absolute;top:40px;left:50%;transform:translateX(-50%);font:8px var(--mono);color:var(--faint);white-space:nowrap}
+.sim-ufcp{padding-bottom:22px}
+
+/* 指示灯 / 前仪表台 */
+.sim-lamps{display:grid;grid-template-columns:repeat(auto-fit,minmax(74px,1fr));gap:4px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px;margin-top:7px}
+.lamp{display:flex;align-items:center;gap:5px;font:9px var(--mono);color:var(--faint);min-width:0}
+.lamp i{width:10px;height:10px;border-radius:50%;background:#1e2835;border:1px solid #3a4a60;flex:0 0 auto}
+.lamp.lit i{background:var(--lc,var(--ok));box-shadow:0 0 8px var(--lc,var(--ok));border-color:transparent}
+.lamp.lit{color:var(--fg)}
+.sim-front{display:flex;flex-direction:column;gap:8px;margin-top:7px}
+
+/* HOTAS 底条 */
+.sim-bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+.sim-hotas{background:linear-gradient(180deg,#182130,#111823);border:1px solid var(--line2);border-radius:9px;padding:8px;min-width:0}
+.sim-hotas h3{font-size:10.5px;color:var(--zc,var(--acc));margin:0 0 6px;letter-spacing:.4px;border-bottom:1px dashed var(--line);padding-bottom:5px}
+.sim-hotas .sim-devs{grid-template-columns:repeat(auto-fill,minmax(78px,1fr))}
+.hotas-visual{height:20px;border-radius:4px;background:linear-gradient(90deg,#26344a,#111823 40%,#26344a);border:1px solid var(--line2);margin-bottom:7px;position:relative}
+.hotas-visual::after{content:"";position:absolute;left:50%;top:-5px;width:12px;height:28px;background:linear-gradient(180deg,#7e93ad,#35455b);border-radius:4px;transform:translateX(-50%)}
+
+/* 侧栏 */
+.sim-now{background:var(--card2);border:1px solid var(--line2);border-left:3px solid var(--acc);border-radius:0 8px 8px 0;padding:9px 11px;font-size:12px;line-height:1.6}
+.sim-now.ok{border-left-color:var(--ok)} .sim-now.warn{border-left-color:var(--warn)} .sim-now.bad{border-left-color:var(--bad)}
+.sim-now b{display:block;color:var(--fg);font-size:12.5px;margin-bottom:3px}
+.sim-now div{color:var(--dim)}
+.sim-now small{display:block;color:var(--faint);font-size:10.5px;margin-top:5px}
+.sim-log{max-height:330px;overflow-y:auto;display:flex;flex-direction:column;gap:5px}
+.log-item{border-left:2px solid var(--acc);background:var(--card2);border-radius:0 6px 6px 0;padding:5px 8px;font-size:11px;line-height:1.55;cursor:pointer}
+.log-item.ok{border-left-color:var(--ok)} .log-item.warn{border-left-color:var(--warn)} .log-item.bad{border-left-color:var(--bad)}
+.log-item.now{background:var(--card3);border-left-width:3px}
+.log-item .t{font:9px var(--mono);color:var(--faint);display:block}
+.log-item b{color:var(--fg)}
+.log-item .e{color:var(--dim);margin-top:2px}
+.log-item .r{display:block;color:var(--faint);font-size:10px;margin-top:2px}
+.log-item .why{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--faint);font-size:10px;margin-top:3px;border-top:1px dashed var(--line);padding-top:3px}
+.log-item.open .why{display:block;overflow:visible}
+.log-item .why b{color:var(--dim);font-weight:600}
+.sim-state-row{display:flex;justify-content:space-between;gap:8px;font-size:11px;border-bottom:1px dashed var(--line);padding:4px 0}
+.sim-state-row span:last-child{font-family:var(--mono);color:var(--acc);text-align:right}
+.sim-check-steps{list-style:none;padding:0;margin:6px 0 0;counter-reset:sc}
+.sim-check-steps li{counter-increment:sc;display:flex;gap:7px;align-items:flex-start;padding:4px 5px;border-radius:5px;font-size:11.5px;color:var(--dim)}
+.sim-check-steps li::before{content:counter(sc);font:700 9px var(--mono);color:var(--faint);border:1px solid var(--line2);border-radius:50%;min-width:16px;height:16px;display:grid;place-items:center;flex:0 0 auto;margin-top:1px}
+.sim-check-steps li.done{color:var(--faint);text-decoration:line-through}
+.sim-check-steps li.done::before{content:"✓";color:var(--ok);border-color:var(--ok)}
+.sim-check-steps li.cur{background:var(--acc-bg);color:var(--fg);font-weight:600}
+.sim-check-steps li.cur::before{color:var(--acc);border-color:var(--acc)}
+.sim-notes{margin-top:9px}
+
+@media(max-width:1180px){.sim-layout{grid-template-columns:1fr}.sim-side{position:static}}
+@media(max-width:900px){
+  .sim-cockpit{grid-template-columns:1fr}
+  .sim-col{max-height:none;overflow:visible}
+  .sim-bottom{grid-template-columns:1fr}
+  .sim-mfds{grid-template-columns:1fr}
+  .sim-screen{grid-template-rows:13px 88px 13px}
+}
+@media(max-width:520px){
+  .sim-statusbar{grid-template-columns:repeat(2,1fr)}
+  .ufcp-keys{grid-template-columns:repeat(4,1fr)}
+}
+@media print{
+  .sim-layout{display:block} .sim-side{position:static}
+  .sim-col{max-height:none;overflow:visible}
+  .sim-log{max-height:none;overflow:visible}
+  .sim-cockpit,.sim-bottom{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">JF-17 座舱虚拟按键训练
+      <small>与《DCS: JF-17 雷电 飞行手册》CN · Change 17 / 2022-12-01 交叉核对 · 离线单文件</small>
+    </div>
+    <div class="stats">
+      <div class="stat ok"><b id="sCorrect">0</b><span>答对</span></div>
+      <div class="stat bad"><b id="sWrong">0</b><span>答错</span></div>
+      <div class="stat warn"><b id="sStreak">0</b><span>连击</span></div>
+      <div class="stat"><b id="sTime">00:00</b><span>用时</span></div>
+      <div class="stat"><b id="sRate">—</b><span>正确率</span></div>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab on" data-go="sec-sim">① 简易座舱</button>
+    <button class="tab" data-go="sec-map">② 座舱总览</button>
+    <button class="tab" data-go="sec-drill">③ 找键训练</button>
+    <button class="tab" data-go="sec-flow">④ 流程训练</button>
+    <button class="tab" data-go="sec-ref">⑤ 控件速查</button>
+    <button class="tab" data-go="sec-coverage">⑥ 手册覆盖核对</button>
+    <button class="tab" data-go="sec-help">⑦ 用法与来源</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ==================== ① 简易座舱 ==================== -->
+<section class="view on" id="sec-sim">
+  <h2>① 简易座舱 · 点一下，飞机就有反应</h2>
+  <p class="lead">这是一台<b>不用进游戏就能操作</b>的简易座舱：拨动开关会动、三块 MFD 与 HUD/UFCP 会亮、告警灯与发动机状态会跟着变。每点一下，右侧「操作效果」都会写清<b>你做了什么 → 系统有什么反应 → 出自手册哪一页</b>。默认冷舱全关，按「一键演示」可看完整开车过程。</p>
+
+  <div class="sim-layout">
+    <div class="sim-main">
+      <div class="sim-statusbar" id="simStatus"></div>
+      <div class="sim-toolbar noprint">
+        <button class="act primary" id="simDemo">▶ 一键演示 · 冷舱开车</button>
+        <button class="act" id="simReset">重置为冷舱</button>
+        <label class="lbl">引导检查单 <select id="simFlow"></select></label>
+        <button class="act" id="simGuide">开始引导</button>
+        <span class="faint">纯前端状态机 · 不连接 DCS · 不发 /cmd</span>
+      </div>
+
+      <div class="sim-cockpit">
+        <div class="sim-col" id="simLeft"></div>
+        <div class="sim-col sim-center">
+          <div class="sim-hud" id="simHud"></div>
+          <div class="sim-mfds" id="simMfds"></div>
+          <div class="sim-ufcp" id="simUfcp"></div>
+          <div class="sim-lamps" id="simLamps"></div>
+          <div class="sim-front" id="simFront"></div>
+        </div>
+        <div class="sim-col" id="simRight"></div>
+      </div>
+
+      <div class="sim-bottom" id="simBottom"></div>
+
+      <details class="sim-notes">
+        <summary>这台模拟座舱怎么读（外观、状态来源、能模拟到哪一步）</summary>
+        <ul>
+          <li><b>外观</b>：小滑块 = 两档 / 三档开关（绿=接通、琥珀=中间档），圆盘 = 旋钮，圆按钮 = 按压键，三角 = HOTAS 多向帽，斜纹条 = 手柄 / 保险盖，圆点 = 只读指示灯。鼠标悬停看得到面板、手册页码与要点。</li>
+          <li><b>屏幕</b>：三块 MFD 的 U/D/L/R 周边键可点；<span class="mono">D3</span> 回主菜单、<span class="mono">D2/D4</span> 切页、<span class="mono">R8</span> 下半区、<span class="mono">U5</span> 雷达控制菜单（§1.8.3 p48、docs/JF17-MFD.md）。屏幕内容由当前电源 / 航电 / 主模式状态推导，不是贴图。</li>
+          <li><b>联动</b>：三个电源开关全接通才有电；<span class="mono">CMBT</span> 起航电；<span class="mono">RDR</span> 自检后进 STBY；惯导 FAST → 输 THDG → NAV；<span class="mono">ENG CTRL + STARTER + 油门 + GND</span> 才让 N2 爬到 70%；没开主军械就扣扳机会明确提示「条件不满足」。</li>
+          <li><b>文字描述</b>：右侧「操作效果」逐条给出操作、系统反应、手册依据与手册要点；点日志条目可展开完整说明；「当前飞机状态」是同一套状态的表格视图。</li>
+          <li><b>边界</b>：这是教学用状态机，不复现真实航电逻辑、不输出 DCS 指令；数值（N2、气压等）取手册典型值做示意。</li>
+        </ul>
+      </details>
+    </div>
+
+    <aside class="sim-side">
+      <div class="card">
+        <h3>刚刚发生了什么</h3>
+        <div class="sim-now" id="simNow"></div>
+      </div>
+      <div class="card">
+        <h3>当前飞机状态</h3>
+        <div id="simState"></div>
+      </div>
+      <div class="card">
+        <h3>操作效果 · 事件日志</h3>
+        <div class="sim-log" id="simLog"></div>
+        <p class="faint" id="simLogHint" style="margin-top:8px">点座舱里任意控件，这里会出现一条说明。</p>
+      </div>
+      <div class="card">
+        <h3>引导检查单</h3>
+        <p class="faint" id="simCheckHint">选一条流程并点「开始引导」，按提示在座舱里点对应控件；点错会提示、不会跳步。</p>
+        <ol class="sim-check-steps" id="simCheck"></ol>
+      </div>
+      <details>
+        <summary>模拟与真实座舱的三个差别</summary>
+        <ul>
+          <li>面板按「方位 → 控制盒」分组，不按真实几何比例，开关位置以座舱内视图为准。</li>
+          <li>档位循环是简化的：真实三档 / 十二档旋钮这里只走几个代表性位置。</li>
+          <li>告警与画面是规则推导的示意，不是 DCS 实时回传；真实显示以游戏与手册为准。</li>
+        </ul>
+      </details>
+    </aside>
+  </div>
+</section>
+
+<!-- ==================== ② 座舱总览 ==================== -->
+<section class="view" id="sec-map">
+  <h2>② 座舱总览 · 手往哪儿伸</h2>
+  <p class="lead">按手册 <b>§2.2 开车前座舱检查</b>（左控制台 / 前仪表台 / 右控制台，p122–136）与 §2.3 开车程序里的方位描述分区。点方块可把它设成「找键训练」的抽题范围。<b>想先看飞机长什么样、点一下会怎样，请切到 ① 简易座舱。</b></p>
+  <div class="cockpit" id="cockpit"></div>
+  <div class="grid2" style="margin-top:14px">
+    <div class="card">
+      <h3>panel.html 里没有的区域，这里全都有</h3>
+      <p class="muted">现有 iPad 面板只做了 MFD 三屏周边键、UFCP 和 7 个座舱快捷按钮。本训练把下面这些补进来了 —— 这正是冷舱开车时真正要低头找的地方。</p>
+      <ul>
+        <li><b>左手下方</b>：混合 / 飞控 / 发动机电气 / 燃油 / 起飞着陆 / 军械控制盒、油门操纵台（§2.2.1 p122–127）</li>
+        <li><b>左手后方与左侧壁板</b>：MISC 面板 SHARS、氧气阀门（§2.3.3 p139、§2.3.6 p147）</li>
+        <li><b>右手下方</b>：告警灯盒、ELEC 电源、AAP、音频控制盒、环控、座舱照明、机外照明（§2.2.3 p131–135）</li>
+        <li><b>右手后方</b>：右控制台最后侧的 DTC 插入读取盒（§2.3.5 p144）</li>
+        <li><b>座椅两侧</b>：弹射座椅保险 / 安全销 / 氧气管 / 抗荷服、氧气调节器（§2.3.6 p147、§2.2.3 p136）</li>
+        <li><b>HOTAS</b>：驾驶杆 S1–S8、油门杆 T1–T6（§7.1 / §7.2 p294–297）</li>
+      </ul>
+      <details><summary>方位描述的手册原文（交叉核对用）</summary>
+        <ul>
+          <li>§2.3.1 p137「<b>看向右控制台的 ELEC</b>」；§2.3.2 p137「看向 <b>ELEC 下方的 AAP</b>」</li>
+          <li>§2.3.3 p139「<b>转头看左控制台后方的 MISC 面板</b>」</li>
+          <li>§2.3.5 p144「<b>看向右控制台的最后侧</b>，点击进行 DTC 插入读取盒加载」</li>
+          <li>§2.3.6 p147「把注意力转移到<b>弹射座椅的右侧</b>」「记得打开<b>左侧壁板上的氧气阀</b>」</li>
+          <li>§2.3.13 p156「<b>转头看向左控制台的发动机控制面板</b>」</li>
+          <li>§2.3.2 p138「告警灯亮度旋钮和氧气示流器亮度旋钮……记得在<b>右前面板</b>打开」</li>
+        </ul>
+      </details>
+    </div>
+    <div class="card">
+      <h3>三种难度，按上手顺序走</h3>
+      <ol>
+        <li><b>认位置</b>：按键上写全「英文缩写 + 中文名」，边找边认。</li>
+        <li><b>只给缩写</b>：座舱里丝印就是英文，练到看见 <span class="mono">A/B</span>、<span class="mono">EMG HYD</span> 就知道在哪。</li>
+        <li><b>盲操</b>：按键文字全部隐藏，靠肌肉记忆点位置；鼠标悬停可临时查看，考场模式下别悬停。</li>
+      </ol>
+      <p class="muted">建议路线：先只勾「前仪表台 + 右控制台」跑一遍冷舱上电，再把「左控制台 / 左后 / 右后」加进来，最后切盲操。</p>
+      <details><summary>按钮右上角的小标记是什么意思</summary>
+        <ul>
+          <li><span class="mono">SW</span> 两档 / 三档开关　<span class="mono">KN</span> 旋钮　<span class="mono">BT</span> 按钮</li>
+          <li><span class="mono">HT</span> 多向帽（HOTAS 上的四向开关）　<span class="mono">LV</span> 手柄 / 保险盖</li>
+          <li><span class="mono">SK</span> 虚线框 = MFD/UFCP <b>画面软键</b>，不是实体开关，功能随页面变（§1.8.3 p48）</li>
+          <li><span class="mono">IND</span> 只读指示灯 / 信号旗，不是按键，但快速上手必须认识它在哪</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== ③ 找键训练 ==================== -->
+<section class="view" id="sec-drill">
+  <h2>③ 找键训练 · 出题 → 在虚拟座舱上点</h2>
+  <p class="lead">题目从控件库自动生成并叠加情境题；每条都带手册章节 / 页码。点错会告诉你正确控件在哪个面板，并自动进错题本。</p>
+
+  <div class="card noprint">
+    <div class="row">
+      <label class="lbl">范围
+        <select id="fZone"><option value="all">全部座舱方位</option></select>
+      </label>
+      <label class="lbl">章节
+        <select id="fCh"><option value="all">全部章节</option></select>
+      </label>
+      <label class="lbl">难度
+        <select id="fDiff">
+          <option value="easy">认位置（缩写 + 中文）</option>
+          <option value="normal">只给缩写</option>
+          <option value="blind">盲操（隐藏文字）</option>
+        </select>
+      </label>
+      <label class="lbl"><input type="checkbox" id="fWrong"> 只练错题</label>
+      <label class="lbl"><input type="checkbox" id="fTimed" checked> 计时</label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="act primary" id="bStart">开始 / 重置</button>
+      <button class="act" id="bPause">暂停</button>
+      <button class="act" id="bHint">提示 (H)</button>
+      <button class="act" id="bSkip">跳过 (S)</button>
+      <button class="act" id="bNext">下一题 (Enter)</button>
+      <button class="act danger" id="bClear">清空记录</button>
+      <span class="faint" id="poolInfo"></span>
+    </div>
+  </div>
+
+  <div class="qbox">
+    <div class="qnum" id="qNum">准备就绪</div>
+    <div class="qtext" id="qText">点「开始 / 重置」抽题，然后在下方虚拟座舱里点对应控件。</div>
+    <div class="qmeta" id="qMeta"><span class="tag">题库覆盖 10 章</span><span class="tag">离线 · 不连接 DCS</span></div>
+    <div class="bar"><i id="qBar"></i></div>
+  </div>
+
+  <div class="feedback" id="fb"><b id="fbTitle"></b><div class="why" id="fbWhy"></div><div id="fbRef"></div></div>
+
+  <div class="spread" style="margin:16px 0 8px">
+    <h3 style="margin:0">虚拟座舱 · 点按键作答</h3>
+    <span class="faint" id="boardHint">默认显示全部方位；切换范围只影响抽题，不影响这里的可点区域。</span>
+  </div>
+  <div class="board" id="boardDrill" data-diff="easy"></div>
+</section>
+
+<!-- ==================== ④ 流程训练 ==================== -->
+<section class="view" id="sec-flow">
+  <h2>④ 流程训练 · 按手册顺序把开关走一遍</h2>
+  <p class="lead">步骤只取手册正文明确写出的动作；每一步都注了页码。走错不跳步，点对了才进入下一步。</p>
+  <div class="card noprint">
+    <div class="row">
+      <label class="lbl">流程
+        <select id="fFlow"></select>
+      </label>
+      <button class="act primary" id="bFlowStart">从头开始</button>
+      <button class="act" id="bFlowHint">提示本步</button>
+      <label class="lbl">难度
+        <select id="fFlowDiff">
+          <option value="easy">缩写 + 中文</option>
+          <option value="normal">只给缩写</option>
+          <option value="blind">盲操</option>
+        </select>
+      </label>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3 id="flowName">—</h3>
+      <p class="faint" id="flowRef">—</p>
+      <ol class="steps" id="flowSteps"></ol>
+      <div class="hr"></div>
+      <div class="feedback" id="flowFb"><b id="flowFbTitle"></b><div class="why" id="flowFbWhy"></div></div>
+      <p class="faint" id="flowDone"></p>
+    </div>
+    <div class="card" style="background:var(--bg2)">
+      <h3>为什么要按顺序练</h3>
+      <p class="muted">JF-17 冷舱开车不是「把开关全打开」，而是有依赖：先上电 → AAP 启航电 → 惯导对准（期间别动飞机）→ DTC 加载 → 才轮到发动机。找键训练练的是「在哪」，流程训练练的是「什么时候」。</p>
+      <details><summary>已被手册明确写死的前置条件</summary>
+        <ul>
+          <li>SHARS / INS 对准期间移动飞机会导致对准异常（§2.3.3 p139、§2.3.4 p143）</li>
+          <li>机炮要先选 GUN、首次或卡弹后点 FEED 充弹；FEED 点超过 3 次不再响应（§4.3.1 p205–206）</li>
+          <li>AAP 的 OFF 要按住 2 秒以上，且条件是「启动航电后上过天又回到地面」（§1.11 p61）</li>
+          <li>关车前慢车至少停留 1 分钟冷却发动机（§1.2.3 p32）</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+  <div class="spread" style="margin:16px 0 8px"><h3 style="margin:0">虚拟座舱 · 完成当前步骤</h3><span class="faint">与找键训练同一套控件库</span></div>
+  <div class="board" id="boardFlow" data-diff="easy"></div>
+</section>
+
+<!-- ==================== ⑤ 控件速查 ==================== -->
+<section class="view" id="sec-ref">
+  <h2>⑤ 控件速查 · 按方位 → 面板 → 控件</h2>
+  <p class="lead">主表默认可见；<b>点控件名</b>会弹出一句话说明。带 <span class="tag m">手册</span> 的是飞行手册正文用词，<span class="tag d">控件表</span> 来自项目 <span class="mono">docs/JF17-CONTROLS.md</span>（DCS clickabledata.lua 解析），<span class="tag s">软键</span> 是 MFD/UFCP 画面软键。</p>
+  <div class="row noprint" style="margin-bottom:12px">
+    <label class="lbl">筛选方位 <select id="rZone"><option value="all">全部</option></select></label>
+    <label class="lbl">搜索 <input id="rSearch" placeholder="缩写 / 中文 / 面板…" style="background:var(--card2);border:1px solid var(--line2);border-radius:7px;padding:5px 9px"></label>
+    <span class="faint" id="rCount"></span>
+  </div>
+  <div id="refList"></div>
+</section>
+
+<!-- ==================== ⑥ 手册覆盖核对 ==================== -->
+<section class="view" id="sec-coverage">
+  <h2>⑥ 手册目录 ↔ 训练覆盖核对</h2>
+  <p class="lead">依据《DCS: JF-17 雷电 飞行手册》CN（335 页，Change 17 / 2022-12-01）目录十章逐条对。操作类章节进题库，纯限制 / 特性章节不硬造按键，改成速记卡。</p>
+  <div class="tblwrap">
+    <table id="coverTable"><thead><tr><th style="width:22%">手册章节</th><th style="width:12%">性质</th><th style="width:22%">训练落点</th><th>核对说明</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>交叉核对发现：目录编号 ≠ 正文编号（第二章起差 1）</h3>
+    <p class="muted">PDF 目录写「2.1 开车前座舱检查 / 2.2 开车 / 2.3 滑行和起飞 / 2.6 降落」，但正文页内标题实际印成「2.2 / 2.3 / 2.4 / 2.7」。本页所有 <span class="mono">§x.x</span> 一律用<b>正文印刷编号</b>，页码用页脚印刷页码 —— 这样按页翻手册能对上；若按目录编号找会差一节。</p>
+    <div class="tblwrap" style="max-height:none"><table>
+      <thead><tr><th>目录印法</th><th>正文印法（本页采用）</th><th>内容</th><th>页码</th></tr></thead>
+      <tbody>
+        <tr><td>2.1 / 2.1.1–2.1.3</td><td><b>2.2 / 2.2.1–2.2.3</b></td><td>开车前座舱检查：左控制台 / 前仪表台 / 右控制台</td><td>p122–136</td></tr>
+        <tr><td>2.2 / 2.2.1–2.2.13</td><td><b>2.3 / 2.3.1–2.3.13</b></td><td>开车：电源、AAP、惯导、DTC、检查、开车</td><td>p137–156</td></tr>
+        <tr><td>2.3</td><td><b>2.4</b></td><td>滑行和起飞</td><td>p157–166</td></tr>
+        <tr><td>2.4</td><td><b>2.5</b></td><td>导航（塔康）</td><td>p167–168</td></tr>
+        <tr><td>2.5</td><td><b>2.6</b></td><td>航线飞行</td><td>p169–170</td></tr>
+        <tr><td>2.6 / 2.6.1–2.6.3</td><td><b>2.7 / 2.7.1–2.7.3</b></td><td>降落：着陆、复飞、ILS 仪表着陆</td><td>p171–176</td></tr>
+        <tr><td>2.4.3（目录误排）</td><td><b>2.4.3（正文照印）</b></td><td>关车</td><td>p177</td></tr>
+      </tbody></table></div>
+    <details><summary>目录里另外几处笔误与版本差异</summary>
+      <ul>
+        <li>目录「5.6.3. DOTS 模式」，正文印 <b>5.6.3. DTOS 模式</b>；目录「1.9.1 如何使用 DTC」，正文印 1.9.2。</li>
+        <li>目录「4.4.7.雷达控制菜单」「6.1.1 RWR」等条目缺空格 / 编号，页码照录。</li>
+        <li>§1.11 说惯导模式开关「有五个位置」，正文只列出 FAST / NAV / GC / STBY 四个，第五档正文未明确；本页按四档训练。</li>
+        <li>§4.2.5 雷达静默只描述状态、没写单独的触发键；SLNK 在部分 DCS 版本未实装，均不硬造按键。</li>
+        <li>「D/CH」在 §1.5 p38 是抛放伞拨动开关，在 §1.7.3 p44 / §2.3.9 p150 是「无伞指示灯」——同一缩写两种含义，本页拆成「阻力伞开关（DRAG CHUTE）」与「D/CH 无伞指示灯」两条并互相注明。</li>
+        <li>减速伞速度：§1.7.3 p44 用 km/h，§2.7.1 p171 用 kt，手册自身口径不同；速记卡两处都照录。</li>
+        <li>§1.5 p38 的应急刹车手柄写作「EMG PULL BRK」，§2.2.2 p129 写作「EMER BRK」，本页合为一个控件。</li>
+        <li><b>不重复建控件</b>：MFD 电源（§2.2.2 p130 泛称 / §2.3.2 p138 流程动作 / §1.8.2 p47 命名 PWR）只建一组 PWR；音频控制盒（§1.18 p107 中英文 / §2.2.3 p134）、告警灯盒（§1.17 p98 / §2.2.3 p132）、阻力伞开关（§1.5 p38 / §1.7.3 p44 / §2.2.2 p129）、EMER BRK 同理各建一组，各处原文用词照录在说明里。</li>
+        <li><b>两处「正文未明确」</b>：§2.3.2 p138 的「UFCP 和 HUD 的开关」与「氧气示流器亮度旋钮」都没给独立控件名；UFCP 组（HUD CONT / HUD BRT / BAK BRT / UFCP BRT / 步进开关）和右控制台 AAP 段（HUD/MFD 亮度模式 / BRT / HUD 防拥）都是亮度与模式控件，不是电源开关。本页为这两句各建一个占位控件并在说明里标明；手册明确命名的是右前辅助操纵台氧气示流器状态灯盒里的 OXY BLINK 灯（§1.14 p92），已另建为只读指示灯控件，氧气示流器方位另有「右前辅助操纵台」的写法。</li>
+      </ul>
+    </details>
+  </div>
+
+  <div class="grid2" style="margin-top:14px">
+    <div class="card">
+      <h3>与现有 tools/panel.html 的差集</h3>
+      <table><thead><tr><th>panel.html 已有</th><th>本训练补上</th></tr></thead><tbody>
+        <tr><td>MFD 三屏 × 33 键（U/D/L/R + 四角）</td><td><b>左控制台</b> 10 组控制盒 / 操纵台</td></tr>
+        <tr><td>UFCP 四窗 + 周边键</td><td><b>左后</b> MISC 面板、左侧壁板氧气阀</td></tr>
+        <tr><td>座舱快捷按钮 7 个（起落架 / 襟翼 / 减速伞 / 着陆灯 / 加油探管 / 应急液压泵）</td><td><b>右控制台</b> ELEC / AAP / ACP / ECS / 两类照明 / 告警灯盒</td></tr>
+        <tr><td>仪表读数（燃油 / 发动机 / 构型 / 配平 / 飞行）</td><td><b>右后</b> DTC 插入读取盒</td></tr>
+        <tr><td>—</td><td><b>座椅</b> 保险 / 安全销 / 氧气管 / 抗荷服 / 氧气调节器</td></tr>
+        <tr><td>—</td><td><b>HOTAS</b> S1–S8、T1–T6 全功能</td></tr>
+        <tr><td>—</td><td><b>正常 / 应急 / 空空 / 空地</b> 按流程串起来练</td></tr>
+      </tbody></table>
+      <p class="faint">依据：tools/panel.html 实际渲染的分区；docs/LAYOUT.md §4.1；docs/BINDING.md §2（15 个 vJoy 按钮）。</p>
+    </div>
+    <div class="card">
+      <h3>交叉核对的三条来源</h3>
+      <ol>
+        <li><b>飞行手册 CN PDF</b>：目录 + §1 各系统、§2.2/§2.3 座舱检查与开车、§2.7 着陆、§3 应急、§4/§5 主模式、§7 HOTAS、§8 FCS。控件名、档位、页码都从这里取。</li>
+        <li><b>docs/JF17-CONTROLS.md</b>：DCS <span class="mono">clickabledata.lua</span> 里带中文注释的 68 个可操作控件，补手册正文没逐个点名的保险盖 / 旋钮。</li>
+        <li><b>docs/JF17-MFD.md / BINDING.md / LAYOUT.md</b>：MFD 33 键语义、HOTAS 命令名（S3/S4/S8/T2/T5）、外设已有覆盖范围。</li>
+      </ol>
+      <details><summary>不确定的地方怎么标</summary>
+        <p>手册只写「看向左控制台的发动机控制面板」而没有逐个列按钮时，控件名以 <span class="tag d">控件表</span> 补，并在速查里标来源；手册没写的方位关系不臆造，只在总览的「方位原文」里列有出处的六条。</p>
+        <p>MFD 上「此刻显示什么字」随页面变化（§1.8.3 p48），本训练把这类键标为 <span class="tag s">软键</span>，只考「它在哪 / 属于哪块屏」，不考某一帧的菜单文字。</p>
+      </details>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>第 9 / 10 章：不是按键，但考场上要用 —— 速记卡</h3>
+    <div class="grid3">
+      <div><h4>着陆与减速（§2.7.1 p171 / p176）</h4><ul><li>约 135 kt 放减速伞，约 20 kt 抛伞</li><li>最大刹车速度 145 kt；刹车柔和逐渐加力</li><li>4 号挂点挂副油箱 / GBU-10 时迎角 &lt; 10°，不挂时 &lt; 12°</li>
+        <li class="faint">口径差异：§1.7.3 p44 用 km/h（放伞 ≤300，应急 ≤340；20～30 km/h 抛伞），§2.7.1 p171 用 kt（约 135 kt 放、低于 20 kt 抛）。两处都是手册原文，别混算。</li></ul></div>
+      <div><h4>起飞与加力（§1.2.3 p32）</h4><ul><li>挂副油箱通常用加力；挂弹 + 副油箱或炸弹必须加力</li><li>先松刹车再推油门接通加力</li><li>关车前慢车冷却 ≥ 1 分钟</li></ul></div>
+      <div><h4>发动机 / 对准（§2.3.13 p156、§2.3.4 p143）</h4><ul><li>慢车 N2 ≈ 70%，T4 &lt; 500 °C</li><li>N2 &gt; 60% 时 HYD LOW 告警灯灭</li><li>SHARS / INS 对准期间不要移动飞机</li></ul></div>
+    </div>
+    <details><summary>完整目录十章（对照用）</summary>
+      <p class="faint">第一章 说明和使用（p1–120）· 第二章 正常程序（p121–177）· 第三章 应急程序（p178–199）· 第四章 空对空主模式（p200–242）· 第五章 空对地主模式（p243–288）· 第六章 告警与反制（p289–293）· 第七章 HOTAS（p294–297）· 第八章 FCS（p298–316）· 第九章 使用限制（p317–322）· 第十章 飞行特性（p323–327）</p>
+    </details>
+  </div>
+</section>
+
+<!-- ==================== ⑦ 用法与来源 ==================== -->
+<section class="view" id="sec-help">
+  <h2>⑦ 用法、边界与来源</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>怎么用（最短路径）</h3>
+      <ol>
+        <li><b>简易座舱（①）</b>：不进游戏也能拨开关。点「一键演示」看完整冷舱开车，或选一条引导检查单按提示点；右侧会写清「做了什么 → 有什么反应 → 手册依据」。</li>
+        <li><b>找键训练（③）</b>：选范围 → 开始 → 看题 → 在虚拟座舱点控件。答完自动下一题，H 提示、S 跳过、Enter 下一题。</li>
+        <li><b>流程训练（④）</b>：选一条流程 → 从头开始 → 按步骤顺序点。适合第一次进座舱前把冷舱开车过一遍。</li>
+        <li><b>控件速查（⑤）</b>：忘了某个缩写是什么意思，点名字看浮层；按方位筛选能当 checklist 用。</li>
+        <li><b>覆盖核对（⑥）</b>：想确认「手册哪一章练到了」就看这里，也写明了哪些章节不设按键。</li>
+      </ol>
+      <p class="muted">进度（对错次数、错题本、连击、偏好）存在浏览器 localStorage，键名前缀 <span class="mono">jf17trainer.v1</span>，不会动项目里其他页面的数据。刷新不丢，「清空记录」才清。</p>
+      <details><summary>快捷键</summary>
+        <ul><li><span class="mono">H</span> 提示：第一次只给方位，第二次高亮正确按钮；用了提示连击归零</li>
+          <li><span class="mono">S</span> 跳过：算一次答错，进错题本</li>
+          <li><span class="mono">Enter</span> 下一题　<span class="mono">P</span> 暂停 / 继续</li>
+          <li>切换顶部标签页不会中断计时（除非按暂停）</li></ul>
+      </details>
+    </div>
+    <div class="card">
+      <h3>边界：这是训练器，不是座舱控制器</h3>
+      <ul>
+        <li><b>不连接 DCS</b>：点这里的按钮只在页面内判分，不会发 <span class="mono">/cmd</span>、不会碰 vJoy、不会动真实座舱。</li>
+        <li><b>① 简易座舱也是纯前端</b>：屏幕、指示灯、发动机数值由本机状态机推导，是教学示意，不是 DCS 实时回传；N2 等数值取手册典型值。</li>
+        <li><b>布局是示意</b>：按「方位 → 控制盒」分组，不按真实几何比例；真实开关位置以座舱内视图与手册插图为准。</li>
+        <li><b>档位题</b>考的是「这个开关在哪」，不是替你记住所有档位；目标档位写在题面和反馈里，实际飞行按手册 checklist。</li>
+        <li><b>MFD 软键</b>功能随画面变（§1.8.3 p48），训练只考固定键位与所属屏幕。</li>
+      </ul>
+      <details><summary>资料文件清单</summary>
+        <ul class="mono" style="font-size:11.5px">
+          <li>DCS JF-17 Flight Manual CN.pdf（335 页）</li>
+          <li>docs/JF17-CONTROLS.md · docs/JF17-MFD.md</li>
+          <li>docs/BINDING.md · docs/LAYOUT.md · docs/PANEL.md</li>
+          <li>jf17控制/JF-17控制命令手册.md（游戏内控制设置整理）</li>
+          <li>tools/panel.html（现有 iPad 面板，用于差集核对）</li>
+        </ul>
+      </details>
+      <details><summary>打印 / 存 PDF</summary>
+        <p>打印前会自动展开所有折叠块，七个章节全部输出；交互按钮和顶栏不打印。可当纸面 checklist 带进座舱。</p>
+      </details>
+    </div>
+  </div>
+  <div class="card">
+    <h3>数据校验</h3>
+    <p class="faint" id="selfCheck">页面加载时自检：控件 ID 唯一、题目答案都存在、每题都有手册引用、方位合法。</p>
+  </div>
+</section>
+
+</main>
+
+<div id="pop"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ==== @engine:start 数据与纯逻辑（不碰 DOM，可用 node 抽取做单测） ==== */
+const ZONES = {
+  front:    {name:'前仪表台', where:'正前方 · HUD / UFCP / 三块 MFD / 起落架手柄', color:'#58a6ff'},
+  left:     {name:'左控制台', where:'左手下方 · 混合 / 飞控 / 发动机 / 燃油 / 起落 / 军械控制盒', color:'#d2a8ff'},
+  leftrear: {name:'左后 · 左侧壁板', where:'左手后方 MISC 面板、氧气阀门', color:'#f778ba'},
+  right:    {name:'右控制台', where:'右手下方 · 告警灯盒 / ELEC / AAP / ACP / ECS / 照明', color:'#7ee787'},
+  rightrear:{name:'右后', where:'右控制台最后侧 · DTC 插入读取盒', color:'#ffa657'},
+  hotas:    {name:'HOTAS', where:'驾驶杆 S1–S8、油门杆 T1–T6', color:'#79c0ff'},
+  seat:     {name:'座椅 / 氧气', where:'弹射座椅两侧、氧气调节器', color:'#a5b4c4'}
+};
+const ZORDER = ['front','left','leftrear','right','rightrear','hotas','seat'];
+
+/* c = {id,a,c,p,z,k,r,ch,t,s,st}  id/缩写/中文/面板/方位/类型/引用/章/说明/来源/目标档位
+   s: M=手册正文  D=项目控件表  S=画面软键   k: sw|kn|btn|hat|lv|soft */
+const CTRL = [
+ // ---------- 前仪表台 ----------
+ {id:'hud-cont',a:'HUD CONT',c:'HUD 对比度旋钮',p:'UFCP 正前方控制板',z:'front',k:'kn',r:'§2.2.2 p129 · §1.10 p57',ch:'1',t:'开车前置于中间位置；连续可调。',s:'M',st:'中间位置'},
+ {id:'hud-brt',a:'HUD BRT',c:'HUD 亮度旋钮',p:'UFCP 正前方控制板',z:'front',k:'kn',r:'§2.2.2 p129 · §1.10 p57',ch:'1',t:'开车前置于中间位置。',s:'M',st:'中间位置'},
+ {id:'ufcp-brt',a:'UFCP BRT',c:'UFCP 亮度旋钮',p:'UFCP 正前方控制板',z:'front',k:'kn',r:'§2.2.2 p130',ch:'1',t:'UFCP 显示窗与按键亮度。',s:'M',st:'中间位置'},
+ {id:'bak-brt',a:'BAK BRT',c:'HUD 备用光栅亮度',p:'UFCP 正前方控制板',z:'front',k:'kn',r:'§2.2.2 p130 · docs/JF17-CONTROLS.md UFCP 731',ch:'1',t:'开车前置于 OFF（断开）；panel.html 标作 STBY RET。',s:'M',st:'OFF'},
+ {id:'ufcp-step',a:'+ / − STEP',c:'步进开关',p:'UFCP 正前方控制板',z:'front',k:'hat',r:'§2.2.2 p130 · §1.10.1 p58',ch:'1',t:'开车前中立；改参数要先用窗口箭头选中，光标停最左一位时 3 秒内拨动才生效。',s:'M',st:'中立位置'},
+ {id:'ufcp-pfl',a:'PFL',c:'飞行故障列表',p:'UFCP 双功能键',z:'front',k:'btn',r:'§1.10 p57',ch:'1',t:'双功能键：缺省显示下是功能键，修改参数时当数字键用；主警告灯复位后，三级 / 四级有效故障可在故障清单里调出（§1.17 p103–104）。',s:'M'},
+ {id:'ufcp-vrc',a:'VRC',c:'录像设置',p:'UFCP 双功能键',z:'front',k:'btn',r:'§1.10 p57',ch:'1',t:'缺省显示下调出录像设置。',s:'M'},
+ {id:'ufcp-dst',a:'DST',c:'航点数据',p:'UFCP 双功能键',z:'front',k:'btn',r:'§1.10 p57 · §2.3.4 p140',ch:'2',t:'惯导快速对准时，UFCP 默认出现 DST 00，在这里输经纬度与高度作为对准点。',s:'M'},
+ {id:'ufcp-tot',a:'TOT',c:'航路目标时间',p:'UFCP 双功能键',z:'front',k:'btn',r:'§1.10 p57',ch:'1',t:'调出航路目标时间显示。',s:'M'},
+ {id:'ufcp-tod',a:'TOD',c:'时间和日期',p:'UFCP 双功能键',z:'front',k:'btn',r:'§1.10 p57 · §2.3.7 p148',ch:'2',t:'日历时间 / 任务时间输入；游戏里随任务时间自动校准，无需更改。',s:'M'},
+ {id:'ufcp-ful',a:'FUL / FUEL',c:'燃油显示 · 最小油量',p:'UFCP 双功能键',z:'front',k:'btn',r:'§1.10 p57 · §2.3.8 p149',ch:'2',t:'进 FUEL 页面后点油量数字右侧白色箭头，设最小燃油量告警值。',s:'M'},
+ {id:'ufcp-iff',a:'IFF',c:'敌我识别',p:'UFCP 双功能键',z:'front',k:'btn',r:'§1.10 p57 · §4.5 p238',ch:'4',t:'UFCP 上调出 IFF 功能；ACM 自动截获时注意自行 IFF。',s:'M'},
+ {id:'ufcp-oap',a:'OAP',c:'偏移瞄准点',p:'UFCP 专用功能键',z:'front',k:'btn',r:'§1.10 p57',ch:'1',t:'专用功能键，优先级高于双功能键。',s:'M'},
+ {id:'ufcp-mkr',a:'MKR',c:'标记当前飞跃点',p:'UFCP 专用功能键',z:'front',k:'btn',r:'§1.10 p57',ch:'1',t:'对当前飞跃点做标记。',s:'M'},
+ {id:'ufcp-pu',a:'P.U',c:'位置修正',p:'UFCP 专用功能键',z:'front',k:'btn',r:'§1.10 p57',ch:'1',t:'在空中对惯导做位置修正。',s:'M'},
+ {id:'ufcp-hns',a:'HNS',c:'导航状态',p:'UFCP 专用功能键',z:'front',k:'btn',r:'§1.10 p57',ch:'1',t:'显示导航状态与工作方式。',s:'M'},
+ {id:'ufcp-ap',a:'A/P',c:'自动驾驶',p:'UFCP 专用功能键',z:'front',k:'btn',r:'§1.10 p57 · §8.4 p303',ch:'8',t:'第三窗口显示自动驾驶状态；S7 可人工切断自动驾驶。',s:'M'},
+ {id:'ufcp-fpm',a:'FPM',c:'偏流切除',p:'UFCP 专用功能键',z:'front',k:'btn',r:'§1.10 p57',ch:'1',t:'修正横风对 FPM 的影响。',s:'M'},
+ {id:'ufcp-rtn',a:'RTN',c:'退回基本显示',p:'UFCP 专用键',z:'front',k:'btn',r:'§1.10.1 p58',ch:'1',t:'从任何特殊显示退回基本显示；输入无效出现 EE 时也靠它复位。',s:'M'},
+ {id:'ufcp-l1',a:'UFCP L1',c:'选 FP-A 进场航路点',p:'UFCP 周边键 · ILS 页面',z:'front',k:'soft',r:'§2.7.3 p171',ch:'2',t:'ILS 仪表着陆第一步：按 L1 选择进 FP-A。',s:'S'},
+ {id:'ufcp-r3',a:'UFCP R3',c:'选择 APR 模式',p:'UFCP 周边键 · ILS 页面',z:'front',k:'soft',r:'§2.7.3 p171',ch:'2',t:'选 APR 后左 MFD 自动进入 APR 页面。',s:'S'},
+ {id:'ufcp-r1',a:'UFCP R1',c:'选择着陆机场',p:'UFCP 周边键 · ILS 页面',z:'front',k:'soft',r:'§2.7.3 p171',ch:'2',t:'WPT50–59，缺省 50 号。',s:'S'},
+ {id:'ufcp-l2',a:'UFCP L2',c:'着陆辅助设备',p:'UFCP 周边键 · ILS 页面',z:'front',k:'soft',r:'§2.7.3 p171',ch:'2',t:'在 ILS / SCA / TCN 之间选。',s:'S'},
+ {id:'ufcp-r2',a:'UFCP R2',c:'进场子模式',p:'UFCP 周边键 · ILS 页面',z:'front',k:'soft',r:'§2.7.3 p171',ch:'2',t:'FAF（最后进场定位）或 RWY（跑道）。',s:'S'},
+ {id:'mfd-l-pwr',a:'L MFD PWR',c:'左 MFD 电源',p:'前仪表台 · 左多功能显示器',z:'front',k:'sw',r:'§2.2.2 p130 · §1.8.2 p47',ch:'1',t:'AAP 启动后分别打开三个 MFD 电源；四角还有 SYM/CONT/BRT。',s:'M',st:'打开'},
+ {id:'mfd-c-pwr',a:'C MFD PWR',c:'中 MFD 电源',p:'前仪表台 · 中多功能显示器',z:'front',k:'sw',r:'§2.2.2 p130 · §1.8.2 p47',ch:'1',t:'雷达页、RDR BIT、REMAIN TIME 都在这块屏看。',s:'M',st:'打开'},
+ {id:'mfd-r-pwr',a:'R MFD PWR',c:'右 MFD 电源',p:'前仪表台 · 右多功能显示器',z:'front',k:'sw',r:'§2.2.2 p130 · §1.8.2 p47',ch:'1',t:'HSD / CLINK 常驻这块屏。',s:'M',st:'打开'},
+ {id:'mfd-corner',a:'SYM / CONT / BRT',c:'MFD 四角调节',p:'前仪表台 · 每块 MFD 四角',z:'front',k:'kn',r:'§1.8.2 p47 · docs/JF17-MFD.md §一',ch:'1',t:'符号亮度 / 对比度 / 亮度；每块屏 33 个可控件。',s:'M'},
+ {id:'mfd-d3',a:'D3',c:'回上半区主菜单',p:'MFD 周边键（固定）',z:'front',k:'soft',r:'§1.8.3 p48 · docs/JF17-MFD.md §二',ch:'1',t:'万能撤销键：随时回上半区 MENU。',s:'S'},
+ {id:'mfd-r8',a:'R8',c:'下半区小画面菜单',p:'MFD 周边键（固定）',z:'front',k:'soft',r:'§1.8.3 p48 · docs/JF17-MFD.md §二',ch:'1',t:'下半区调度小画面；一块 MFD 上下半区可独立控制。',s:'S'},
+ {id:'mfd-d2',a:'D2',c:'快速切换（左 CMBT / 中雷达 / 右 HSD）',p:'MFD 周边键',z:'front',k:'soft',r:'docs/JF17-MFD.md §二 · 手册 §1.8.3 p48',ch:'1',t:'同一物理键在不同屏切到不同页面。',s:'S'},
+ {id:'mfd-d4',a:'D4',c:'快速切换（左 SMS / 右 CLINK）',p:'MFD 周边键',z:'front',k:'soft',r:'docs/JF17-MFD.md §二',ch:'1',t:'左显切外挂管理 SMS，右显切数据链 CLINK，中显无。',s:'S'},
+ {id:'sms-gun',a:'GUN',c:'SMS 页选机炮',p:'左 MFD · SMS 画面软键',z:'front',k:'soft',r:'§4.3.1 p205 · docs/BINDING.md §2 末',ch:'4',t:'扣扳机前先选 GUN（也可用 S1 前推两次）。没选 GUN，S4 绑对了也抠不动。',s:'S'},
+ {id:'sms-feed',a:'FEED',c:'机炮充弹',p:'左 MFD · SMS 画面软键',z:'front',k:'soft',r:'§4.3.1 p205–206',ch:'4',t:'首次使用或卡弹后要点 FEED；火药弹只有 3 发，点超过 3 次不再响应。',s:'S'},
+ {id:'dtc-all',a:'ALL',c:'DTC 全选加载',p:'MFD · DTC 加载画面软键',z:'front',k:'soft',r:'§2.3.5 p144',ch:'2',t:'插入 DTC 卡后点 ALL，再点 ENT 加载所选信息。',s:'S'},
+ {id:'dtc-ent',a:'ENT',c:'DTC 确认加载',p:'MFD · DTC 加载画面软键',z:'front',k:'soft',r:'§2.3.5 p144',ch:'2',t:'加载结束后该系统标题名称的方框消失。',s:'S'},
+ {id:'chute',a:'DRAG CHUTE',c:'减速伞开关',p:'前仪表台',z:'front',k:'sw',r:'§2.2.2 p129 · §2.7.1 p171 · §1.7.3 p44',ch:'2',t:'三态：中间断开 / DEPLOY 放伞 / JETT 抛伞，开车前中立；前起落架收上后误扳 DEPLOY 不会放出。注意「D/CH」在 §1.5 p38 指主仪表板下侧抛放伞开关盒的拨动开关，在 §1.7.3 p44 / §2.3.9 p150 却指「无伞指示灯」——本页把它与「D/CH 无伞指示灯」拆成两个控件、互相交叉注明，答题时看清问的是开关还是灯。放伞/抛伞速度两处口径不同，见覆盖页速记卡。',s:'M',st:'中立位置'},
+ {id:'emer-brk',a:'EMER BRK',c:'应急刹车手柄',p:'前仪表台',z:'front',k:'lv',r:'§2.2.2 p129 · §1.7.1 p42',ch:'3',t:'开车前关闭；主刹车失效时拉出（§1.5 p38 写作 EMG PULL BRK），拉出位移越大输出压力越大，松开即解除。与左控制台 BRAKE 的 PARK/NORM 通道开关是两个控件。',s:'M',st:'关闭位置'},
+ {id:'lg-lever',a:'LG',c:'起落架手柄',p:'前仪表台左侧 / 起落系统',z:'front',k:'lv',r:'§2.2.1 p127 · §1.6.1 p39 · docs/JF17-CONTROLS.md GEAR 505',ch:'2',t:'开车前 DOWN；收放指示与应急放轮见 §1.6.2 / §1.6.3。',s:'M',st:'DOWN'},
+ {id:'oxy-ind-brt',a:'OXY FLOW BRT',c:'氧气示流器亮度旋钮',p:'右前面板',z:'front',k:'kn',r:'§2.3.2 p138 · docs/JF17-CONTROLS.md WARNING 903',ch:'2',t:'§2.3.2 p138 提到「氧气示流器亮度旋钮默认关闭，记得在右前面板打开」，但手册其它处明确命名的是右前辅助操纵台氧气示流器状态灯盒里的「OXY BLINK」指示灯（§1.14 p92；§2.3.6 p147 的氧气示意灯、§3.1.9 p186 的氧气示流器灯均指它），并未给亮度旋钮独立控件名，方位也写作「右前辅助操纵台」。本页按该句建占位控件、按右前面板归档；项目 docs/JF17-CONTROLS.md WARNING 903 有对应的亮度调节旋钮。',s:'M'},
+ {id:'hud',a:'HUD',c:'平视显示器',p:'前仪表台',z:'front',k:'sw',r:'§1.8.1 p45 · §2.3.2 p138',ch:'1',t:'HUD 显示内容随航电主模式自动设置、飞行员不能自选（§1.8.1 p45）。§2.3.2 p138 只泛称「打开 UFCP 和 HUD 的开关」，未给独立控件名，本页按该泛称建一个占位控件；别与 UFCP 的 HUD CONT / HUD BRT 亮度旋钮混淆。',s:'M'},
+ {id:'mfd-u5',a:'MFD U5',c:'雷达控制菜单',p:'MFD 周边键 · 雷达画面',z:'front',k:'soft',r:'§4.4.7 p233',ch:'4',t:'从雷达画面进雷达控制菜单；雷达模式切换也可走 HOTAS S2。',s:'S'},
+ {id:'mfd-agprog',a:'AG PROG',c:'SMS 空面程序菜单',p:'左 MFD · 空面程序软键',z:'front',k:'soft',r:'§1.8.3 p48 · §5.1 p243 · §1.19.7 p119',ch:'5',t:'调出投放程序菜单，选 CCIP / AUTO / DTOS / DIR 等程序；程序状态会显示 RDY / RDYX / SIM / MAL。',s:'S'},
+ {id:'sms-auto',a:'AUTO / CCRP',c:'自动投放模式',p:'左 MFD · 空面程序软键',z:'front',k:'soft',r:'§5.6.2 p269',ch:'5',t:'连续计算投放点，HUD 给投放提示；由 S3 执行投放。',s:'S'},
+ {id:'sms-dtos',a:'DTOS',c:'俯冲投放模式',p:'左 MFD · 空面程序软键',z:'front',k:'soft',r:'§5.6.3 p270（目录印 DOTS）',ch:'5',t:'目录写 DOTS、正文写 DTOS；超越角可在 DTC 的 AS DATA 页改（§2.3.5 p146）。',s:'S'},
+ {id:'sms-dir',a:'DIR',c:'直接投放模式',p:'左 MFD · 空面程序软键',z:'front',k:'soft',r:'§5.6.4 p273',ch:'5',t:'HOTAS T-2 可进 DIRECT；超越角在 AS DATA 页设置。',s:'S'},
+ {id:'mfd-pod',a:'POD → WMD7',c:'吊舱页面菜单',p:'MFD 主页面 · POD 软键',z:'front',k:'soft',r:'§5.7.2 p276 · §5.7.3 p279',ch:'5',t:'自检完成后点 MFD 主页面的 POD，再选 WMD7 使用吊舱；AAP 上还要单独启动 CLDP / IRST。',s:'S'},
+ {id:'radar-map',a:'MAP / RBM',c:'真实波束地图测绘模式',p:'MFD · 对地雷达模式菜单软键',z:'front',k:'soft',r:'§5.2.1 p246 · §5.3 p254',ch:'5',t:'对地雷达基础模式；同菜单还有 FTT / DBS / GMTI / GMTT 与对海、气象、地形回避模式。',s:'S'},
+ {id:'mfd-data',a:'DATA',c:'数据页面 / DTC 加载入口',p:'MFD 主页面 · DATA',z:'front',k:'soft',r:'§1.9 p56 · §2.3.5 p145',ch:'2',t:'路径 D3→L4(DATA)→R4(DTC)；没带 DTC 卡时在这里人工输入数据。AS DATA 页还能改 DIR / DTOS 超越角（p146）。',s:'S'},
+ {id:'mfd-l2-gun',a:'L MFD L2',c:'左 MFD 选 GUN（23-2 机炮）',p:'左 MFD · 格斗画面软键',z:'front',k:'soft',r:'§4.3.3 p212 · §4.3.1 p205',ch:'4',t:'23-2 机炮无法用 HOTAS 选；切格斗后点左 MFD 的 L2 选 GUN。一般机炮可 S1 前推两次。',s:'S'},
+ {id:'mfd-u2-feed',a:'L MFD U2',c:'左 MFD FEED 充弹',p:'左 MFD · 机炮画面软键',z:'front',k:'soft',r:'§4.3.3 p212 · §4.3.1 p206',ch:'4',t:'火药弹只有 3 发，点超过 3 次不响应并闪烁。',s:'S'},
+ {id:'sms-ccip',a:'CCIP',c:'连续计算命中点投放模式',p:'左 MFD · 空面程序软键',z:'front',k:'soft',r:'§5.6.1 p266–268',ch:'5',t:'HUD 出现 CCIP 投放符号；把 PIPPER 压住目标后按 S3 投放。',s:'S'},
+ {id:'sms-sd10',a:'SMS SD-10',c:'SMS 页选 SD-10 挂点',p:'左 MFD · SMS 画面软键',z:'front',k:'soft',r:'§4.4.8 p234–236',ch:'4',t:'BVR 前在 SMS 页选好 SD-10；HUD 会显示 DLZ 与发射提示。',s:'S'},
+ {id:'thdg',a:'THDG',c:'真航向输入窗口',p:'UFCP / 中 MFD · 惯导对准',z:'front',k:'soft',r:'§2.3.4 p141',ch:'2',t:'FAST 对准出现 REMAIN TIME 后，倒计时结束前把飞机当前真航向输进 THDG。',s:'S'},
+ {id:'ufcp-alt',a:'A/P ALT',c:'高度保持模态软键',p:'UFCP · A/P 页面周边键',z:'front',k:'soft',r:'§8.4 p304–305',ch:'8',t:'在 A/P 页面点 ATT 右侧箭头进 ALT；数字符号后输入高度，再输一次确认。',s:'S'},
+ {id:'master-warning',a:'MASTER WARN',c:'主警告灯（按压复位）',p:'右前面板 · 主告警灯盒',z:'front',k:'btn',r:'§1.17 p98–104 · §8.5.2 p310–312',ch:'6',t:'一级 / 二级告警时闪亮，按压灯罩复位；当时有效故障可在 UFCP 的 PFL 故障清单里列出。',s:'M'},
+ {id:'oxy-blink',a:'OXY BLINK',c:'氧气示流器状态灯（OXY BLINK）',p:'右前辅助操纵台 · 氧气示流器状态灯盒',z:'front',k:'ind',r:'§1.14 p92 · §2.3.6 p147 · §3.1.9 p186',ch:'2',t:'只读指示灯：氧气调节器在肺式供氧时，OXY BLINK 灯不断闪烁表示供氧正常（§1.14 p92）。§2.3.6 p147 的「右前面板氧气示意灯」、§3.1.9 p186 的「氧气示流器灯」指的都是它；手册明确命名的是这盏灯，不是亮度旋钮。',s:'M'},
+ {id:'dch-lamp',a:'D/CH LAMP',c:'无伞指示灯（D/CH）',p:'座舱信号灯组 · 位置手册未明确',z:'front',k:'ind',r:'§1.7.3 p44 · §2.3.9 p150 · §1.15 p94',ch:'2',t:'只读指示灯：抛伞后亮，表示伞已抛掉；开车前信号灯检查要求它熄灭。与「D/CH 拨动开关」（阻力伞开关）同名但不是一个东西，见 DRAG CHUTE 条目。手册只写「座舱里的无伞指示灯」，未给具体面板，本页按前仪表台信号灯组归档。',s:'M'},
+ {id:'sb-lamp',a:'S/B LAMP',c:'减速板信号灯（S/B）',p:'座舱信号灯组 · 位置手册未明确',z:'front',k:'ind',r:'§2.3.9 p150 · §2.4.1 p158',ch:'2',t:'只读绿色信号灯：用油门 T3 打开减速板时应亮；开车前信号灯检查要求它熄灭。',s:'M'},
+
+ // ---------- 左控制台 ----------
+ {id:'dir-lnk',a:'DIR LNK',c:'直接连接开关',p:'左控制台 · 飞控控制盒',z:'left',k:'sw',r:'§2.2.1 p123 · §8.1 p298–299',ch:'8',t:'开车前 OFF；尾旋改出时可置 DIR LNK，但在攻角限制内不起作用。',s:'M',st:'OFF'},
+ {id:'cfg-1',a:'CONFIG I',c:'构型开关 Ⅰ',p:'左控制台 · 飞控控制盒',z:'left',k:'sw',r:'§2.2.1 p123 · §8.1 p299',ch:'8',t:'按外挂选空-空 / 空-地；凡挂空地武器或副油箱就是空/地构型。',s:'M',st:'按外挂'},
+ {id:'cfg-2',a:'CONFIG II',c:'构型开关 Ⅱ',p:'左控制台 · 飞控控制盒',z:'left',k:'sw',r:'§2.2.1 p123 · §8.1 p299',ch:'8',t:'空/地 1 与空/地 2 的分界是「有没有挂机翼副油箱」。',s:'M',st:'按外挂'},
+ {id:'efcs',a:'EFCS / AUTO',c:'模拟备份开关',p:'左控制台 · 飞控控制盒',z:'left',k:'sw',r:'§2.2.1 p123 · §8.1 p299',ch:'8',t:'开车前 AUTO（DFCS 状态）；EFCS 位强制工作于备份飞控。',s:'M',st:'AUTO'},
+ {id:'ry-aug',a:'R/Y AUG',c:'横航向增稳切除开关',p:'左控制台 · 飞控控制盒',z:'left',k:'sw',r:'§2.2.1 p123 · §8.1 p299',ch:'8',t:'开车前 R/Y AUG（接通增稳）；OFF 为纯机械操纵。',s:'M',st:'R/Y AUG'},
+ {id:'yaw-trim',a:'YAW TRIM',c:'航向配平开关',p:'左控制台 · 飞控控制盒',z:'left',k:'hat',r:'§8.1 p299 · docs/JF17-CONTROLS.md FCS 532',ch:'8',t:'按拨动方向做航向配平；HOTAS 上另有 S6 配平帽。',s:'M'},
+ {id:'fcs-bit',a:'BIT',c:'飞控机内自检测开关',p:'左控制台 · 飞控控制盒',z:'left',k:'btn',r:'§8.1 p299 · docs/JF17-CONTROLS.md FCS 531',ch:'8',t:'按压开始 PBIT，完成或再按一次结束。',s:'M'},
+ {id:'fcs-reset',a:'FCS RESET',c:'飞控复位 / 重启',p:'左控制台 · 飞控控制盒',z:'left',k:'btn',r:'§8.1 p299 · docs/JF17-CONTROLS.md FCS 544',ch:'8',t:'对飞控进行复位。',s:'M'},
+ {id:'aa-ag',a:'AA / AG',c:'空空 / 空地切换开关',p:'左控制台 · 飞控控制盒',z:'left',k:'sw',r:'docs/JF17-CONTROLS.md FCS 536',ch:'8',t:'注意与油门杆 T1 主模式开关区分：这是飞控控制盒上的物理开关。',s:'D'},
+ {id:'ag1-ag2',a:'AG1 / AG2',c:'构型切换开关',p:'左控制台 · 飞控控制盒',z:'left',k:'sw',r:'docs/JF17-CONTROLS.md FCS 535',ch:'8',t:'与构型开关 Ⅱ 对应的空/地 1、空/地 2。',s:'D'},
+ {id:'tef-sw',a:'TEF',c:'前缘襟翼开关',p:'左控制台 · 飞控控制盒 / 起飞着陆控制盒',z:'left',k:'sw',r:'§2.2.1 p126 · docs/JF17-CONTROLS.md FCS 513',ch:'2',t:'开车前 OFF；起降时按构型放/收。',s:'M',st:'OFF'},
+ {id:'eng-ctrl',a:'ENG CTRL',c:'发动机系统开关',p:'左控制台 · 发动机电气控制盒',z:'left',k:'sw',r:'§2.2.1 p124 · §2.3.13 p156 · §1.2.3 p32',ch:'2',t:'开车前 OFF；开车时接通；关车最后扳回 OFF。',s:'M',st:'OFF（开车前）'},
+ {id:'air-start',a:'AIR',c:'发动机空中起动开关',p:'左控制台 · 发动机电气控制盒',z:'left',k:'sw',r:'§2.2.1 p124 · §1.2.3 p32',ch:'3',t:'开车前下位断开；空中起动时扳上位，油门放慢车，起动后要断开。',s:'M',st:'下位 / 断开'},
+ {id:'eng-mode',a:'ENG MODE',c:'发动机工作状态转换开关',p:'左控制台 · 发动机电气控制盒',z:'left',k:'sw',r:'§2.2.1 p124 · §1.2.2 p31 · docs/JF17-CONTROLS.md ENGINE 522',ch:'2',t:'作战 / 作战+训练 / 训练三档，按任务要求。',s:'M',st:'按任务'},
+ {id:'ab-sw',a:'A/B',c:'加力切断开关',p:'左控制台 · 发动机电气控制盒',z:'left',k:'sw',r:'§2.2.1 p124',ch:'2',t:'开车前上位 A/B（接通加力）。',s:'M',st:'A/B 接通'},
+ {id:'a-surge',a:'A/SURGE',c:'防喘切断开关',p:'左控制台 · 发动机电气控制盒',z:'left',k:'sw',r:'§2.2.1 p124 · §3.1.14 p190',ch:'2',t:'开车前上位接通；进气道喘振、防喘保护故障、大气系统故障、发动机降转等应急都要断开它（§3.1.12/14/16/20 p189–195）。',s:'M',st:'A/SURGE 接通'},
+ {id:'sec-sw',a:'SEC',c:'备份系统转换开关',p:'左控制台 · 发动机电气控制盒',z:'left',k:'sw',r:'§2.2.1 p124 · docs/JF17-CONTROLS.md ENGINE 523',ch:'2',t:'开车前下位 OFF。',s:'M',st:'OFF'},
+ {id:'starter',a:'STARTER',c:'起动开关',p:'左控制台 · 发动机控制面板',z:'left',k:'sw',r:'§2.3.13 p156',ch:'2',t:'开车时置中位 START。',s:'M',st:'中位 START'},
+ {id:'eng-stop',a:'STOP PIN',c:'发动机止动销',p:'左控制台 · 发动机控制面板',z:'left',k:'btn',r:'§2.3.13 p156',ch:'2',t:'开车顺序：ENG CTRL 接通 → STARTER 中位 → 点止动销 → 油门稍推 → GND 1~2 秒。',s:'M'},
+ {id:'gnd-start',a:'GND',c:'地面起动按钮',p:'左控制台 · 发动机控制面板',z:'left',k:'btn',r:'§2.3.13 p156',ch:'2',t:'按压 1~2 秒；随后在 MFD 上看 N2 ≈ 70%、T4 < 500 °C。',s:'M'},
+ {id:'thr-magnet',a:'EMERG MAGNET',c:'油门电磁铁应急按钮',p:'左控制台 · 油门操纵台',z:'left',k:'lv',r:'§2.2.1 p125',ch:'2',t:'开车前拔起位置。',s:'M',st:'拔起'},
+ {id:'fuel-active',a:'ACTIVE',c:'燃油阀 active / OFF',p:'左控制台 · 燃油控制盒',z:'left',k:'sw',r:'§2.2.1 p125 · docs/JF17-CONTROLS.md FUEL 517',ch:'2',t:'开车前 ACTIVE（接通）。',s:'M',st:'ACTIVE'},
+ {id:'fuel-feed',a:'FEED',c:'FEED 油阀',p:'左控制台 · 燃油控制盒',z:'left',k:'sw',r:'§2.2.1 p125 · docs/JF17-CONTROLS.md FUEL 515',ch:'2',t:'开车前 FEED（接通）。注意与 SMS 页机炮 FEED 充弹同名但不是一回事。',s:'M',st:'FEED'},
+ {id:'start-pump',a:'START PUMP',c:'直流电动泵开关',p:'左控制台 · 燃油控制盒',z:'left',k:'sw',r:'§2.2.1 p125 · §1.2.3 p32 · §2.3.12 p153',ch:'2',t:'开车前 OFF；关车时也要扳到 OFF。',s:'M',st:'OFF'},
+ {id:'feed-guard',a:'FEED GUARD',c:'FEED 油阀保险盖',p:'左控制台 · 燃油控制盒',z:'left',k:'lv',r:'docs/JF17-CONTROLS.md FUEL 514/516',ch:'2',t:'动油阀前先开保险盖；项目控件表里两个盖分别对应 FEED 与油阀。',s:'D'},
+ {id:'aar-sw',a:'AAR',c:'空中加油开关 / 探管',p:'左控制台 · 燃油控制盒',z:'left',k:'sw',r:'docs/JF17-CONTROLS.md FUEL 564 · §1.3 p34',ch:'1',t:'三档；panel.html 的「加油探管」快捷按钮走的就是它。',s:'D'},
+ {id:'brake-sw',a:'BRAKE',c:'刹车电源开关',p:'左控制台 · 起飞着陆系统控制盒',z:'left',k:'sw',r:'§2.2.1 p126 · §2.4.1 p159 · §1.2.3 p32',ch:'2',t:'开车前 ON / PARK；起飞前放 NORM；关车时扳 OFF。PARK 时刹车压力 ≥2700 PSI。',s:'M',st:'ON / PARK'},
+ {id:'gnd-jett',a:'GND JETT',c:'地面允许投放开关',p:'左控制台 · 军械开关盒',z:'left',k:'sw',r:'§2.2.1 p127 · docs/JF17-CONTROLS.md SMS 506',ch:'2',t:'开车前 OFF；地面误投放保护。',s:'M',st:'OFF'},
+ {id:'panic',a:'PANIC',c:'应急投放保险盖',p:'左控制台 · 军械开关盒',z:'left',k:'lv',r:'§2.2.1 p127 · §1.19.4 p116 · docs/JF17-CONTROLS.md SMS 507',ch:'3',t:'开车前保护盖关闭；选择抛弃程序 SEL JET 相关。',s:'M',st:'保护盖关闭'},
+ {id:'master-arm',a:'MASTER ARM',c:'主军械开关',p:'左控制台 · 军械开关盒',z:'left',k:'sw',r:'§2.2.1 p127 · §1.19.7 p120',ch:'2',t:'开车前 OFF；置「训练」位置时 SMS 显示 SIM / SIMX（§1.19.7 p120）。地面应急投副油箱要置 ARM 并开 GND JETT ENABLE（§1.19.4 p116 / §3.1.22 p197）。',s:'M',st:'OFF'},
+ {id:'saiu-sw',a:'SAIU',c:'SAIU 备份开关',p:'左控制台 · 武器系统',z:'left',k:'sw',r:'§2.2.1 p127 · docs/JF17-CONTROLS.md WCS 500 / AAP SAIU',ch:'2',t:'开车前 OFF；SAIU 备份开关另有 OFF / BOMB / IR / GUN 四档（§1.19.5 p118）。AAP 上的 SAIU 键才是启动整个武器系统。',s:'M',st:'OFF'},
+ {id:'emg-hyd',a:'EMG HYD',c:'应急液压泵开关',p:'左控制台 · 混合控制盒',z:'left',k:'sw',r:'§2.2.1 p123 · docs/JF17-CONTROLS.md MISC 539',ch:'3',t:'开车前 OFF；液压系统故障时启用（§3.1.3 / §3.1.4 p180–181）。',s:'M',st:'OFF'},
+ {id:'flare-guard',a:'FLARE GUARD',c:'信号弹发射保险盖',p:'左控制台 · 混合控制盒',z:'left',k:'lv',r:'docs/JF17-CONTROLS.md MISC 537',ch:'6',t:'发射按钮的保险盖。',s:'D'},
+ {id:'flare-btn',a:'FLARE BTN',c:'信号弹发射按钮',p:'左控制台 · 混合控制盒',z:'left',k:'btn',r:'docs/JF17-CONTROLS.md MISC 538 · §6.2 p292',ch:'6',t:'与 HOTAS T2 的箔条 / 红外弹投放不是同一个控件。',s:'D'},
+ {id:'lg-ind-test',a:'LG IND TEST',c:'起落架信号灯盒检灯按钮',p:'左辅助操纵台 · 着陆信号灯盒',z:'left',k:'btn',r:'§3.1.2 p179 · §2.4.6 p165 · §1.6.2 p40',ch:'3',t:'三个起落架绿灯全灭时，先按 TEST 检灯，再判断是不是真没放下。',s:'M'},
+
+ // ---------- 左后 / 左侧壁板 ----------
+ {id:'shars',a:'SHARS',c:'捷联航姿开关',p:'左控制台后方 · MISC 面板',z:'leftrear',k:'sw',r:'§2.2.1 p123 · §2.3.3 p139 · docs/JF17-CONTROLS.md MISC 540',ch:'2',t:'接通后开始对准约 1 分钟，EFIS 上 SHARS ALIGN 闪烁；对准期间不要移动飞机。手册 §2.3.3 明确说「转头看左控制台后方的 MISC 面板」。',s:'M',st:'SHARS（接通）'},
+ {id:'oxy-valve',a:'OXY VALVE',c:'氧气阀门',p:'左侧壁板',z:'leftrear',k:'sw',r:'§2.2.1 p126 · §2.3.6 p147 · §1.14 p90',ch:'2',t:'开车前打开；§2.3.6 写明在「左侧壁板」上。',s:'M',st:'打开'},
+
+ // ---------- 右控制台 ----------
+ {id:'warn-day-night',a:'DAY / NIGHT',c:'告警灯盒昼夜开关',p:'右控制台 · 告警灯盒面板',z:'right',k:'sw',r:'§2.2.3 p132 · §1.17 p98',ch:'1',t:'按需设置。',s:'M',st:'按需'},
+ {id:'warn-brt',a:'WARN BRT',c:'告警灯盒亮度旋钮',p:'右控制台 · 告警灯盒面板',z:'right',k:'kn',r:'§2.2.3 p132 · §1.17 p98 · docs/JF17-CONTROLS.md WARNING 901',ch:'1',t:'开车前中间位置；§2.3.2 提醒 AAP 启动后别忘打开。',s:'M',st:'中间位置'},
+ {id:'warn-test',a:'WARN TEST',c:'告警自检按钮',p:'右控制台 · 告警灯盒面板',z:'right',k:'btn',r:'§2.3.10 p151 · §1.17 p98',ch:'2',t:'按压时灯盒自检、UFCP 与 AAP 按键灯全亮，同时检查音响告警；松开停止。主警告灯闪时按压灯罩复位（§8.5.2 p310）。',s:'M'},
+ {id:'ac-gen',a:'AC GEN',c:'主交流发电机开关',p:'右控制台 · 电源操纵控制盒 ELEC',z:'right',k:'sw',r:'§2.2.3 p133 · §2.3.1 p137 · docs/JF17-CONTROLS.md ELECTRIC 905',ch:'2',t:'上车第一件事：看向右控制台的 ELEC，AC/DC GEN + BATT 全接通。',s:'M',st:'AC GEN 接通'},
+ {id:'dc-gen',a:'DC GEN',c:'直流发电机开关',p:'右控制台 · 电源操纵控制盒 ELEC',z:'right',k:'sw',r:'§2.2.3 p133 · §2.3.1 p137 · docs/JF17-CONTROLS.md ELECTRIC 906',ch:'2',t:'与 AC GEN、BATT 一起接通。',s:'M',st:'DC GEN 接通'},
+ {id:'batt',a:'BATT',c:'蓄电池开关',p:'右控制台 · 电源操纵控制盒 ELEC',z:'right',k:'sw',r:'§2.2.3 p133 · §2.3.1 p137 · docs/JF17-CONTROLS.md ELECTRIC 904',ch:'2',t:'蓄电池供电时 MFD 电压约 18–24V，TRU 供电约 25–30V（§2.3.11 p152）。',s:'M',st:'BATT 接通'},
+ {id:'aap-cmbt',a:'CMBT',c:'战斗（一键启动航电）',p:'右控制台 · 航空电子启动板 AAP',z:'right',k:'btn',r:'§1.11 p61 · §2.3.2 p138',ch:'2',t:'按下启动整个航电，除 SPJ / CLDP / IRST / ACMI 外所有子系统灯亮；SLNK 在部分 DCS 版本上未实装。',s:'M'},
+ {id:'aap-train',a:'TRAIN',c:'训练（部分航电）',p:'右控制台 · 航空电子启动板 AAP',z:'right',k:'btn',r:'§1.11 p61 · §2.3.2 p138',ch:'2',t:'启动 INS / WMMC1 / WMMC2 / COM1 / COM2 / NAV / IFF / ACMI。',s:'M'},
+ {id:'aap-off',a:'AAP OFF',c:'关闭全部航电子系统',p:'右控制台 · 航空电子启动板 AAP',z:'right',k:'btn',r:'§1.11 p61',ch:'2',t:'按住 2 秒以上；条件是启动航电后飞机上过天又回到地面。',s:'M'},
+ {id:'aap-rdr',a:'RDR',c:'雷达子系统',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60 · §4.2.3 p203 · §4.2.6 p204',ch:'4',t:'按下启动雷达并进入自检（中 MFD 显示 RDR BIT），自检后处 STBY；再按一次关机（RDR OFF）。',s:'M'},
+ {id:'aap-ins',a:'INS',c:'惯导子系统',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60 · §2.3.4 p140',ch:'2',t:'启动惯导；对准靠 AAP 上的惯导模式选择开关。',s:'M'},
+ {id:'ins-mode',a:'INS MODE',c:'惯导工作模式选择开关',p:'右控制台 · AAP',z:'right',k:'sw',r:'§1.11 p61 · §2.3.4 p140–143',ch:'2',t:'FAST 快速对准 / GC 罗经对准 / NAV 导航 / STBY 准备。快速对准：DST 输经纬度 → FAST → THDG 输真航向 → 倒计时结束转 NAV。',s:'M',st:'FAST → NAV'},
+ {id:'aap-com1',a:'COM1',c:'电台 1',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60',ch:'1',t:'启动电台 1；音量在音频控制盒上调。',s:'M'},
+ {id:'aap-com2',a:'COM2',c:'电台 2',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60',ch:'1',t:'启动电台 2。',s:'M'},
+ {id:'aap-nav',a:'NAV',c:'导航子系统',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60',ch:'1',t:'启动塔康、无线电高度表、ILS 和信标接收机。',s:'M'},
+ {id:'aap-iff',a:'IFF',c:'敌我识别',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60 · §4.5 p238',ch:'4',t:'启动敌我识别系统；询问用油门杆 T4 中间按下。',s:'M'},
+ {id:'aap-rwr',a:'RWR',c:'雷达告警接收机',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60 · §6.1.1 p289',ch:'6',t:'启动 RWR；导弹发射告警 MSL LCH 靠它。',s:'M'},
+ {id:'aap-oesp',a:'OESP',c:'光电自保护系统',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60 · §6.1.2 p291',ch:'6',t:'启动 OESP。',s:'M'},
+ {id:'aap-slnk',a:'SLNK',c:'导弹指令机',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60',ch:'1',t:'启动导弹指令机。',s:'M'},
+ {id:'aap-saiu',a:'SAIU',c:'武器系统',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60 · §2.3.2 p138',ch:'1',t:'启动 SAIU 和整个武器系统。与左控制台的 SAIU 备份开关不是一回事。',s:'M'},
+ {id:'aap-cldp',a:'CLDP',c:'激光指示吊舱',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60 · §5.7.2 p276',ch:'5',t:'CMBT 一键启动不会带它，要单独按。',s:'M'},
+ {id:'aap-irst',a:'IRST',c:'光电瞄准吊舱',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60',ch:'5',t:'CMBT 不带，需单独启动。',s:'M'},
+ {id:'aap-spj',a:'SPJ',c:'自保护干扰吊舱',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60 · §2.3.2 p138',ch:'6',t:'CMBT 不带；T2 前推给它加高压。',s:'M'},
+ {id:'aap-acmi',a:'ACMI',c:'空战动作记录',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60',ch:'1',t:'TRAIN 会带它，CMBT 不带。',s:'M'},
+ {id:'aap-wmmc1',a:'WMMC1',c:'武器与任务计算机 1',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60 · §2.3.2 p137',ch:'1',t:'按任一子系统键时它会自动跟着亮，并启动所有显示器。',s:'M'},
+ {id:'aap-wmmc2',a:'WMMC2',c:'武器与任务计算机 2',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60',ch:'1',t:'启动武器与任务计算机 2。',s:'M'},
+ {id:'aap-hmd',a:'HMD',c:'头显系统',p:'右控制台 · AAP 子系统键',z:'right',k:'btn',r:'§1.11 p60',ch:'1',t:'手册注明「请期待 BLK3」。',s:'M'},
+ {id:'com1-vol',a:'COM1 VOL',c:'电台 1 音量旋钮',p:'右控制台 · 音频控制盒 ACP',z:'right',k:'kn',r:'§2.2.3 p134 · §1.18 p106',ch:'1',t:'开车前中立位置。',s:'M',st:'中立'},
+ {id:'com2-vol',a:'COM2 VOL',c:'电台 2 音量旋钮',p:'右控制台 · 音频控制盒 ACP',z:'right',k:'kn',r:'§2.2.3 p134 · docs/JF17-CONTROLS.md ACP 938',ch:'1',t:'开车前中立位置。',s:'M',st:'中立'},
+ {id:'tcn-ils-vol',a:'TCN / ILS VOL',c:'塔康 / 仪表着陆音量',p:'右控制台 · 音频控制盒 ACP',z:'right',k:'kn',r:'§2.2.3 p134',ch:'1',t:'开车前中立位置。',s:'M',st:'中立'},
+ {id:'msl-vol',a:'MSL VOL',c:'导弹音量旋钮',p:'右控制台 · 音频控制盒 ACP',z:'right',k:'kn',r:'§2.2.3 p134 · docs/JF17-CONTROLS.md ACP 940',ch:'1',t:'开车前中立位置。',s:'M',st:'中立'},
+ {id:'int-com',a:'INT COM',c:'机内通话开关',p:'右控制台 · 音频控制盒 ACP',z:'right',k:'sw',r:'§2.2.3 p134',ch:'1',t:'开车前 OFF。',s:'M',st:'OFF'},
+ {id:'ant-sw',a:'ANT',c:'天线选择开关',p:'右控制台 · 音频控制盒 ACP',z:'right',k:'sw',r:'§2.2.3 p134',ch:'1',t:'开车前 UPPER（上）位置。',s:'M',st:'UPPER'},
+ {id:'ecs-mode',a:'ECS MODE',c:'环控工作状态旋钮',p:'右控制台 · 座舱温度选择器',z:'right',k:'kn',r:'§2.2.3 p134 · §1.16.1 p96 · docs/JF17-CONTROLS.md ECS 942',ch:'1',t:'开车前 NORM（正常）。',s:'M',st:'NORM'},
+ {id:'ecs-temp',a:'SUPPLY TEMP',c:'供气温度选择旋钮',p:'右控制台 · 座舱温度选择器',z:'right',k:'kn',r:'§2.2.3 p134 · docs/JF17-CONTROLS.md ECS 941',ch:'1',t:'开车前 AUTO 档；12 档旋钮。',s:'M',st:'AUTO'},
+ {id:'inst-disp',a:'INST / DISPLAY',c:'仪表显示照明旋钮',p:'右控制台 · 座舱照明控制盒',z:'right',k:'kn',r:'§2.2.3 p135 · §1.13.1 p80–81',ch:'1',t:'顺时针旋接通 MFD 周边键与右辅助操纵台导光板照明，越转越亮。',s:'M',st:'按需'},
+ {id:'consoles',a:'CONSOLES',c:'操纵台照明旋钮',p:'右控制台 · 座舱照明控制盒',z:'right',k:'kn',r:'§2.2.3 p135 · §1.13.1 p82',ch:'1',t:'控制两侧操纵台控制盒导光板字符亮度。',s:'M',st:'按需'},
+ {id:'flood',a:'FLOOD',c:'泛光灯旋钮',p:'右控制台 · 座舱照明控制盒',z:'right',k:'kn',r:'§2.2.3 p135 · §1.13.1 p83',ch:'1',t:'控制左右操纵台上方口框泛光灯。',s:'M',st:'按需'},
+ {id:'flash-steady',a:'FLASH / STEADY',c:'闪光 / 常亮开关',p:'右控制台 · 机外照明控制盒',z:'right',k:'sw',r:'§2.2.3 p135 · §1.13.2 p85',ch:'1',t:'开车前按需。',s:'M',st:'按需'},
+ {id:'bri-dim',a:'BRI / DIM',c:'航行灯亮 / 暗开关',p:'右控制台 · 机外照明控制盒',z:'right',k:'sw',r:'§2.2.3 p135 · §1.13.3 p86',ch:'1',t:'按需；对应 docs/JF17-CONTROLS.md LIGHTS 952。',s:'M',st:'按需'},
+ {id:'nav-form',a:'NAV-FORM',c:'编队灯 / 航行灯开关',p:'右控制台 · 机外照明控制盒',z:'right',k:'sw',r:'§2.2.3 p135 · §1.13.3 p86',ch:'1',t:'按需。',s:'M',st:'按需'},
+ {id:'anti-col',a:'ANTI-COL',c:'防撞灯开关',p:'右控制台 · 机外照明控制盒',z:'right',k:'sw',r:'§2.2.3 p135 · §1.13.4 p89',ch:'1',t:'按需；docs 里另有防撞灯 5 档旋钮 949。',s:'M',st:'按需'},
+ {id:'land-taxi',a:'LAND / OFF / TAXI',c:'着陆 / 滑行灯 3 档开关',p:'右控制台 · 机外照明控制盒',z:'right',k:'sw',r:'§1.13.2 p85 · docs/JF17-CONTROLS.md LIGHTS 512',ch:'1',t:'panel.html「着陆灯」快捷按钮对应的实体开关。',s:'D'},
+ {id:'master-ext',a:'MASTER EXT LT',c:'机外主照明开关',p:'右控制台 · 机外照明控制盒',z:'right',k:'sw',r:'docs/JF17-CONTROLS.md LIGHTS 947',ch:'1',t:'3 档机外主照明。',s:'D'},
+ {id:'aar-light',a:'AAR LIGHT',c:'空中加油灯',p:'右控制台 · 机外照明控制盒',z:'right',k:'sw',r:'docs/JF17-CONTROLS.md LIGHTS 963/964',ch:'1',t:'加油灯开关与亮度旋钮。',s:'D'},
+ {id:'hud-declutter',a:'HUD DECLUTTER',c:'HUD 防拥开关',p:'右控制台 · AAP 段',z:'right',k:'sw',r:'§2.2.3 p133',ch:'1',t:'开车前置于 NORM（正常）。',s:'M',st:'NORM'},
+ {id:'hud-mfd-brt',a:'BRT MODE',c:'HUD/MFD 亮度模式',p:'右控制台 · AAP 段',z:'right',k:'sw',r:'§2.2.3 p133',ch:'1',t:'开车前按需；与座舱照明控制盒的 INST/DISPLAY 不是一回事。',s:'M',st:'按需'},
+ {id:'audio-main-stby',a:'AUDIO MAIN/STBY',c:'主 / 备份音频选择开关',p:'右控制台 · 音频控制盒',z:'right',k:'sw',r:'§1.18 p107 · §1.18.1 p108',ch:'1',t:'MAIN 接通主用；STBY 时仅 COM1 可用、无音量控制。',s:'M'},
+ {id:'defog',a:'DEFOG',c:'除雾按钮',p:'右控制台 · 座舱温度选择器',z:'right',k:'btn',r:'§1.16.2 p97 · §3.1.11 p188',ch:'3',t:'座舱出现水雾 / 风挡起雾时按压，增加供气温度与流量。',s:'M'},
+ {id:'micro-air',a:'MICRO AIR',c:'微型空气减压器手柄',p:'右操纵台 · 增压通风',z:'right',k:'lv',r:'§3.1.7 p184 · §1.14 p90',ch:'3',t:'座舱冒烟应急时从此引入外界空气吹散烟雾。',s:'M'},
+ {id:'emg-gear',a:'EMG LANDING GEAR',c:'应急放起落架操纵开关',p:'右操纵台 · 起落架应急面板',z:'right',k:'lv',r:'§1.6.3 p41 · §3.1.2 p179',ch:'3',t:'§1.5 p38 原文：先拉出 EMG LANDING GEAR 手柄到位 → 等前起落架绿灯亮 → 旋转 90° 后继续向上拉出；靠高压氮气放下起落架与应急刹车；§1.6.3 p41 把它标成 PULL / ROTATE / PULL 三位置开关。',s:'M'},
+ {id:'emg-gear-guard',a:'EMG GEAR GUARD',c:'应急放轮保险盖',p:'右操纵台 · 起落架应急面板',z:'right',k:'lv',r:'§3.1.2 p179',ch:'3',t:'动 EMG LANDING GEAR 之前先开这个盖。',s:'M'},
+ {id:'form-knob',a:'FORMATION',c:'编队灯旋转开关',p:'右控制台 · 机外照明控制盒',z:'right',k:'kn',r:'§1.13.3 p88 · docs/JF17-CONTROLS.md LIGHTS 948',ch:'1',t:'五档加 OFF，控制编队灯亮度；EXT MASTER 接通后才有效。',s:'M'},
+ {id:'anti-col-knob',a:'ANTI-COL KNOB',c:'防撞灯旋转开关',p:'右控制台 · 机外照明控制盒',z:'right',k:'kn',r:'§1.13.4 p89 · docs/JF17-CONTROLS.md LIGHTS 949',ch:'1',t:'五档加 OFF；与 ANTI-COL 开关、FLASH/STEADY 配合。',s:'M'},
+
+ // ---------- 右后 ----------
+ {id:'dtc-slot',a:'DTC SLOT',c:'DTC 插入读取盒',p:'右控制台最后侧',z:'rightrear',k:'lv',r:'§2.3.5 p144 · §1.9 p54',ch:'2',t:'「看向右控制台的最后侧」插卡；卡里是武器 / 导航 / 进场 / EWS 数据，不是飞行必要条件，任一阶段可插拔。',s:'M'},
+
+ // ---------- HOTAS ----------
+ {id:'s1',a:'S1',c:'传感器选择开关（SS）',p:'HOTAS · 驾驶杆',z:'hotas',k:'hat',r:'§7.1 p294–295 · §4.3.2 p207',ch:'7',t:'前推进 ACM 格斗 / 循环格斗子模式；后拉循环平显-中下显；左右推选左右下显；中间按下进 DTT 或退出 ACM 返回先前主模式。',s:'M'},
+ {id:'s2',a:'S2',c:'传感器控制开关（SC）',p:'HOTAS · 驾驶杆',z:'hotas',k:'hat',r:'§7.1 p295 · §4.3.2 p207–209',ch:'7',t:'ACM 下：后拉 VT、前推 BS、右推 HA；中间按下抛掉目标 / 进 RWS。前后也管显示距离，右推改扫描宽度。',s:'M'},
+ {id:'s3',a:'S3',c:'武器发射 / 投放按钮',p:'HOTAS · 驾驶杆',z:'hotas',k:'btn',r:'§7.1 p295 · docs/BINDING.md §2',ch:'7',t:'压下投放炸弹或发射 PL-5E / SD-10。项目里绑 JOY_BTN7（S3: Weapon Launch）。',s:'M'},
+ {id:'s4',a:'S4',c:'航炮射击扳机',p:'HOTAS · 驾驶杆',z:'hotas',k:'btn',r:'§7.1 p295 · §4.3.1 p205 · docs/BINDING.md §2',ch:'7',t:'与 S3 是两条独立命令；扣之前要先选 GUN 并 FEED 充弹。项目里绑 JOY_BTN12。',s:'M'},
+ {id:'s5',a:'S5',c:'导弹放弃 / 前轮操纵',p:'HOTAS · 驾驶杆',z:'hotas',k:'btn',r:'§7.1 p294–295 · §1.7.2 p43',ch:'7',t:'压下人工放弃当前导弹并自动选另一枚同型弹；兼前轮操纵开关。',s:'M'},
+ {id:'s6',a:'S6',c:'配平开关',p:'HOTAS · 驾驶杆',z:'hotas',k:'hat',r:'§7.1 p295',ch:'8',t:'上下左右配平。',s:'M'},
+ {id:'s7',a:'S7',c:'自动驾驶切断开关',p:'HOTAS · 驾驶杆',z:'hotas',k:'btn',r:'§7.1 p295 · §8.4 p303',ch:'8',t:'压下人工切断自动驾驶仪。',s:'M'},
+ {id:'s8',a:'S8',c:'导弹类型选择按钮',p:'HOTAS · 驾驶杆',z:'hotas',k:'btn',r:'§7.1 p295 · docs/BINDING.md §2',ch:'7',t:'脉冲型：按一下在 PL-5E 与 SD-10 之间循环，JF-17 没有上/下两条命令。',s:'M'},
+ {id:'t1',a:'T1',c:'航电主模式开关（MMS）',p:'HOTAS · 油门杆',z:'hotas',k:'hat',r:'§7.2 p297',ch:'7',t:'上 = 空空 INTC，中 = 导航 NAV，下 = 空面 AG。',s:'M'},
+ {id:'t2',a:'T2',c:'干扰弹 / CAGE 解锁',p:'HOTAS · 油门杆',z:'hotas',k:'hat',r:'§7.2 p297 · §6.2 p292',ch:'6',t:'后拉发射箔条 / 红外干扰弹，前推给干扰吊舱加高压，中间按下 Manual 子模式 / 导弹位标器 CAGE。',s:'M'},
+ {id:'t3',a:'T3',c:'减速板收放开关',p:'HOTAS · 油门杆',z:'hotas',k:'hat',r:'§7.2 p297 · §2.4.1 p158',ch:'2',t:'上放出 / 下收起 / 按下收放；液压检查时用它确认绿色 S/B 指示灯亮。',s:'M'},
+ {id:'t4',a:'T4',c:'PTT / IFF 询问',p:'HOTAS · 油门杆',z:'hotas',k:'hat',r:'§7.2 p297 · §1.18.1 p108',ch:'1',t:'前推电台 1 发话、后拉电台 2 发话、中间按下启动 / 停止 IFF 询问。',s:'M'},
+ {id:'t5',a:'T5 / TDC',c:'目标标定控制（TDC 帽）',p:'HOTAS · 油门杆',z:'hotas',k:'hat',r:'§7.2 p297 · docs/BINDING.md §2',ch:'4',t:'上下左右移动光标 / 扫描中心；压下目标标定与传感器锁定，释放抛掉目标。项目里四向占 JOY_BTN5/8/9/10。',s:'M'},
+ {id:'t6',a:'T6',c:'雷达天线俯仰开关',p:'HOTAS · 油门杆',z:'hotas',k:'hat',r:'§7.2 p297',ch:'4',t:'上 / 下移动雷达扫描中心（AGR 模式除外）。',s:'M'},
+ {id:'throttle',a:'THROTTLE',c:'油门杆（慢车 / 最大 / 加力 / 停车）',p:'HOTAS · 油门杆',z:'hotas',k:'lv',r:'§1.2.3 p32 · §7.2 p296',ch:'2',t:'慢车—最大—小加力—全加力有止动器；停车位是关车终点。挂副油箱起飞通常要用加力。',s:'M'},
+ {id:'thr-safety',a:'THR SAFETY',c:'油门操纵台保险扳机',p:'左控制台 · 油门操纵台',z:'left',k:'lv',r:'§1.2.3 p32 · 关车专节 p177',ch:'2',t:'关车时扳到前极限位置，防止误推油门。',s:'M'},
+
+ // ---------- 座椅 / 氧气 ----------
+ {id:'eject-pin',a:'EJECT SAFETY',c:'弹射座椅保险 / 安全销',p:'弹射座椅右侧',z:'seat',k:'lv',r:'§2.3.6 p147 · docs/JF17-CONTROLS.md ZCP 541/542',ch:'2',t:'§2.3.6 原文「关闭弹射座椅的保险，并插上氧气管」；保险未取下会导致无法弹射，抗荷服未接会降低抗荷能力。',s:'M',st:'保险关闭'},
+ {id:'oxy-hose',a:'OXY HOSE',c:'氧气管接口',p:'弹射座椅右侧',z:'seat',k:'lv',r:'§2.3.6 p147 · §1.14 p90',ch:'2',t:'插上氧气管；有氧气供应时右前面板氧气示意灯不断闪烁。',s:'M'},
+ {id:'g-suit',a:'G-SUIT',c:'抗荷服接口',p:'弹射座椅右侧',z:'seat',k:'lv',r:'§2.3.6 p147',ch:'2',t:'未连接会导致抗荷能力下降。',s:'M'},
+ {id:'n-100',a:'N – 100%',c:'氧气调节器拨动开关',p:'座椅 · 氧气调节器',z:'seat',k:'sw',r:'§2.2.3 p136 · §1.14 p90',ch:'2',t:'开车前置于 N（正常）。',s:'M',st:'N（正常）'},
+ {id:'canopy',a:'CANOPY',c:'座舱盖开关',p:'座舱盖 / 风挡系统',z:'seat',k:'lv',r:'§1.15.1 p93 · §1.15.2 p94 · §3.1.8 p185',ch:'3',t:'电动 / 手动开关、气密与破裂系统；座舱盖未锁定有专门应急程序。',s:'M'},
+ {id:'seat-fire',a:'SEAT INIT',c:'弹射座椅启动销 / 控制按钮',p:'座椅 · ZCP',z:'seat',k:'btn',r:'docs/JF17-CONTROLS.md ZCP 541–543',ch:'3',t:'项目控件表里的销秘控制按钮与保护盖，手册 §2.3.6 只提到保险与安全销。',s:'D'}
+];
+const BYID = Object.fromEntries(CTRL.map(c => [c.id, c]));
+
+/* 情境题：题目 / 答案控件 / 手册引用 / 讲解 */
+const SCENES = [
+ ['冷舱上电第一步，手册让你「看向右控制台的 ELEC」，先接通哪个？','batt','§2.3.1 p137','AC GEN / DC GEN / BATT 三个一起接通；题目取 BATT，因为它是电源链的起点。'],
+ ['只按一个键就把整套航电启动起来（除吊舱与 ACMI），按哪个？','aap-cmbt','§1.11 p61 · §2.3.2 p138','AAP 上的 CMBT；观光用 TRAIN。'],
+ ['要让雷达进自检（中 MFD 出现 RDR BIT），在 AAP 上按哪个子系统键？','aap-rdr','§4.2.3 p203','自检结束后雷达处 STBY，不发射信号也不转天线。再按一次是关机（RDR OFF）。'],
+ ['惯导快速对准，把 AAP 上的模式开关先转到哪一档？','ins-mode','§2.3.4 p140','先 UFCP 的 DST 00 输经纬度与高度，再转 FAST；倒计时里在 THDG 输真航向，结束转 NAV。'],
+ ['插卡加载武器与航路参数，手册说要看向「右控制台的最后侧」，那是哪个控件？','dtc-slot','§2.3.5 p144','DTC 插入读取盒；插卡后 MFD 出现加载画面，点 ALL 再点 ENT。'],
+ ['SHARS 开始对准，EFIS 上 SHARS ALIGN 闪烁约一分钟 —— 去哪儿找这个开关？','shars','§2.3.3 p139','手册原文「转头看左控制台后方的 MISC 面板」。对准期间不要移动飞机。'],
+ ['开车序列最后按 1~2 秒的那个地面起动按钮，在左控制台哪块板上？','gnd-start','§2.3.13 p156','发动机控制面板：ENG CTRL → STARTER 中位 → 止动销 → 油门稍推 → GND 1~2 秒。'],
+ ['起飞前要把刹车从 PARK 放到 NORM，这个开关在哪？','brake-sw','§2.2.1 p126 · §2.4.1 p159','左控制台的起飞着陆系统控制盒；PARK 时刹车压力 ≥2700 PSI。'],
+ ['地面防止误投放挂架，开车前必须确认 OFF 的是哪个开关？','gnd-jett','§2.2.1 p127','左控制台军械开关盒的 GND JETT；同盒还有 PANIC 保护盖和 MASTER 主军械开关。'],
+ ['扣 S4 扳机前，除了选 GUN，首次使用还要在 SMS 页点哪个软键充弹？','sms-feed','§4.3.1 p205–206','FEED。火药弹只有 3 发，点超过 3 次不再响应。'],
+ ['视距内 10 NM 内要自动截获，HOTAS 上哪个动作进 ACM 格斗模式？','s1','§4.3.2 p207','S1 前推进 ACM；S1 中间按下退出并返回先前主模式。'],
+ ['进了 ACM 想切 4° 孔径搜索（目视看见敌机），S2 往哪推？','s2','§4.3.2 p208','S2 前推 = BS；后拉 = VT（10°×50° 垂直条），右推 = HA（整个 HUD 范围）。'],
+ ['发射 PL-5E / SD-10 与打航炮，是两个独立按钮 —— 打航炮用哪个？','s4','§7.1 p295 · docs/BINDING.md §2','S4 航炮扳机；S3 是武器发射 / 投放。两者在 DCS 里是独立命令，不能混绑。'],
+ ['要在 PL-5E 与 SD-10 之间循环，按哪个？','s8','§7.1 p295','S8 是脉冲型单向循环，JF-17 没有「上一个 / 下一个」两条命令。'],
+ ['发射箔条 / 红外干扰弹，油门杆上拨哪个开关、往哪个方向？','t2','§7.2 p297 · §6.2 p292','T2 后拉；前推是给干扰吊舱加高压，中间按下是 CAGE / Manual。'],
+ ['把航电主模式从导航切到空面（对地），油门杆上怎么拨？','t1','§7.2 p297','T1 下 = AG 空面，上 = INTC 空空，中 = NAV。'],
+ ['用 IFF 询问目标，油门杆上按哪个？','t4','§7.2 p297','T4 中间按下；前推 / 后拉分别是电台 1 / 电台 2 发话。'],
+ ['雷达光标 / 扫描中心四向移动，靠油门杆上哪个帽？','t5','§7.2 p297','T5 / TDC 上下左右；压下是目标标定与传感器锁定，释放抛掉目标。'],
+ ['人工切断自动驾驶仪，驾驶杆上按哪个？','s7','§7.1 p295 · §8.4 p303','S7；自动驾驶状态显示在 UFCP 第三窗口，用 A/P 键调。'],
+ ['尾旋改出时会用到、但开车前必须 OFF 的飞控开关是哪个？','dir-lnk','§2.2.1 p123 · §8.1 p298','DIR LNK 直接连接开关；在攻角限制内它不起作用。'],
+ ['告警灯盒自检，按压后 UFCP 与 AAP 按键灯全亮，按的是哪个？','warn-test','§2.3.10 p151','松开即停止检查，显示与灯光回正常。'],
+ ['最小燃油量告警值在哪儿设？','ufcp-ful','§2.3.8 p149','UFCP 的 FUEL / FUL 页面，点油量数字右侧白色箭头修改。'],
+ ['ILS 仪表着陆，UFCP 上先按哪个周边键选进 FP-A？','ufcp-l1','§2.7.3 p171','顺序：L1 选 FP-A → R3 选 APR → R1 选机场 → L2 选 ILS/SCA/TCN → R2 选 FAF/RWY。'],
+ ['从 MFD 任意上半区画面退回主菜单，按哪个固定键？','mfd-d3','§1.8.3 p48 · docs/JF17-MFD.md §二','D3 是万能撤销；R8 管下半区小画面菜单。'],
+ ['一块 MFD 的下半区要换小画面，按哪个固定键？','mfd-r8','§1.8.3 p48','上下半区可分别独立控制，同一画面不能同时出现在两块屏。'],
+ ['夜航要照亮两侧操纵台控制盒的字符，调哪个旋钮？','consoles','§1.13.1 p82','CONSOLES；INST/DISPLAY 管 MFD 周边键导光板，FLOOD 管泛光灯。'],
+ ['关车最后一步，把哪个发动机开关扳到 OFF？','eng-ctrl','§1.2.3 p32','顺序：慢车冷却 1 分钟 → 油门停车 → 刹车电源 OFF → START PUMP OFF → ENG CTRL OFF。'],
+ ['空中起动发动机时，左控制台发动机控制盒上要扳上位的开关是？','air-start','§1.2.3 p32 · §2.2.1 p124','AIR 开关扳上位、油门放慢车；START 灯亮，起动后要扳回下位。'],
+ ['机炮卡弹后充弹，或首次使用机炮充弹，点哪个软键？','sms-feed','§4.3.1 p205–206','FEED；超过 3 次不再响应并不断闪烁。'],
+ ['地面滑行前用减速板检查液压，绿色 S/B 灯该亮 —— 用哪个开关放减速板？','t3','§2.4.1 p158 · §7.2 p297','油门杆 T3 上 / 按下放出，下收起。'],
+ ['氧气示流器不亮，手册提醒 AAP 启动后要去右前面板开哪个旋钮？','oxy-ind-brt','§2.3.2 p138','氧气示流器亮度旋钮默认关闭；同批还有告警灯盒亮度旋钮。'],
+ ['要启动塔康、无线电高度表、ILS 和信标接收机，AAP 上按哪个子系统键？','aap-nav','§1.11 p60','NAV 一键管这四类导航设备。'],
+ ['ACM 自动截获不区分敌我，手册提醒要自行做什么？','aap-iff','§4.3.2 p207 · §4.5 p238','先开 IFF（AAP 上），询问用 T4 中间按下。'],
+ ['主军械开关置「训练」时 SMS 会显示 SIM / SIMX，这个开关在哪？','master-arm','§2.2.1 p127 · §1.19.7 p120','左控制台军械开关盒的 MASTER；开车前 OFF。'],
+ ['右控制台音频控制盒上，开车前要放 UPPER 位的是哪个？','ant-sw','§2.2.3 p134','ANT 天线选择开关；同盒 INT COM 要 OFF，四个音量旋钮置中立。'],
+ ['为了缩短滑跑距离，着陆后放减速伞，前仪表台上对应哪个开关？','chute','§2.2.2 p129 · §2.7.1 p171','阻力伞开关；约 135 kt 放、20 kt 抛，按后约 2 秒张满。'],
+ ['应急刹车手柄开车前必须关闭，它在哪儿？','emer-brk','§2.2.2 p129 · §1.7.1 p42','前仪表台 EMER BRK 手柄。'],
+ ['飞控 PBIT 自检，按左控制台飞控控制盒上的哪个？','fcs-bit','§8.1 p299','机内自检测开关；PBIT 完成或再按一次结束。'],
+ ['要在 UFCP 上退回基本显示（输入无效出现 EE 也靠它），按哪个？','ufcp-rtn','§1.10.1 p58','RTN；也可等预定时间自动退出，双功能键无计时器。'],
+ ['挂了机翼副油箱，构型开关 Ⅱ 该对应哪一档？','cfg-2','§8.1 p299','空/地 2 构型；空/地 1 是不挂机翼副油箱的空/地构型。'],
+ ['CLDP 激光指示吊舱用 CMBT 一键启动不会亮，要单独按哪个？','aap-cldp','§1.11 p61 · §2.3.2 p138','AAP 的 CLDP；同批还有 SPJ、IRST、ACMI。'],
+ ['RDR BIT 自检结束后雷达处于什么状态，由哪个按键反复切换开关机？','aap-rdr','§4.2.3–4.2.6 p203–204','STBY 待机；再按 RDR 关机，MFD 显示 RDR OFF 并锁定天线。'],
+ ['三个起落架绿灯全灭，先按哪个检灯按钮排除灯泡故障？','lg-ind-test','§3.1.2 p179','左辅助操纵台着陆信号灯盒的 TEST；确认不是灯泡坏，才走应急放轮。'],
+ ['应急放起落架，右操纵台上要拉起并转 90° 的开关是？','emg-gear','§1.6.3 p41 · §3.1.2 p179','EMG LANDING GEAR；先开保险盖，靠蓄压器放下起落架。'],
+ ['液压 2 系统故障（起落架 / 刹车 / 减速板不可用），手册首先让你接通哪个泵？','emg-hyd','§3.1.3 p180','左控制台混合控制盒的 EMG HYD 应急液压泵，开车前它是 OFF。'],
+ ['座舱冒烟应急处置，右操纵台上要打开哪个手柄引入外界空气？','micro-air','§3.1.7 p184','微型空气减压器手柄；同时氧气调节器置 100%、打开通风与放气开关。'],
+ ['座舱出现水雾 / 风挡起雾，按压哪个除雾按钮？','defog','§3.1.11 p188 · §1.16.2 p97','右控制台座舱温度选择器上的 DEFOG，增加供气温度与流量。'],
+ ['发动机失火关车前，先关闭哪个供油阀？','fuel-feed','§3.1.17 p193','左控制台燃油控制盒的 FEED 供油切断阀；然后 ENG CTRL OFF、A/B OFF。'],
+ ['防喘保护故障 / 大气系统故障 / 发动机降转，共同要求断开哪个开关？','a-surge','§3.1.12 p189 · §3.1.16 p192 · §3.1.20 p195','A/SURGE（ANTI-SURG）防喘开关，断开后油门不超过 85%、禁止加力。'],
+ ['直 / 交流发电机故障，手册让把发电机开关断开 2 秒后再合上 —— 动哪个？','ac-gen','§3.1.15 p191','右控制台 ELEC 电源操纵控制盒的 AC GEN（直流是同盒的 DC GEN）。'],
+ ['空中停车，自动起动失败后先把油门杆推到哪个位置？','throttle','§3.1.23 p198','推到停车位，接通 AIR 空中起动开关，再把油门放慢车。'],
+ ['座舱盖未锁定告警，应先回去检查哪一组开关？','canopy','§3.1.8 p185 · §1.15 p93–95','座舱盖电动 / 手动开关、气密与破裂系统；手册要求不超过 216kt 并尽快着陆。'],
+ ['地面应急投放副油箱前，要把哪个开关从 OFF 切到 ENABLE？','gnd-jett','§1.19.4 p116 · §3.1.22 p197','左控制台军械开关盒 GND JETT 置 ENABLE，地面还要按压 PANIC；空中投放则不管 GND JETT 位置、只按 PANIC（§3.1.22 p197）。'],
+ ['关车时要把油门操纵台上的保险扳机扳到前极限，指的是哪个控件？','thr-safety','关车专节 p177 · §1.2.3 p32','防止误推油门的机械保险，不是油门杆 T1 主模式开关。'],
+ ['主警告灯闪烁，按压哪个灯罩可以复位？','master-warning','§1.17 p98–104 · §8.5.2 p310–312','右前面板主告警灯盒的主警告灯；复位后灯灭、音响停，故障清单仍在。'],
+ ['复位主警告灯后，用 UFCP 哪个双功能键调出当时的有效故障清单？','ufcp-pfl','§1.17 p103–104 · §1.10 p57','PFL 飞行故障列表；三级 / 四级告警的当时有效故障都能列出。'],
+ ['对地投放前必须把主军械开关置 ARM，它在哪块控制盒？','master-arm','§5.6.1 p266 · §2.2.1 p127','左控制台军械开关盒；开车前是 OFF。'],
+ ['选 CCIP（连续计算命中点）投放模式，在左 MFD 的空面程序页点哪个软键？','sms-ccip','§5.6.1 p266–268','CCIP；HUD 出现 PIPPER，压住目标后按 S3 投放。'],
+ ['雷达控制菜单（切换 RWS/TWS/VS 等）从 MFD 哪颗周边键进？','mfd-u5','§4.4.7 p233','U5；也可用 HOTAS S2 左推循环切子模式。'],
+ ['没带 DTC 卡要人工输入任务数据，MFD 主页面点哪个入口？','mfd-data','§2.3.5 p145 · §1.9 p56','DATA 页面，路径 D3→L4(DATA)→R4(DTC)。'],
+ ['23-2 机炮无法用 HOTAS 选，切格斗后左 MFD 点哪颗软键选 GUN？','mfd-l2-gun','§4.3.3 p212','L2 选 GUN，U2 是 FEED 充弹；一般机炮可 S1 前推两次选。'],
+ ['承上，该页面的 FEED 充弹软键是哪一颗？','mfd-u2-feed','§4.3.3 p212','U2；火药弹只有 3 发，超过不再响应。'],
+ ['接通自动驾驶缺省的姿态保持（ATT），先按 UFCP 哪个专用功能键？','ufcp-ap','§1.10 p57 · §8.4 p303','A/P；第三窗口显示自动驾驶状态，S7 可人工切断。'],
+ ['在 A/P 页面从 ATT 切到高度保持 ALT，点哪个周边软键？','ufcp-alt','§8.4 p304–305','ATT 右侧箭头进 ALT；数字符号后输高度，再输一次确认。'],
+ ['夜航防撞灯的五档亮度旋钮在右控制台哪个控制盒？','anti-col-knob','§1.13.4 p89','机外照明控制盒；五档加 OFF，与 FLASH/STEADY 配合。'],
+ ['编队灯要调亮度，转右控制台机外照明控制盒上的哪个旋钮？','form-knob','§1.13.3 p88','FORMATION 五档旋钮加 OFF；EXT MASTER 要先接通。'],
+ ['机外照明总开关 NORMAL / NVG，对应哪个控件？','master-ext','§1.13.2 p87 · docs/JF17-CONTROLS.md LIGHTS 947','机外主照明开关；NVG 档用于夜视仪兼容。'],
+ ['开车前检查要置于 NORM 的 HUD 防拥开关，在右控制台哪一段？','hud-declutter','§2.2.3 p133','AAP 所在的右控制台面板段；同段还有 HUD/MFD 亮度模式。'],
+ ['音频控制盒上 MAIN / STBY 选择开关切到 STBY 会怎样？','audio-main-stby','§1.18 p107 · §1.18.1 p108','仅 COM1 可用且没有音量控制；通常保持 MAIN。'],
+ ['BVR 发射 SD-10 前，在左 MFD 的 SMS 页要先选好什么？','sms-sd10','§4.4.8 p234–236','选好 SD-10 挂点，HUD 才会给 DLZ 与 SHOOT 提示。'],
+ ['CCIP / AUTO / DTOS / DIR 这些投放程序，从哪个 MFD 菜单选？','mfd-agprog','§1.8.3 p48 · §5.1 p243','SMS 空面程序菜单；程序状态有 RDY / RDYX / SIM / MAL 等（§1.19.7 p120）。'],
+ ['连续计算投放点、HUD 给投放提示的 AUTO（CCRP）模式，选哪个软键？','sms-auto','§5.6.2 p269','AUTO；投放仍由 HOTAS S3 执行。'],
+ ['目录印「DOTS」、正文印「DTOS」的那个俯冲投放模式，点哪个？','sms-dtos','§5.6.3 p270','DTOS；超越角在 DTC 的 AS DATA 页（§2.3.5 p146）调整。'],
+ ['用 HOTAS T-2 能直接进 DIRECT 方式，对应的投放程序软键是？','sms-dir','§5.6.4 p273 · §2.3.5 p146','DIR；DIR 超越角在 AS DATA 页设置。'],
+ ['使用 WMD7 吊舱，自检完成后先点 MFD 主页面哪个菜单？','mfd-pod','§5.7.2 p276','POD → 选 WMD7；别忘 AAP 上单独启动 CLDP / IRST。'],
+ ['对地雷达的真实波束地图测绘，从哪个模式软键进？','radar-map','§5.2.1 p246','MAP / RBM；同菜单还有 FTT、DBS、GMTI、GMTT 等。'],
+ ['AG 主模式下想切传感器焦点到三块屏之一 / HUD，用哪个 HOTAS 开关？','s1','§5.1 p243 · §7.1 p295','S1 后拉循环选择平显 / 中下显；左右推选左下显、右下显。'],
+ ['开车前信号灯检查要求「D/CH 灯应熄灭」—— 这指的是哪个？','dch-lamp','§2.3.9 p150 · §1.7.3 p44','D/CH 无伞指示灯（只读）。注意不是主仪表板下侧那个 D/CH 拨动开关 / 阻力伞开关，两者同名不同物。'],
+ ['液压检查时用油门 T3 打开减速板，绿色 S/B 灯应亮 —— 哪个是这个灯？','sb-lamp','§2.4.1 p158 · §2.3.9 p150','S/B 减速板信号灯，只读；开车前检查要求它熄灭。'],
+ ['插好氧气管、打开氧气阀后，右前辅助操纵台上哪盏灯会不断闪烁？','oxy-blink','§1.14 p92 · §2.3.6 p147','OXY BLINK 氧气示流器状态灯，肺式供氧正常时闪烁；它是手册明确命名的灯，不是 OXY FLOW BRT 亮度旋钮。']
+];
+
+/* 流程：steps = [提示, 答案控件, 手册引用] */
+const FLOWS = [
+ {id:'cold',name:'冷舱上电 → 航电启动',ref:'§2.3.1 p137 · §2.3.2 p138 · §2.2.2 p130',steps:[
+  ['看向右控制台 ELEC：接通蓄电池','batt','§2.3.1 p137'],
+  ['接通主交流发电机','ac-gen','§2.3.1 p137'],
+  ['接通直流发电机','dc-gen','§2.3.1 p137'],
+  ['看向 ELEC 下方的 AAP：一键启动整套航电','aap-cmbt','§2.3.2 p138'],
+  ['打开左 MFD 电源','mfd-l-pwr','§2.2.2 p130'],
+  ['打开中 MFD 电源','mfd-c-pwr','§2.2.2 p130'],
+  ['打开右 MFD 电源','mfd-r-pwr','§2.2.2 p130'],
+  ['打开 HUD 开关','hud','§2.3.2 p138'],
+  ['右前面板：打开告警灯盒亮度旋钮','warn-brt','§2.3.2 p138'],
+  ['右前面板：打开氧气示流器亮度旋钮','oxy-ind-brt','§2.3.2 p138']
+ ]},
+ {id:'ins',name:'惯导快速对准 FAST',ref:'§2.3.4 p140–143 · §1.11 p61',steps:[
+  ['按 UFCP 的 DST，在 DST 00 输入经纬度与高度','ufcp-dst','§2.3.4 p140'],
+  ['把 AAP 上的惯导模式开关转到 FAST','ins-mode','§2.3.4 p140'],
+  ['中 MFD 出现 REMAIN TIME，倒计时结束前在 THDG 窗口输入真航向','thdg','§2.3.4 p141'],
+  ['倒计时结束后把模式开关转到 INS NAV','ins-mode','§2.3.4 p141']
+ ]},
+ {id:'dtc',name:'DTC 数据卡加载',ref:'§2.3.5 p144',steps:[
+  ['看向右控制台最后侧：插入 DTC 卡','dtc-slot','§2.3.5 p144'],
+  ['在 MFD 加载画面点 ALL 全选','dtc-all','§2.3.5 p144'],
+  ['点 ENT 确认加载','dtc-ent','§2.3.5 p144']
+ ]},
+ {id:'start',name:'开车（发动机起动）',ref:'§2.3.13 p156 · §1.2.3 p32',steps:[
+  ['转头看左控制台发动机控制面板：接通 ENG CTRL','eng-ctrl','§2.3.13 p156'],
+  ['STARTER 置中位 START','starter','§2.3.13 p156'],
+  ['点击发动机止动销','eng-stop','§2.3.13 p156'],
+  ['油门稍稍推出（油门操纵台）','thr-magnet','§2.3.13 p156'],
+  ['按压 GND 1~2 秒','gnd-start','§2.3.13 p156']
+ ]},
+ {id:'taxi',name:'滑出前检查 → 起飞',ref:'§2.4.1 p157–159 · §2.4.2 p160 · §2.2.1 p126',steps:[
+  ['确认飞控直连开关 OFF','dir-lnk','§2.4.2 p160'],
+  ['按外挂设置构型开关 Ⅰ','cfg-1','§2.4.2 p160 · §8.1 p299'],
+  ['按外挂设置构型开关 Ⅱ','cfg-2','§2.4.2 p160 · §8.1 p299'],
+  ['用油门 T3 打开减速板，确认绿色 S/B 灯亮','t3','§2.4.1 p158'],
+  ['BRAKE 从 PARK 放到 NORM','brake-sw','§2.4.1 p159'],
+  ['起飞前把 TEF / 襟翼放到起飞位','tef-sw','§2.2.1 p126'],
+  ['离地后收起落架','lg-lever','§1.6.1 p39']
+ ]},
+ {id:'ils',name:'ILS 仪表着陆设置',ref:'§2.7.3 p171–175',steps:[
+  ['UFCP 按 L1 选进 FP-A','ufcp-l1','§2.7.3 p171'],
+  ['按 R3 选 APR 模式','ufcp-r3','§2.7.3 p171'],
+  ['按 R1 选着陆机场（WPT50–59）','ufcp-r1','§2.7.3 p171'],
+  ['按 L2 选 ILS / SCA / TCN','ufcp-l2','§2.7.3 p171'],
+  ['按 R2 选 FAF 或 RWY 子模式','ufcp-r2','§2.7.3 p171'],
+  ['放下起落架','lg-lever','§2.7.1 p171']
+ ]},
+ {id:'land',name:'着陆 → 减速 → 脱离跑道',ref:'§2.7.1 p171 / p176 · §1.7.3 p44',steps:[
+  ['放下起落架','lg-lever','§2.7.1 p171'],
+  ['约 135 kt 放减速伞','chute','§2.7.1 p171'],
+  ['柔和使用机轮刹车（最大刹车速度 145 kt）','brake-sw','§2.7.1 p176'],
+  ['低于 20 kt 抛掉减速伞','chute','§2.7.1 p171']
+ ]},
+ {id:'acm',name:'ACM 视距内格斗',ref:'§4.3.2 p207–209 · §7.1 p295',steps:[
+  ['S1 前推进 ACM 格斗模式','s1','§4.3.2 p207'],
+  ['目视见敌机：S2 前推切 BS 孔径搜索','s2','§4.3.2 p208'],
+  ['盘旋中高离轴：S2 后拉切 VT 垂直搜索','s2','§4.3.2 p207'],
+  ['只知大概方位：S2 右推切 HA','s2','§4.3.2 p209'],
+  ['S8 循环选好 PL-5E / SD-10','s8','§7.1 p295'],
+  ['S3 压下发射导弹','s3','§7.1 p295'],
+  ['S1 中间按下退出 ACM','s1','§4.3.2 p207']
+ ]},
+ {id:'gun',name:'机炮开火前置条件',ref:'§4.3.1 p205–206 · §7.1 p295',steps:[
+  ['SMS 页点 GUN 选中机炮','sms-gun','§4.3.1 p205'],
+  ['首次 / 卡弹后点 FEED 充弹','sms-feed','§4.3.1 p206'],
+  ['S4 压下航炮扳机','s4','§7.1 p295']
+ ]},
+ {id:'shutdown',name:'关车',ref:'§1.2.3 p32 · 关车专节 p177（正文误印 §2.4.3）',steps:[
+  ['慢车冷却至少 1 分钟，收油门至停车','throttle','§1.2.3 p32'],
+  ['刹车电源开关扳到 OFF','brake-sw','§1.2.3 p32'],
+  ['应急液压开关置 OFF（关车专节补充项）','emg-hyd','关车专节 p177'],
+  ['油门操纵台保险扳机扳到前极限','thr-safety','关车专节 p177 · §1.2.3 p32'],
+  ['燃油控制盒 START PUMP 扳到 OFF','start-pump','§1.2.3 p32 · p177'],
+  ['ENG CTRL 扳至 OFF','eng-ctrl','§1.2.3 p32 · p177']
+ ]},
+ {id:'emggear',name:'应急放起落架',ref:'§3.1.2 p179 · §1.6.3 p41',steps:[
+  ['三个绿灯全灭：先按检灯按钮排除灯泡故障','lg-ind-test','§3.1.2 p179'],
+  ['起落架手柄 UP→NEUT→DOWN 重复尝试','lg-lever','§3.1.2 p179'],
+  ['打开右操纵台应急放轮保险盖','emg-gear-guard','§3.1.2 p179'],
+  ['拉起 EMG LANDING GEAR 开关','emg-gear','§1.6.3 p41'],
+  ['再转 90° 向外拉，靠蓄压器放下起落架','emg-gear','§3.1.2 p179']
+ ]},
+ {id:'airrestart',name:'空中停车 · 再起动',ref:'§3.1.23 p198 · §1.2.3 p32',steps:[
+  ['收油门到慢车观察 20 秒，自动起动成功则完成','throttle','§1.2.3 p32'],
+  ['自动起动失败：把油门杆推到停车位','throttle','§3.1.23 p198'],
+  ['AIR 空中起动开关扳上位','air-start','§3.1.23 p198'],
+  ['油门放慢车，START 灯亮，起动后断开 AIR','throttle','§3.1.23 p198 · §1.2.3 p32']
+ ]},
+ {id:'bvr',name:'BVR 超视距拦截（SD-10）',ref:'§4.4.8 p234–236 · §4.2.3 p203',steps:[
+  ['AAP 上启动雷达子系统','aap-rdr','§4.2.3 p203'],
+  ['主军械开关置 ARM','master-arm','§4.4.8 p234 · §1.19.7 p120'],
+  ['油门杆 T1 上拨，进空空 INTC 主模式','t1','§7.2 p297'],
+  ['左 MFD 的 SMS 页选好 SD-10 挂点','sms-sd10','§4.4.8 p234'],
+  ['T5 / TDC 帽压下锁定目标','t5','§7.2 p297'],
+  ['HUD 出现 SHOOT 提示后压下 S3 发射','s3','§4.4.8 p236 · §7.1 p295']
+ ]},
+ {id:'ccip',name:'对地 CCIP 投放',ref:'§5.6.1 p266–268',steps:[
+  ['主军械开关置 ARM','master-arm','§5.6.1 p266'],
+  ['油门杆 T1 下拨进 AG 空面主模式','t1','§7.2 p297 · §5.1 p243'],
+  ['左 MFD 空面程序选 CCIP','sms-ccip','§5.6.1 p266'],
+  ['确认 HUD 出现 CCIP 投放符号与 PIPPER','hud','§5.6.1 p266'],
+  ['压下 S3 投放炸弹','s3','§7.1 p295']
+ ]},
+ {id:'ap',name:'自动驾驶接通与断开',ref:'§8.4 p303–305',steps:[
+  ['UFCP 上按 A/P 专用功能键','ufcp-ap','§1.10 p57 · §8.4 p303'],
+  ['A/P 页面点 ATT 右侧箭头，接通姿态保持','ufcp-ap','§8.4 p303'],
+  ['点 ALT 进入高度保持','ufcp-alt','§8.4 p304'],
+  ['按压驾驶杆 S7 人工切断自动驾驶','s7','§7.1 p295 · §8.4 p303']
+ ]}
+];
+
+const COVER = [
+ ['第一章 说明和使用（p1–120）','系统 / 面板','控件速查 + 找键训练','§1.8 显控、§1.10 UFCP、§1.11 AAP、§1.13 照明、§1.15 舱盖、§1.16 环控、§1.17 告警、§1.18 通讯、§1.19 SMS 的控件全部入前仪表台 / 右控制台 / 座椅三组。'],
+ ['第二章 正常程序（p121–177）','操作流程','15 条流程训练 + 情境题','§2.2 座舱检查三块面板逐项入控件库；§2.3 开车 / 惯导 / DTC / 开车，§2.4 滑行起飞，§2.7 着陆与 ILS，§1.2.3 关车，各成一条流程。'],
+ ['第三章 应急程序（p178–199）','应急操作','应急放轮 / 空中起动流程 + 情境题','§3.1.2 检灯与应急放轮（右操纵台 EMG LANDING GEAR）、§3.1.3 应急液压泵、§3.1.7 座舱冒烟、§3.1.11 水雾 DEFOG、§3.1.17 供油切断阀、§3.1.22 应急投副油箱、§3.1.23 空中停车再起动，均可指到具体控件。'],
+ ['第四章 空对空主模式（p200–242）','模式操作','ACM / 机炮流程 + HOTAS 情境题','§4.2 雷达启动待机静默关机、§4.3 ACM 三子模式与机炮、§4.4 BVR 各雷达模式，落到 AAP RDR、S1/S2/S3/S4/S8、T1/T5/T6 与 UFCP/IFF。'],
+ ['第五章 空对地主模式（p243–288）','模式操作','CCIP 投放流程 + 情境题 + 控件速查','主模式 AG（T1 下）、SS/SPI、对地雷达 MAP/FTT/DBS/GMTI/GMTT、CCIP/AUTO(CCRP)/DTOS/DIR 投放模式（左 MFD 空面程序软键）、WMD7 吊舱（AAP 的 CLDP/IRST 单独启动）；投放仍由 S3 执行。'],
+ ['第六章 告警与反制（p289–293）','告警 / 反制','情境题 + 主警告灯复位控件','RWR / OESP 在 AAP 上启动；干扰弹由 T2 后拉，干扰吊舱加高压由 T2 前推；右前面板主警告灯按压复位，UFCP 的 PFL 调故障清单；告警灯盒自检用 WARN TEST。'],
+ ['第七章 HOTAS（p294–297）','按键定义','独立方位：HOTAS 面板','S1–S8（驾驶杆）与 T1–T6（油门杆）逐个入控件库，动作语义按 p295 / p297 两张表核对；与 docs/BINDING.md 的 vJoy 映射交叉验证。'],
+ ['第八章 FCS（p298–316）','飞控 / 自驾','左控制台飞控控制盒 + UFCP A/P','DIR LNK、构型 Ⅰ/Ⅱ、EFCS、R/Y AUG、YAW TRIM、BIT、RESET；S6 配平、S7 自驾切断、UFCP A/P 键。'],
+ ['第九章 使用限制（p317–322）','数值限制','速记卡（不设虚拟按键）','速度 / 攻角过载 / 燃油 / 武器 / 发动机 / 氧气限制是数值而非开关，硬造按键没有训练价值；关键数值放在覆盖页速记卡。'],
+ ['第十章 飞行特性（p323–327）','操纵特性','速记卡（不设虚拟按键）','起飞、着陆、加减速、稳定性、失速尾旋等是操纵特性；相关可操作项（迎角、减速伞、刹车）已在着陆流程与速记卡中覆盖。']
+];
+
+/* ---- 纯函数 ---- */
+function buildQuestions(){
+  const out = [];
+  CTRL.forEach(c => {
+    let q;
+    if (c.st) q = '把「' + c.a + ' · ' + c.c + '」置于 ' + c.st + ' —— 它座舱在哪里？';
+    else if (c.k === 'hat') q = '拨动「' + c.a + ' · ' + c.c + '」—— 找到这个多向开关';
+    else if (c.k === 'soft') q = '「' + c.a + ' · ' + c.c + '」属于哪块屏 / 哪块面板？';
+    else q = '操作「' + c.a + ' · ' + c.c + '」—— 点击它';
+    out.push({id:'c-'+c.id, q:q, ans:c.id, ref:c.r, ch:c.ch, why:c.t, zone:c.z, kind:'ctrl'});
+  });
+  SCENES.forEach((s,i) => {
+    const c = BYID[s[1]] || {};
+    out.push({id:'s-'+i, q:s[0], ans:s[1], ref:s[2], ch:c.ch || '', why:s[3], zone:c.z || '', kind:'scene'});
+  });
+  return out;
+}
+function filterQuestions(all, o){
+  return all.filter(q => {
+    if (o.zone && o.zone !== 'all' && q.zone !== o.zone) return false;
+    if (o.ch && o.ch !== 'all' && q.ch !== o.ch) return false;
+    if (o.wrongOnly && !(o.wrongIds || {})[q.ans]) return false;
+    return true;
+  });
+}
+function shuffle(arr, rnd){
+  const r = rnd || Math.random, a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(r() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+function judge(st, q, picked, skipped){
+  const ok = !skipped && picked === q.ans;
+  const s = Object.assign({}, st);
+  s.total = (s.total || 0) + 1;
+  s.correct = (s.correct || 0) + (ok ? 1 : 0);
+  s.wrong = (s.wrong || 0) + (ok ? 0 : 1);
+  s.streak = ok ? (s.streak || 0) + 1 : 0;
+  s.best = Math.max(s.best || 0, s.streak);
+  s.wrongIds = Object.assign({}, s.wrongIds || {});
+  if (ok) delete s.wrongIds[q.ans]; else s.wrongIds[q.ans] = (s.wrongIds[q.ans] || 0) + 1;
+  s.perCtrl = Object.assign({}, s.perCtrl || {});
+  s.perCtrl[q.ans] = s.perCtrl[q.ans] || {ok:0, bad:0};
+  s.perCtrl[q.ans][ok ? 'ok' : 'bad']++;
+  return {ok:ok, state:s};
+}
+function checkData(){
+  const errs = [];
+  const ids = new Set();
+  CTRL.forEach(c => {
+    if (ids.has(c.id)) errs.push('重复控件 ID: ' + c.id); ids.add(c.id);
+    if (!ZONES[c.z]) errs.push('非法方位: ' + c.id + ' -> ' + c.z);
+    if (!c.r) errs.push('缺手册引用: ' + c.id);
+    if (!c.t) errs.push('缺说明: ' + c.id);
+  });
+  buildQuestions().forEach(q => { if (!BYID[q.ans]) errs.push('题目答案不存在: ' + q.id + ' -> ' + q.ans); if (!q.ref) errs.push('题目缺引用: ' + q.id); });
+  FLOWS.forEach(f => f.steps.forEach((s,i) => { if (!BYID[s[1]]) errs.push('流程步骤答案不存在: ' + f.id + '#' + i + ' -> ' + s[1]); }));
+  SCENES.forEach((s,i) => { if (!BYID[s[1]]) errs.push('情境题答案不存在: #' + i + ' -> ' + s[1]); });
+  return errs;
+}
+/* ==== @engine:end ==== */
+
+/* ==== @simengine:start 简易座舱纯状态机（不碰 DOM，可用 node 抽取单测） ==== */
+/* 数据复用：每个 SIM_DEVS.id 都必须在 CTRL 里，手册引用直接取 BYID[id].r，
+   这样"点一下 → 有反应 → 附手册依据"三段文字全都来自已核对过的控件库。 */
+
+const SIM_BAYS = [
+  {id:'left-eng',   name:'左控制台 · 发动机 / 燃油 / 军械', z:'left',      col:'left',   w:'左手下方 · §2.2.1 p122–127 / §2.3.13 p156'},
+  {id:'left-misc',  name:'左后 · MISC 面板 / 氧气 / 应急', z:'leftrear',  col:'left',   w:'转头看左控制台后方 · §2.3.3 p139'},
+  {id:'right-elec', name:'右控制台 · ELEC 电源 / 告警灯盒', z:'right',     col:'right',  w:'看向右控制台 · §2.3.1 p137'},
+  {id:'right-aap',  name:'右控制台 · AAP 航电启动面板',     z:'right',     col:'right',  w:'ELEC 下方 · §2.3.2 p138 / §1.11 p61'},
+  {id:'right-light',name:'右控制台 · 环控 / 照明',           z:'right',     col:'right',  w:'§2.2.3 p132–135'},
+  {id:'right-dtc',  name:'右后 · DTC 插入读取盒',            z:'rightrear', col:'right',  w:'右控制台最后侧 · §2.3.5 p144'},
+  {id:'front-main', name:'前仪表台 · 显控电源 / 起落 / 手柄', z:'front',     col:'front',  w:'正前方 · §2.2.2 p129–130'},
+  {id:'front-lamp', name:'前仪表台 · 只读信号灯',            z:'front',     col:'front',  w:'§1.7.3 p44 / §1.14 p92 / §2.3.9 p150'},
+  {id:'front-soft', name:'前仪表台 · MFD 画面软键',          z:'front',     col:'front',  w:'虚线框=画面软键，功能随页面变 · §1.8.3 p48'},
+  {id:'hotas-stick',name:'HOTAS · 驾驶杆 S1–S8',             z:'hotas',     col:'bottom', w:'§7.1 p294–295'},
+  {id:'hotas-thr',  name:'HOTAS · 油门杆 T1–T6',             z:'hotas',     col:'bottom', w:'§7.2 p296–297'},
+  {id:'seat',       name:'座椅 / 氧气',                      z:'seat',      col:'bottom', w:'§2.3.6 p147 / §2.2.3 p136'}
+];
+
+const SD = (id, k, n, pos, bay, o) => Object.assign({id:id, k:k, n:n, pos:pos || [], bay:bay, w:'', note:''}, o || {});
+const SW2 = ['OFF','ON'], SW3 = ['OFF','MID','ON'], KN3 = ['OFF','MID','MAX'];
+
+const SIM_DEVS = [
+  /* ---- 左控制台 ---- */
+  SD('eng-ctrl','sw',2,SW2,'left-eng',{note:'发动机系统开关：接通后才允许地面起动。'}),
+  SD('starter','sw',3,['OFF','START','AIR'],'left-eng',{note:'START 是中位；AIR 用于空中起动（§3 应急）。'}),
+  SD('eng-stop','btn',0,[],'left-eng',{note:'发动机止动销，开车前先点开。'}),
+  SD('gnd-start','btn',0,[],'left-eng',{note:'地面起动按钮，按住 1~2 秒；每按一次 N2 上升一档（本页示意）。'}),
+  SD('thr-magnet','btn',0,[],'left-eng',{note:'油门电磁铁应急按钮，用于越过止动销推油门。'}),
+  SD('throttle','lv',4,['停车','慢车','巡航','最大'],'left-eng',{note:'开车时稍稍推出慢车以上，GND 才起作用。'}),
+  SD('air-start','sw',2,SW2,'left-eng'),
+  SD('eng-mode','kn',3,['CRUISE','MAX','AB'],'left-eng'),
+  SD('fuel-active','sw',2,['OFF','ACTIVE'],'left-eng'),
+  SD('fuel-feed','sw',2,SW2,'left-eng'),
+  SD('start-pump','sw',2,SW2,'left-eng'),
+  SD('feed-guard','lv',2,['盖上','打开'],'left-eng'),
+  SD('brake-sw','sw',3,['OFF','NORM','PARK'],'left-eng'),
+  SD('master-arm','sw',2,['SAFE','ARM'],'left-eng',{note:'主军械开关：没拨到 ARM，S3/S4 都不会有反应。'}),
+  SD('gnd-jett','sw',2,SW2,'left-eng'),
+  SD('saiu-sw','sw',2,SW2,'left-eng'),
+  SD('cfg-1','sw',2,['A/A','A/G'],'left-eng'),
+  SD('cfg-2','sw',2,['AG1','AG2'],'left-eng'),
+  SD('efcs','sw',2,SW2,'left-eng',{note:'飞控模拟备份；断开会在告警灯盒点亮 FCS。'}),
+  SD('fcs-reset','btn',0,[],'left-eng'),
+  SD('fcs-bit','btn',0,[],'left-eng'),
+  SD('yaw-trim','kn',3,['L','中','R'],'left-eng'),
+  SD('lg-ind-test','btn',0,[],'left-eng'),
+  SD('emg-hyd','sw',2,SW2,'left-eng'),
+
+  /* ---- 左后 / 左侧壁板 ---- */
+  SD('shars','sw',2,SW2,'left-misc',{note:'捷联航姿开关：开车前接通，HUD/惯导才有姿态基准。'}),
+  SD('oxy-valve','sw',2,['关','开'],'left-misc',{note:'左侧壁板上的氧气阀（§2.3.6 p147）。'}),
+  SD('panic','lv',2,['盖上','打开'],'left-misc'),
+  SD('flare-guard','lv',2,['盖上','打开'],'left-misc'),
+  SD('flare-btn','btn',0,[],'left-misc'),
+  SD('emg-gear','lv',2,['收起','放下'],'left-misc',{note:'应急放轮：PULL / ROTATE / PULL（§1.6.3 p40）。'}),
+  SD('emg-gear-guard','lv',2,['盖上','打开'],'left-misc'),
+
+  /* ---- 右控制台 ELEC ---- */
+  SD('batt','sw',2,SW2,'right-elec',{note:'蓄电池：冷舱第一下就点它。'}),
+  SD('ac-gen','sw',2,SW2,'right-elec'),
+  SD('dc-gen','sw',2,SW2,'right-elec'),
+  SD('warn-brt','kn',3,KN3,'right-elec',{note:'告警灯盒亮度旋钮默认关闭，打开后信号灯才亮（§2.3.2 p138）。'}),
+  SD('warn-day-night','sw',2,['DAY','NIGHT'],'right-elec'),
+  SD('warn-test','btn',0,[],'right-elec',{note:'检灯：点亮全部信号灯，再点一次复位。'}),
+  SD('master-warning','btn',0,[],'right-elec',{note:'主警告灯按压复位；复位后可在 UFCP 的 PFL 调出故障清单。'}),
+
+  /* ---- 右控制台 AAP ---- */
+  SD('aap-cmbt','sw',2,['OFF','CMBT'],'right-aap',{note:'一键启动整套航电，冷舱开车的关键一步（§2.3.2 p138）。'}),
+  SD('aap-train','sw',2,SW2,'right-aap'),
+  SD('aap-off','btn',0,[],'right-aap',{note:'关闭全部航电子系统。'}),
+  SD('aap-rdr','sw',2,SW2,'right-aap',{note:'雷达子系统：接通后先自检 BIT，用 U5 进雷达控制菜单切 STBY/OPR。'}),
+  SD('aap-ins','sw',2,SW2,'right-aap'),
+  SD('aap-saiu','sw',2,SW2,'right-aap'),
+  SD('aap-rwr','sw',2,SW2,'right-aap'),
+  SD('aap-nav','sw',2,SW2,'right-aap'),
+  SD('aap-com1','sw',2,SW2,'right-aap'),
+  SD('aap-cldp','sw',2,SW2,'right-aap'),
+  SD('aap-irst','sw',2,SW2,'right-aap'),
+  SD('ins-mode','kn',3,['OFF','FAST','NAV'],'right-aap',{note:'快速对准 FAST → 输 THDG → NAV；没输真航向就转 NAV 会被拦下。'}),
+
+  /* ---- 右控制台 环控 / 照明 ---- */
+  SD('ecs-mode','kn',3,['OFF','AUTO','MAN'],'right-light'),
+  SD('ecs-temp','kn',3,['COLD','MID','HOT'],'right-light'),
+  SD('inst-disp','kn',3,KN3,'right-light'),
+  SD('consoles','kn',3,KN3,'right-light'),
+  SD('flood','kn',3,KN3,'right-light'),
+  SD('land-taxi','kn',3,['OFF','TAXI','LAND'],'right-light'),
+  SD('master-ext','sw',2,SW2,'right-light'),
+  SD('anti-col','sw',2,SW2,'right-light'),
+  SD('flash-steady','sw',2,['FLASH','STEADY'],'right-light'),
+  SD('bri-dim','sw',2,['BRI','DIM'],'right-light'),
+
+  /* ---- 右后 DTC ---- */
+  SD('dtc-slot','lv',2,['未插卡','已插卡'],'right-dtc',{note:'看向右控制台最后侧插入 DTC 卡（§2.3.5 p144）。'}),
+  SD('dtc-all','btn',0,[],'right-dtc',{note:'加载画面点 ALL 全选；没插卡时会提示条件不满足。'}),
+  SD('dtc-ent','btn',0,[],'right-dtc',{note:'点 ENT 确认加载；加载完成后系统标题的方框消失。'}),
+  SD('mfd-data','btn',0,[],'right-dtc',{note:'路径 D3 → L4(DATA) → R4(DTC)；没带卡时在这里人工输入。',w:'',k:'btn'}),
+
+  /* ---- 前仪表台 ---- */
+  SD('hud','sw',2,SW2,'front-main',{note:'§2.3.2 p138 只泛称「打开 UFCP 和 HUD 的开关」，本页按该句建占位开关。'}),
+  SD('mfd-l-pwr','sw',2,SW2,'front-main'),
+  SD('mfd-c-pwr','sw',2,SW2,'front-main'),
+  SD('mfd-r-pwr','sw',2,SW2,'front-main'),
+  SD('lg-lever','lv',2,['DOWN','UP'],'front-main'),
+  SD('chute','sw',3,['中立','DEPLOY','JETT'],'front-main',{note:'JETT 抛伞后 D/CH 无伞指示灯亮。'}),
+  SD('emer-brk','lv',2,['关闭','拉出'],'front-main'),
+  SD('hud-cont','kn',3,KN3,'front-main',{w:'ufcp'}),
+  SD('hud-brt','kn',3,KN3,'front-main',{w:'ufcp'}),
+  SD('ufcp-brt','kn',3,KN3,'front-main',{w:'ufcp'}),
+  SD('bak-brt','kn',3,KN3,'front-main',{w:'ufcp'}),
+  SD('oxy-ind-brt','kn',3,KN3,'front-main',{w:'ufcp',note:'氧气示流器亮度旋钮（§2.3.2 p138 正文未给独立控件名，本页占位）。'}),
+  SD('hud-mfd-brt','sw',2,['DAY','NIGHT'],'front-main',{}),
+  SD('hud-declutter','sw',2,SW2,'front-main',{}),
+  SD('mfd-corner','kn',3,KN3,'front-main',{w:'ufcp'}),
+  SD('thdg','btn',0,[],'front-main',{w:'ufcp',note:'FAST 对准出现 REMAIN TIME 后，倒计时结束前把真航向输进 THDG。'}),
+  SD('ufcp-dst','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-rtn','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-pfl','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-ful','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-ap','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-alt','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-mkr','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-hns','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-tod','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-iff','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-vrc','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-tot','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-oap','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-pu','btn',0,[],'front-main',{w:'ufcp'}),
+  SD('ufcp-fpm','btn',0,[],'front-main',{w:'ufcp'}),
+
+  /* ---- 只读指示灯（会随状态亮灭，但不能点动） ---- */
+  SD('oxy-blink','ind',0,[],'front-lamp',{note:'肺式供氧时不断闪烁 = 供氧正常；手册明确命名的是这盏灯。'}),
+  SD('dch-lamp','ind',0,[],'front-lamp',{note:'抛伞后亮。与 D/CH 拨动开关同名但不是同一个东西。'}),
+  SD('sb-lamp','ind',0,[],'front-lamp',{note:'用 T3 打开减速板时亮。'}),
+
+  /* ---- MFD 画面软键 ---- */
+  SD('mfd-d3','btn',0,[],'front-soft',{note:'万能撤销键：随时回上半区主菜单。'}),
+  SD('mfd-r8','btn',0,[],'front-soft'),
+  SD('mfd-d2','btn',0,[],'front-soft',{note:'同一物理键：左屏 CMBT/SMS、中屏雷达、右屏 HSD。'}),
+  SD('mfd-d4','btn',0,[],'front-soft'),
+  SD('mfd-u5','btn',0,[],'front-soft',{note:'雷达控制菜单，BIT → STBY → OPR。'}),
+  SD('mfd-l2-gun','btn',0,[],'front-soft',{note:'23-2 机炮无法用 HOTAS 选，只能点这里。'}),
+  SD('mfd-u2-feed','btn',0,[],'front-soft',{note:'FEED 充弹；火药弹只有 3 发。'}),
+  SD('sms-gun','btn',0,[],'front-soft',{note:'SMS 页选机炮；也可用 S1 前推两次。'}),
+  SD('sms-feed','btn',0,[],'front-soft'),
+  SD('sms-sd10','btn',0,[],'front-soft',{note:'BVR 前在 SMS 页选好 SD-10。'}),
+  SD('sms-ccip','btn',0,[],'front-soft'),
+  SD('sms-auto','btn',0,[],'front-soft'),
+  SD('sms-dtos','btn',0,[],'front-soft'),
+  SD('sms-dir','btn',0,[],'front-soft'),
+  SD('mfd-agprog','btn',0,[],'front-soft'),
+  SD('mfd-pod','btn',0,[],'front-soft'),
+  SD('radar-map','btn',0,[],'front-soft'),
+
+  /* ---- HOTAS 驾驶杆 ---- */
+  SD('s1','hat',5,['中立','上','下','左','右'],'hotas-stick',{note:'传感器选择开关 SS：前推两次可选机炮。'}),
+  SD('s2','hat',5,['中立','上','下','左','右'],'hotas-stick',{note:'传感器控制开关 SC：雷达模式 / 天线俯仰。'}),
+  SD('s3','btn',0,[],'hotas-stick',{note:'武器发射 / 投放。需要 MASTER ARM + 已选武器。'}),
+  SD('s4','btn',0,[],'hotas-stick',{note:'航炮扳机。需要 MASTER ARM + GUN + FEED。'}),
+  SD('s5','btn',0,[],'hotas-stick'),
+  SD('s6','hat',5,['中立','上','下','左','右'],'hotas-stick'),
+  SD('s7','btn',0,[],'hotas-stick',{note:'人工切断自动驾驶。'}),
+  SD('s8','btn',0,[],'hotas-stick',{note:'导弹类型单向循环，不能倒着选。'}),
+
+  /* ---- HOTAS 油门杆 ---- */
+  SD('t1','sw',3,['NAV','A/A','A/G'],'hotas-thr',{note:'航电主模式开关 MMS：切 NAV / 空空 / 空地，HUD 与 MFD 跟着换。'}),
+  SD('t2','btn',0,[],'hotas-thr',{note:'干扰弹投放 / CAGE 解锁。'}),
+  SD('t3','btn',0,[],'hotas-thr',{note:'减速板收放；打开时 S/B 绿灯亮。'}),
+  SD('t4','btn',0,[],'hotas-thr'),
+  SD('t5','hat',5,['中立','上','下','左','右'],'hotas-thr',{note:'TDC 目标标定四向帽。'}),
+  SD('t6','kn',3,['低','中','高'],'hotas-thr',{note:'雷达天线俯仰。'}),
+
+  /* ---- 座椅 / 氧气 ---- */
+  SD('eject-pin','lv',2,['保险','解除'],'seat'),
+  SD('oxy-hose','lv',2,['断开','接好'],'seat'),
+  SD('g-suit','lv',2,['断开','接好'],'seat'),
+  SD('n-100','sw',2,['N','100%'],'seat',{note:'氧气调节器；肺式供氧时 OXY BLINK 灯闪烁。'}),
+  SD('canopy','lv',2,['关闭','打开'],'seat'),
+  SD('seat-fire','btn',0,[],'seat')
+];
+
+const SIM_BYID = Object.fromEntries(SIM_DEVS.map(d => [d.id, d]));
+const SK_CTRL = {D3:'mfd-d3',R8:'mfd-r8',D2:'mfd-d2',D4:'mfd-d4',U5:'mfd-u5',L2:'mfd-l2-gun',U2:'mfd-u2-feed',L4:'mfd-data',R4:'mfd-data'};
+const SK_NAME = {D3:'回主菜单',R8:'下半区小画面菜单',D2:'快捷切页',D4:'快捷切页',U5:'雷达控制菜单',L2:'左屏选 GUN',U2:'左屏 FEED 充弹',L4:'DATA 数据页',R4:'DTC 加载'};
+
+function simInit(){
+  const v = {}; SIM_DEVS.forEach(d => v[d.id] = 0);
+  return {
+    v:v, pulses:{}, seq:0, warnAck:0,
+    power:false, aapOff:0, engN2:0, thdg:false, radarPhase:0,
+    dtc:0, dtcSel:0, weapon:'NONE', feed:0, agProg:'—', mode:'NAV',
+    speedBrake:0, chuteJett:0, ap:0, lampTest:0, gearDown:0, shots:0, rounds:0, cm:0,
+    page:['MENU','MENU','MENU'],
+    history:[{lv:'', act:'冷舱就绪', eff:'全机断电：ELEC 三开关 OFF、AAP 未启动、三块 MFD 与 HUD 全黑、发动机 N2 = 0%。', ref:'§2.3.1 p137 · §2.2.2 p130', why:'点座舱里任意控件就能看到「做了什么 → 有什么反应 → 手册依据」；也可以直接按「一键演示 · 冷舱开车」。', t:'00'}]
+  };
+}
+
+const SV = (s,k) => s.v[k] || 0;
+function simPower(s){ return SV(s,'batt') === 1 && SV(s,'ac-gen') === 1 && SV(s,'dc-gen') === 1; }
+function simAvion(s){ return simPower(s) && !s.aapOff && (SV(s,'aap-cmbt') === 1 || SV(s,'aap-train') === 1); }
+
+function simDerived(s){
+  const power = simPower(s), avion = simAvion(s), full = avion && SV(s,'aap-cmbt') === 1;
+  const mfd = ['mfd-l-pwr','mfd-c-pwr','mfd-r-pwr'].map(k => avion && SV(s,k) === 1);
+  const ufcpOn = avion, hudOn = avion && SV(s,'hud') === 1, brt = SV(s,'warn-brt');
+  const insMode = SV(s,'ins-mode');
+  const ins = !power ? 'OFF' : insMode === 0 ? 'OFF'
+    : insMode === 1 ? (s.thdg ? 'FAST / THDG OK' : 'FAST / REMAIN TIME')
+    : (s.thdg ? 'NAV' : 'NAV (未对准)');
+  const radar = !avion || SV(s,'aap-rdr') !== 1 ? 'OFF' : ['BIT','STBY','OPR'][Math.min(s.radarPhase,2)];
+  const eng = s.engN2 >= 70 ? 'IDLE' : s.engN2 > 0 ? 'START' : 'OFF';
+  const arm = SV(s,'master-arm') === 1;
+  const gear = (SV(s,'lg-lever') === 1 && !s.gearDown) ? 'UP' : 'DOWN';
+  const dtc = s.dtc === 0 ? '未插卡' : s.dtc === 1 ? (s.dtcSel ? '已全选' : '已插卡') : '已加载';
+  const oxy = SV(s,'oxy-valve') === 1 && SV(s,'n-100') === 1 ? '肺式供氧' : (SV(s,'oxy-valve') === 1 ? '供氧' : 'OFF');
+  const warns = [];
+  if (power && SV(s,'efcs') !== 1) warns.push('FCS OFF');
+  if (avion && insMode === 1 && !s.thdg) warns.push('ENTER THDG');
+  if (power && brt === 0) warns.push('告警灯盒未开');
+  if (arm && s.weapon === 'NONE') warns.push('NO WPN');
+  if (avion && !hudOn) warns.push('HUD OFF');
+  const mw = warns.length > 0 && brt > 0 && s.warnAck < s.seq;
+  const oxyBlink = oxy === '肺式供氧' && SV(s,'oxy-ind-brt') > 0;
+  const lamps = [
+    {n:'MASTER WARN',on:mw,c:'#f85149'},{n:'OXY BLINK',on:oxyBlink,c:'#3fb950'},
+    {n:'D/CH',on:s.chuteJett === 1 && brt > 0,c:'#e3b341'},{n:'S/B',on:s.speedBrake === 1 && brt > 0,c:'#3fb950'},
+    {n:'LG DOWN',on:gear === 'DOWN' && power && brt > 0,c:'#3fb950'},
+    {n:'INS NAV',on:ins.indexOf('NAV') === 0 && brt > 0,c:'#3fb950'},
+    {n:'RDR',on:radar === 'OPR',c:'#e3b341'},{n:'A/P',on:s.ap === 1,c:'#3fb950'},
+    {n:'MASTER ARM',on:arm && brt > 0,c:'#f85149'},{n:'LAMP TEST',on:s.lampTest === 1,c:'#e3b341'},
+    {n:'ENG FIRE',on:false,c:'#f85149'},{n:'LOW FUEL',on:false,c:'#e3b341'}
+  ];
+  if (s.lampTest === 1) lamps.forEach(l => l.on = true);
+  return {power:power, avion:avion, full:full, mfd:mfd, ufcpOn:ufcpOn, hudOn:hudOn,
+    ins:ins, radar:radar, eng:eng, n2:s.engN2, arm:arm, weapon:s.weapon, feed:s.feed,
+    agProg:s.agProg, mode:s.mode, gear:gear, brake:s.speedBrake ? 'OPEN' : 'CLOSED',
+    dtc:dtc, oxy:oxy, oxyBlink:oxyBlink, lamps:lamps, warns:warns, mw:mw, page:s.page.slice(),
+    brt:brt, shots:s.shots, rounds:s.rounds};
+}
+
+function simSummary(d){
+  return {
+    '全机供电': d.power ? 'ON' : 'OFF',
+    '航电': d.avion ? (d.full ? 'CMBT 全部启动' : 'TRAIN 部分启动') : 'OFF',
+    'HUD': d.hudOn ? 'ON' : 'OFF',
+    'UFCP': d.ufcpOn ? 'ON' : 'OFF',
+    '左 MFD': d.mfd[0] ? d.page[0] : 'OFF',
+    '中 MFD': d.mfd[1] ? d.page[1] : 'OFF',
+    '右 MFD': d.mfd[2] ? d.page[2] : 'OFF',
+    '惯导': d.ins,
+    '雷达': d.radar,
+    '发动机': d.eng,
+    'N2': d.n2 + '%',
+    '主模式': d.mode,
+    '主军械': d.arm ? 'ARM' : 'SAFE',
+    '所选武器': d.weapon,
+    '充弹': d.feed + ' 发',
+    '投放程序': d.agProg,
+    '起落架': d.gear,
+    '减速板': d.brake,
+    '氧气': d.oxy,
+    'DTC': d.dtc,
+    '主警告': d.mw ? '亮' : '灭'
+  };
+}
+function simDiff(a, b){ const o = []; Object.keys(b).forEach(k => { if (a[k] !== b[k]) o.push(k + '：' + a[k] + ' → ' + b[k]); }); return o; }
+
+function simReq(s, id, val){
+  const P = k => SV(s,k), power = simPower(s), avion = simAvion(s);
+  const needPower = 'ELEC 的 BATT / AC GEN / DC GEN 三个开关要先全部接通（§2.3.1 p137）';
+  const needAvion = '先在 AAP 上按 CMBT 一键启动航电（§2.3.2 p138）';
+  switch(id){
+    case 'aap-cmbt': case 'aap-train': case 'aap-rdr': case 'aap-ins': case 'aap-saiu':
+    case 'aap-rwr': case 'aap-nav': case 'aap-com1': case 'aap-cldp': case 'aap-irst':
+      if (val > 0 && !power) return needPower; break;
+    case 'mfd-l-pwr': case 'mfd-c-pwr': case 'mfd-r-pwr': case 'hud':
+      if (val > 0 && !avion) return needAvion; break;
+    case 'ins-mode':
+      if (val === 1 && !avion) return needAvion;
+      if (val === 2 && !s.thdg) return '先在 UFCP 的 THDG 窗口输入当前真航向，倒计时结束前完成（§2.3.4 p141）'; break;
+    case 'thdg':
+      if (P('ins-mode') !== 1) return '惯导模式开关要先转 FAST，UFCP 才会出现 THDG 窗口（§2.3.4 p140–141）'; break;
+    case 'gnd-start':
+      if (P('eng-ctrl') !== 1) return '先接通左控制台的 ENG CTRL（§2.3.13 p156）';
+      if (P('starter') !== 1) return 'STARTER 要置中位 START（§2.3.13 p156）';
+      if (P('throttle') < 1) return '油门操纵台要先稍稍推出慢车以上（§2.3.13 p156）'; break;
+    case 'dtc-all': if (s.dtc < 1) return '先到右控制台最后侧插入 DTC 卡（§2.3.5 p144）'; break;
+    case 'dtc-ent': if (!s.dtcSel) return '先在加载画面点 ALL 全选，再点 ENT 确认（§2.3.5 p144）'; break;
+    case 's3':
+      if (!P('master-arm')) return 'MASTER ARM 还在 SAFE，扣 S3 不会投放（§4.3 p205）';
+      if (s.weapon === 'NONE') return 'SMS 页还没选武器；先点 SD-10 或 GUN（§4.4.8 p234）'; break;
+    case 's4':
+      if (!P('master-arm')) return 'MASTER ARM 还在 SAFE，扣 S4 不会击发（§4.3.1 p205）';
+      if (s.weapon !== 'GUN') return '当前武器不是 GUN；在 SMS 页点 GUN 或 S1 前推两次（§4.3.1 p205）';
+      if (!s.feed) return '首次射击要先点 FEED 充弹；火药弹只有 3 发（§4.3.1 p205–206）'; break;
+    case 'sms-feed': case 'mfd-u2-feed':
+      if (s.feed >= 3) return '火药弹只有 3 发，点超过 3 次不再响应并闪烁（§4.3.1 p206）'; break;
+  }
+  return null;
+}
+
+function simSpecial(ns, id, val, opt){
+  const pg = opt && typeof opt.i === 'number' ? opt.i : 0;
+  switch(id){
+    case 'gnd-start': ns.engN2 = Math.min(70, ns.engN2 + 35); break;
+    case 'thdg': ns.thdg = true; break;
+    case 'dtc-slot': ns.dtc = val === 1 ? 1 : 0; if (!val) ns.dtcSel = 0; break;
+    case 'dtc-all': ns.dtcSel = 1; ns.page[0] = 'DTC'; break;
+    case 'dtc-ent': ns.dtc = 2; ns.page[0] = 'DTC'; break;
+    case 'mfd-data': ns.page[pg] = 'DATA'; break;
+    case 'aap-cmbt': if (val === 1) ns.aapOff = 0; break;
+    case 'aap-off': ns.aapOff = 1; ns.v['aap-cmbt'] = 0; ns.v['aap-train'] = 0; break;
+    case 'aap-rdr': if (val === 1) ns.radarPhase = 0; break;
+    case 'mfd-u5': ns.radarPhase = Math.min(2, ns.radarPhase + 1); ns.page[pg] = 'RADAR CTL'; break;
+    case 'mfd-d3': ns.page[pg] = 'MENU'; break;
+    case 'mfd-r8': ns.page[pg] = 'SUB MENU'; break;
+    case 'mfd-d2': ns.page[pg] = ['SMS','RDR','HSD'][pg]; break;
+    case 'mfd-d4': if (pg === 0) ns.page[pg] = 'SMS'; else if (pg === 2) ns.page[pg] = 'CLINK'; break;
+    case 'mfd-l2-gun': case 'sms-gun': ns.weapon = 'GUN'; ns.page[0] = 'SMS'; break;
+    case 'mfd-u2-feed': case 'sms-feed': ns.feed = Math.min(3, ns.feed + 1); ns.page[0] = 'SMS'; break;
+    case 'sms-sd10': ns.weapon = 'SD-10'; ns.page[0] = 'SMS'; break;
+    case 'sms-ccip': ns.agProg = 'CCIP'; ns.page[0] = 'AG PROG'; break;
+    case 'sms-auto': ns.agProg = 'AUTO/CCRP'; ns.page[0] = 'AG PROG'; break;
+    case 'sms-dtos': ns.agProg = 'DTOS'; ns.page[0] = 'AG PROG'; break;
+    case 'sms-dir': ns.agProg = 'DIR'; ns.page[0] = 'AG PROG'; break;
+    case 'mfd-agprog': ns.page[0] = 'AG PROG'; break;
+    case 'mfd-pod': ns.page[0] = 'POD'; break;
+    case 'radar-map': ns.page[1] = 'MAP/RBM'; break;
+    case 't1': ns.mode = ['NAV','A/A','A/G'][val]; break;
+    case 'aa-ag': ns.mode = val === 1 ? 'A/G' : 'NAV'; break;
+    case 't2': ns.cm += 1; break;
+    case 't3': ns.speedBrake = ns.speedBrake ? 0 : 1; break;
+    case 's3': ns.shots += 1; break;
+    case 's4': ns.rounds += 1; break;
+    case 'warn-test': ns.lampTest = ns.lampTest ? 0 : 1; break;
+    case 'master-warning': ns.warnAck = ns.seq; break;
+    case 'ufcp-ap': ns.ap = ns.ap ? 0 : 1; break;
+    case 'ufcp-alt': ns.ap = 1; break;
+    case 'ufcp-rtn': ns.ap = 0; break;
+    case 'emg-gear': ns.gearDown = val === 1 ? 1 : 0; if (val === 1) ns.v['lg-lever'] = 0; break;
+    case 'lg-lever': if (val === 0) ns.gearDown = 0; break;
+    case 'chute': ns.chuteJett = val === 2 ? 1 : 0; break;
+    case 'fcs-reset': ns.warnAck = 0; break;
+  }
+}
+
+function simSoft(ns, sk, i){
+  if (sk === 'D3') ns.page[i] = 'MENU';
+  else if (sk === 'R8') ns.page[i] = 'SUB MENU';
+  else if (sk === 'D2') ns.page[i] = ['SMS','RDR','HSD'][i];
+  else if (sk === 'D4') { if (i === 0) ns.page[i] = 'SMS'; else if (i === 2) ns.page[i] = 'CLINK'; }
+  else if (sk === 'U5') { ns.radarPhase = Math.min(2, ns.radarPhase + 1); ns.page[i] = 'RADAR CTL'; }
+  else if (sk === 'L2' && i === 0) { ns.weapon = 'GUN'; ns.page[0] = 'SMS'; }
+  else if (sk === 'U2' && i === 0) { ns.feed = Math.min(3, ns.feed + 1); ns.page[0] = 'SMS'; }
+  else if (sk === 'L4') ns.page[i] = 'DATA';
+  else if (sk === 'R4') ns.page[i] = 'DTC';
+  else return false;
+  return true;
+}
+
+function simCtrl(id){ return (typeof BYID !== 'undefined' && BYID[id]) ? BYID[id] : null; }
+function simPush(s, log){ s.history = s.history || []; s.history.unshift(Object.assign({t:String(s.seq).padStart(2,'0')}, log)); if (s.history.length > 80) s.history.length = 80; }
+
+/* 唯一入口：所有点击都走这里，返回新状态；history 里带完整文字描述 */
+function simApply(s, id, val, opt){
+  opt = opt || {};
+  const d = SIM_BYID[id], c = simCtrl(id), soft = !!opt.sk;
+  const sk = opt.sk, i = typeof opt.i === 'number' ? opt.i : 0;
+  const cid = soft ? (SK_CTRL[sk] || '') : id;
+  const ref = soft ? ((simCtrl(cid) || {}).r || '§1.8.3 p48 · docs/JF17-MFD.md')
+                   : ((c || {}).r || '§1.8.3 p48');
+  const why = (c ? c.t : '') || (d ? d.note : '') || '';
+  const act = soft ? ('点 ' + ['左','中','右'][i] + ' MFD 的 ' + sk + ' 周边键' + (SK_NAME[sk] ? '（' + SK_NAME[sk] + '）' : ''))
+    : (d ? ((c ? c.a : id) + '（' + (c ? c.c : '') + '）') : id);
+
+  const ns = JSON.parse(JSON.stringify(s));
+  ns.seq++;
+
+  /* 只读指示灯：不可拨动，给状态说明 */
+  if (d && d.k === 'ind'){
+    const dd = simDerived(s), map = {
+      'oxy-blink':'氧气示流器：' + dd.oxy, 'dch-lamp':'无伞指示灯：' + (s.chuteJett ? '亮（伞已抛）' : '灭'),
+      'sb-lamp':'减速板信号灯：' + (s.speedBrake ? '亮' : '灭')};
+    simPush(ns, {lv:'warn', act:'查看 ' + act, eff:'这是只读指示灯，不能拨动。当前 ' + (map[id] || '—') + '。', ref:ref, why:why});
+    return ns;
+  }
+
+  /* MFD 周边键：先查该屏有没有电 */
+  if (soft){
+    const dd = simDerived(s);
+    if (!dd.mfd[i]){
+      simPush(ns, {lv:'bad', act:act, eff:'条件不满足：这块 MFD 还没上电。先按 AAP 的 CMBT，再打开对应 MFD 电源（§2.2.2 p130）。', ref:ref, why:why});
+      return ns;
+    }
+    const hit = simSoft(ns, sk, i);
+    const after = simDerived(ns), diff = simDiff(simSummary(dd), simSummary(after));
+    simPush(ns, {lv:'ok', act:act, eff:(hit ? (diff.length ? diff.join('；') : '画面切到 ' + ns.page[i] + '，系统状态不变')
+      : '该周边键在当前页面没有定义功能；画面软键的功能随页面变化（§1.8.3 p48）。'), ref:ref, why:why});
+    ns.pulses['sk:' + i + ':' + sk] = (ns.pulses['sk:' + i + ':' + sk] || 0) + 1;
+    if (SK_CTRL[sk]) ns.pulses[SK_CTRL[sk]] = (ns.pulses[SK_CTRL[sk]] || 0) + 1;
+    return ns;
+  }
+
+  if (!d){ simPush(ns, {lv:'warn', act:act, eff:'该控件在本模拟座舱里没有建模。', ref:ref, why:why}); return ns; }
+  const btn = d.k === 'btn';
+  const next = btn ? 0 : (typeof val === 'number' ? val : ((SV(s,id) + 1) % d.n));
+  const blocked = simReq(s, id, next);
+  if (blocked){
+    simPush(ns, {lv:'bad', act:act, eff:'条件不满足：' + blocked + '。操作未生效，飞机状态保持原样。', ref:ref, why:why});
+    return ns;
+  }
+
+  const before = simDerived(s);
+  ns.v[id] = next;
+  if (btn) ns.pulses[id] = (ns.pulses[id] || 0) + 1;
+  simSpecial(ns, id, next, opt);
+  const after = simDerived(ns);
+  const diff = simDiff(simSummary(before), simSummary(after));
+  const posTxt = btn ? '按压' : ('拨到 ' + (d.pos[next] || String(next)));
+  const eff = diff.length ? diff.join('；')
+    : (d.note ? '画面 / 局部状态变化：' + d.note : '画面或局部状态变化，主系统状态未变');
+  simPush(ns, {lv:'ok', act:act + ' · ' + posTxt, eff:eff, ref:ref, why:why});
+  return ns;
+}
+
+function simLog(s, lv, act, eff, ref, why){
+  const ns = JSON.parse(JSON.stringify(s)); ns.seq++;
+  simPush(ns, {lv:lv, act:act, eff:eff, ref:ref || '—', why:why || ''});
+  return ns;
+}
+
+/* 画面文字：由状态推导，不是贴图 */
+function simScreen(d, i){
+  if (!d.mfd[i]) return {t:'NO POWER', l:['MFD PWR OFF','先开 AAP + 本屏电源'], e:'§2.2.2 p130'};
+  const p = d.page[i];
+  const M = {
+    'MENU':['MAIN MENU','SMS · RDR · HSD · DATA','D3 主菜单 · D2 快捷切页'],
+    'SMS':['STORES MANAGEMENT','WPN: ' + d.weapon + '   FEED: ' + d.feed,'ARM: ' + (d.arm ? 'ARM' : 'SAFE')],
+    'RDR':['RADAR','MODE: ' + d.radar,'U5 进雷达控制菜单'],
+    'HSD':['HORIZONTAL SITUATION','INS: ' + d.ins,'WPT / DTC: ' + d.dtc],
+    'RADAR CTL':['RADAR CONTROL','BIT → STBY → OPR','当前 ' + d.radar],
+    'SUB MENU':['SUB MENU','上下半区独立控制','R8 / D3 切换'],
+    'DATA':['DATA','DTC: ' + d.dtc,'L4 DATA → R4 DTC'],
+    'DTC':['DTC LOAD','ALL 全选 → ENT 确认',d.dtc],
+    'CLINK':['DATA LINK','LINK: ' + (d.avion ? 'ON' : 'OFF'),'右屏 D4 快捷'],
+    'AG PROG':['AG PROGRAMS',d.agProg,'CCIP / AUTO / DTOS / DIR'],
+    'POD':['POD','WMD7 吊舱页面','§5.7.2 p276'],
+    'MAP/RBM':['MAP / RBM','真实波束地图测绘','§5.2.1 p246']
+  };
+  const a = M[p] || M.MENU;
+  return {t:p, l:[a[0], a[1]], e:a[2]};
+}
+
+function simHud(d){
+  if (!d.hudOn) return {on:false, mode:'HUD OFF', spd:'— / —', alt:'— / —', msg:'打开 HUD 开关后这里才有画面 · §2.3.2 p138'};
+  const msg = d.warns.length ? ('⚠ ' + d.warns.join(' / ')) : (d.eng === 'IDLE' ? 'READY · ' + d.mode : 'GND · ' + d.mode);
+  return {on:true, mode:d.mode + (d.arm ? ' / ARM' : ''),
+    spd:(d.eng === 'IDLE' ? '000' : '---') + ' kt' + '\nGS ' + (d.eng === 'IDLE' ? '000' : '---'),
+    alt:(d.gear === 'DOWN' ? '0' : '---') + ' ft' + '\nBARO 1013',
+    msg:msg};
+}
+function simUfcp(d){
+  if (!d.ufcpOn) return [{b:'----',s:'COM1'},{b:'----',s:'NAV'},{b:'----',s:'A/P'},{b:'----',s:'FUEL'}];
+  return [{b:d.mode,s:'MASTER MODE'},{b:d.ins,s:'INS'},{b:d.arm ? 'ARM' : 'SAFE',s:'MASTER ARM'},{b:d.dtc,s:'DTC'}];
+}
+
+/* 演示 / 引导用的顺序表（复用手册开车顺序） */
+const SIM_POWER_SEQ = [['batt',1],['ac-gen',1],['dc-gen',1],['warn-brt',1],['warn-test',0],['warn-test',0],
+  ['aap-cmbt',1],['aap-rdr',1],['aap-ins',1],['aap-saiu',1],['mfd-l-pwr',1],['mfd-c-pwr',1],['mfd-r-pwr',1],['hud',1],
+  ['ufcp-brt',1],['hud-brt',1],['oxy-ind-brt',1],['mfd-d3',0]];
+const SIM_INS_SEQ = [['ins-mode',1],['ufcp-dst',0],['thdg',0],['ins-mode',2],['dtc-slot',1],['dtc-all',0],['dtc-ent',0]];
+const SIM_ENG_SEQ = [['eng-ctrl',1],['starter',1],['eng-stop',0],['throttle',1],['gnd-start',0],['gnd-start',0],
+  ['shars',1],['efcs',1],['oxy-valve',1],['n-100',1],['oxy-hose',1],['g-suit',1],['canopy',1],['lg-lever',0]];
+const SIM_WPN_SEQ = [['master-arm',1],['sms-sd10',0],['t1',1],['mfd-u5',0],['mfd-u5',0],['s3',0],['s8',0]];
+const SIM_DEMO_SEQ = SIM_POWER_SEQ.concat(SIM_INS_SEQ, SIM_ENG_SEQ, SIM_WPN_SEQ);
+
+const SIM_GUIDES = [
+  {id:'power', name:'第 1 组 · 冷舱上电 → 航电启动', ref:'§2.3.1 p137 · §2.3.2 p138 · §2.2.2 p130', preset:[], steps:[
+    ['把 BATT 蓄电池开关拨到 ON','batt',1,'§2.3.1 p137'],
+    ['接通 AC GEN 主交流发电机','ac-gen',1,'§2.3.1 p137'],
+    ['接通 DC GEN 直流发电机','dc-gen',1,'§2.3.1 p137'],
+    ['打开告警灯盒亮度旋钮','warn-brt',1,'§2.3.2 p138'],
+    ['在 AAP 上按 CMBT 一键启动航电','aap-cmbt',1,'§2.3.2 p138'],
+    ['打开左 MFD 电源','mfd-l-pwr',1,'§2.2.2 p130'],
+    ['打开中 MFD 电源','mfd-c-pwr',1,'§2.2.2 p130'],
+    ['打开右 MFD 电源','mfd-r-pwr',1,'§2.2.2 p130'],
+    ['打开 HUD 开关','hud',1,'§2.3.2 p138']
+  ]},
+  {id:'ins', name:'第 2 组 · 惯导快速对准 + DTC 加载', ref:'§2.3.4 p140–143 · §2.3.5 p144', preset:SIM_POWER_SEQ, steps:[
+    ['AAP 惯导模式转到 FAST','ins-mode',1,'§2.3.4 p140'],
+    ['在 UFCP 点 DST 查看 DST 00 对准点','ufcp-dst',1,'§2.3.4 p140'],
+    ['倒计时结束前在 THDG 输入真航向','thdg',1,'§2.3.4 p141'],
+    ['把惯导模式转到 INS NAV','ins-mode',2,'§2.3.4 p141'],
+    ['看向右控制台最后侧插入 DTC 卡','dtc-slot',1,'§2.3.5 p144'],
+    ['在加载画面点 ALL 全选','dtc-all',1,'§2.3.5 p144'],
+    ['点 ENT 确认加载','dtc-ent',1,'§2.3.5 p144']
+  ]},
+  {id:'eng', name:'第 3 组 · 发动机地面开车', ref:'§2.3.13 p156 · §1.2.3 p32', preset:SIM_POWER_SEQ.concat(SIM_INS_SEQ), steps:[
+    ['接通左控制台 ENG CTRL','eng-ctrl',1,'§2.3.13 p156'],
+    ['STARTER 置中位 START','starter',1,'§2.3.13 p156'],
+    ['点开发动机止动销','eng-stop',1,'§2.3.13 p156'],
+    ['油门稍稍推出到慢车以上','throttle',1,'§2.3.13 p156'],
+    ['按住 GND 1~2 秒（第 1 次）','gnd-start',1,'§2.3.13 p156'],
+    ['再按 GND 直到 N2 到 70% 慢车','gnd-start',2,'§2.3.13 p156'],
+    ['接通左侧壁板氧气阀门','oxy-valve',1,'§2.3.6 p147'],
+    ['氧气调节器转到 100% / 肺式供氧','n-100',1,'§1.14 p92']
+  ]},
+  {id:'wpn', name:'第 4 组 · 武器与 HOTAS 前置条件', ref:'§4.3.1 p205 · §4.4.8 p234 · §7.1 p294', preset:SIM_POWER_SEQ.concat(SIM_INS_SEQ, SIM_ENG_SEQ), steps:[
+    ['把 MASTER ARM 拨到 ARM','master-arm',1,'§4.3 p205'],
+    ['在 SMS 页选 SD-10','sms-sd10',1,'§4.4.8 p234'],
+    ['T1 主模式切到 A/A','t1',1,'§7.2 p296'],
+    ['点 U5 让雷达从 BIT 走到 STBY/OPR','mfd-u5',1,'§4.4.7 p233'],
+    ['扣 S3 发射 / 投放','s3',1,'§7.1 p294']
+  ]}
+];
+
+function simStepDone(s, step){
+  const id = step[1], target = step[2], d = SIM_BYID[id];
+  if (!d) return false;
+  if (d.k === 'btn' || d.k === 'ind') return (s.pulses[id] || 0) >= target;
+  return SV(s, id) >= target;
+}
+function simGuideIndex(s, g){ let i = 0; while (i < g.steps.length && simStepDone(s, g.steps[i])) i++; return i; }
+function simPreset(s, seq){
+  let x = s;
+  seq.forEach(([id, val]) => { x = simApply(x, id, val); });
+  x.history = [{lv:'', act:'引导就绪', eff:'已把飞机设置到该检查单的起点状态（前置步骤静默完成）。',
+    ref:seq.length ? '§2.3 正常程序 p137–156' : '冷舱',
+    why:'按右侧「引导检查单」从上往下点座舱里的控件；点错会提示，不会跳步。', t:'00'}];
+  return x;
+}
+function simCheckData(){
+  const e = [];
+  const ids = SIM_DEVS.map(d => d.id);
+  if (new Set(ids).size !== ids.length) e.push('SIM_DEVS id 重复');
+  SIM_DEVS.forEach(d => {
+    if (!SIM_BAYS.some(b => b.id === d.bay)) e.push('控件 ' + d.id + ' 的 bay 不存在');
+    if (typeof BYID !== 'undefined' && !BYID[d.id]) e.push('控件 ' + d.id + ' 不在 CTRL 库里，取不到手册引用');
+    if (d.k !== 'btn' && d.k !== 'ind' && d.n !== d.pos.length) e.push('控件 ' + d.id + ' 档位数与档位文字不符');
+    if (d.w && !(d.w === 'ufcp' && (d.k === 'btn' || d.k === 'kn'))) e.push('控件 ' + d.id + ' 的 w 无法被渲染（会消失）');
+  });
+  SIM_GUIDES.forEach(g => g.steps.forEach(st => {
+    if (!SIM_BYID[st[1]]) e.push('引导 ' + g.id + ' 的步骤控件 ' + st[1] + ' 不存在');
+    if (!st[3]) e.push('引导 ' + g.id + ' 的步骤缺手册页码');
+  }));
+  SIM_DEMO_SEQ.forEach(([id]) => { if (!SIM_BYID[id]) e.push('演示序列控件 ' + id + ' 不存在'); });
+  return e;
+}
+/* ==== @simengine:end ==== */
+
+/* ==================== DOM 层 ==================== */
+const $ = id => document.getElementById(id);
+const LS_STAT = 'jf17trainer.v1.stats', LS_PREF = 'jf17trainer.v1.prefs';
+const esc = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+let pref = {zone:'all', ch:'all', diff:'easy', wrongOnly:false, timed:true, flow:'cold', flowDiff:'easy'};
+let st = {total:0, correct:0, wrong:0, streak:0, best:0, wrongIds:{}, perCtrl:{}};
+try { Object.assign(pref, JSON.parse(localStorage.getItem(LS_PREF) || '{}')); } catch(e){}
+try { Object.assign(st, JSON.parse(localStorage.getItem(LS_STAT) || '{}')); } catch(e){}
+const save = () => { try { localStorage.setItem(LS_STAT, JSON.stringify(st)); localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch(e){} };
+
+let questions = [], queue = [], qi = -1, cur = null, locked = false, paused = false, seconds = 0, timer = null, hintLevel = 0;
+let flow = null, flowStep = 0, flowDoneCount = 0;
+let toastTimer = null;
+
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.style.display = 'none', 1800);
+}
+function fmtTime(s){ return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); }
+function paintStats(){
+  $('sCorrect').textContent = st.correct; $('sWrong').textContent = st.wrong;
+  $('sStreak').textContent = st.streak; $('sTime').textContent = fmtTime(seconds);
+  $('sRate').textContent = st.total ? Math.round(st.correct / st.total * 100) + '%' : '—';
+}
+
+/* ---------- 导航 ---------- */
+function go(id){
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === id));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.go === id));
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+$('tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b) go(b.dataset.go); });
+
+/* ---------- 座舱总览 ---------- */
+function renderCockpit(){
+  const counts = {}; CTRL.forEach(c => counts[c.z] = (counts[c.z] || 0) + 1);
+  const wide = {front:1, left:1, right:1};
+  $('cockpit').innerHTML = ZORDER.map(z => {
+    const Z = ZONES[z];
+    return '<div class="zonebox z-' + z + (wide[z] ? ' wide' : '') + (pref.zone === z ? ' sel' : '') + '" data-z="' + z + '">' +
+      '<b>' + Z.name + '</b><div class="n">' + (counts[z] || 0) + '</div><small>' + esc(Z.where) + '</small></div>';
+  }).join('') + '<div class="zonenote">↑ 前 / 机头方向　·　左 = 飞行员左手侧，右 = 右手侧　·　点击任一方块设为找键训练范围</div>';
+}
+$('cockpit').addEventListener('click', e => {
+  const b = e.target.closest('.zonebox'); if (!b) return;
+  pref.zone = (pref.zone === b.dataset.z) ? 'all' : b.dataset.z;
+  $('fZone').value = pref.zone; save(); renderCockpit(); resetDrill();
+  toast(pref.zone === 'all' ? '范围：全部座舱方位' : '范围：' + ZONES[pref.zone].name);
+});
+
+/* ---------- 虚拟按键面板 ---------- */
+function keyHtml(c){
+  const kk = {sw:'SW',kn:'KN',btn:'BT',hat:'HT',lv:'LV',soft:'SK',ind:'IND'}[c.k] || 'SW';
+  return '<button class="key' + (c.k === 'soft' ? ' soft' : '') + '" data-id="' + c.id + '" title="' + esc(c.a + ' · ' + c.c + ' ｜ ' + c.p) + '" aria-label="' + esc(c.a + ' ' + c.c) + '">' +
+    '<span class="kk">' + kk + '</span><span class="ab">' + esc(c.a) + '</span><span class="cn">' + esc(c.c) + '</span></button>';
+}
+function renderBoards(){
+  [['boardDrill', pref.diff], ['boardFlow', pref.flowDiff]].forEach(([id, diff]) => {
+    const el = $(id); el.dataset.diff = diff;
+    el.innerHTML = ZORDER.map(z => {
+      const list = CTRL.filter(c => c.z === z);
+      if (!list.length) return '';
+      return '<section class="bay z-' + z + '"><div class="spread"><h3>' + ZONES[z].name + '</h3>' +
+        '<span class="where">' + esc(ZONES[z].where) + ' · ' + list.length + ' 个控件</span></div>' +
+        '<div class="btns">' + list.map(keyHtml).join('') + '</div></section>';
+    }).join('');
+  });
+}
+function boardClick(e){
+  const k = e.target.closest('.key'); if (!k) return;
+  if (e.currentTarget.id === 'boardFlow') flowAnswer(k.dataset.id, k);
+  else answer(k.dataset.id, k);
+}
+$('boardDrill').addEventListener('click', boardClick);
+$('boardFlow').addEventListener('click', boardClick);
+
+/* ---------- 找键训练 ---------- */
+function initSelects(){
+  $('fZone').innerHTML = '<option value="all">全部座舱方位</option>' + ZORDER.map(z => '<option value="' + z + '">' + ZONES[z].name + '（' + CTRL.filter(c=>c.z===z).length + '）</option>').join('');
+  $('rZone').innerHTML = '<option value="all">全部</option>' + ZORDER.map(z => '<option value="' + z + '">' + ZONES[z].name + '</option>').join('');
+  const chs = ['1','2','3','4','5','6','7','8'];
+  const chName = {'1':'1 说明和使用','2':'2 正常程序','3':'3 应急程序','4':'4 空对空','5':'5 空对地','6':'6 告警与反制','7':'7 HOTAS','8':'8 FCS'};
+  $('fCh').innerHTML = '<option value="all">全部章节</option>' + chs.map(c => '<option value="' + c + '">' + chName[c] + '</option>').join('');
+  $('fFlow').innerHTML = FLOWS.map(f => '<option value="' + f.id + '">' + esc(f.name) + '</option>').join('');
+  $('fZone').value = pref.zone; $('fCh').value = pref.ch; $('fDiff').value = pref.diff;
+  $('fWrong').checked = pref.wrongOnly; $('fTimed').checked = pref.timed;
+  $('fFlow').value = pref.flow; $('fFlowDiff').value = pref.flowDiff;
+}
+function buildQueue(){
+  questions = buildQuestions();
+  const o = {zone:pref.zone, ch:pref.ch, wrongOnly:pref.wrongOnly, wrongIds:st.wrongIds};
+  let pool = filterQuestions(questions, o);
+  if (!pool.length){
+    if (o.wrongOnly) toast('错题本为空，已按当前范围的全部题抽题');
+    pool = filterQuestions(questions, {zone:pref.zone, ch:pref.ch});
+  }
+  queue = shuffle(pool); qi = -1; locked = false; hintLevel = 0;
+  $('poolInfo').textContent = '本次题池 ' + pool.length + ' 题 · 控件 ' + CTRL.length + ' 个 · 情境题 ' + SCENES.length + ' 条';
+}
+function nextQuestion(){
+  if (!queue.length) buildQueue();
+  qi++;
+  if (qi >= queue.length){ queue = shuffle(queue); qi = 0; }
+  cur = queue[qi]; locked = false; hintLevel = 0;
+  $('qNum').textContent = '第 ' + (qi + 1) + ' / ' + queue.length + ' 题 · ' + (cur.kind === 'scene' ? '情境题' : '控件定位') + ' · 第 ' + cur.ch + ' 章';
+  $('qText').textContent = cur.q;
+  $('qMeta').innerHTML = '<span class="tag">' + (cur.zone ? ZONES[cur.zone].name : '全部') + '</span><span class="tag m">' + esc(cur.ref) + '</span><span class="tag">难度：' + ({easy:'认位置',normal:'只给缩写',blind:'盲操'}[pref.diff]) + '</span>';
+  $('qBar').style.width = (queue.length ? qi / queue.length * 100 : 0) + '%';
+  $('fb').className = 'feedback';
+  document.querySelectorAll('.key.hit,.key.miss,.key.flash').forEach(k => k.classList.remove('hit','miss','flash'));
+}
+function resetDrill(){
+  buildQueue(); nextQuestion(); paused = false; $('bPause').textContent = '暂停';
+  if (!timer) timer = setInterval(() => { if (!paused && pref.timed){ seconds++; paintStats(); save(); } }, 1000);
+}
+function answer(id, btn){
+  if (!cur || locked) return;
+  const correct = id === cur.ans;
+  const r = judge(st, cur, id, false); st = r.state; locked = true;
+  const c = BYID[id], right = BYID[cur.ans];
+  document.querySelectorAll('#boardDrill .key[data-id="' + cur.ans + '"]').forEach(k => k.classList.add('hit'));
+  if (!correct && btn) btn.classList.add('miss');
+  const fb = $('fb');
+  fb.className = 'feedback show ' + (correct ? 'ok' : 'bad');
+  $('fbTitle').textContent = correct ? '✓ 答对了：' + right.a + ' · ' + right.c : '✗ 不对。正确答案是 ' + right.a + ' · ' + right.c;
+  $('fbWhy').textContent = (correct ? '' : '你点的是 ' + c.a + ' · ' + c.c + '（' + c.p + '）。') + cur.why;
+  $('fbRef').innerHTML = '<span class="tag m">' + esc(cur.ref) + '</span> <span class="tag">' + esc(right.p) + ' · ' + ZONES[right.z].name + '</span>';
+  paintStats(); save();
+  setTimeout(() => { if (locked) nextQuestion(); }, correct ? 850 : 1900);
+}
+function skip(){
+  if (!cur) return;
+  const r = judge(st, cur, null, true); st = r.state;
+  const right = BYID[cur.ans];
+  const fb = $('fb'); fb.className = 'feedback show bad';
+  $('fbTitle').textContent = '跳过 → ' + right.a + ' · ' + right.c;
+  $('fbWhy').textContent = cur.why;
+  $('fbRef').innerHTML = '<span class="tag m">' + esc(cur.ref) + '</span> <span class="tag">' + esc(right.p) + '</span>';
+  paintStats(); save(); locked = true;
+  setTimeout(() => { if (locked) nextQuestion(); }, 1700);
+}
+function hint(){
+  if (!cur || locked) return;
+  const right = BYID[cur.ans]; hintLevel++;
+  st.streak = 0; paintStats(); save();
+  if (hintLevel === 1){
+    toast('提示：在「' + ZONES[right.z].name + '」· ' + right.p);
+    $('fb').className = 'feedback show';
+    $('fbTitle').textContent = '提示 1 / 2 · 方位';
+    $('fbWhy').textContent = '去 ' + ZONES[right.z].name + ' 的「' + right.p + '」找。再按一次提示会高亮按钮（连击已归零）。';
+    $('fbRef').innerHTML = '<span class="tag m">' + esc(cur.ref) + '</span>';
+  } else {
+    document.querySelectorAll('#boardDrill .key[data-id="' + cur.ans + '"]').forEach(k => { k.classList.add('flash'); k.scrollIntoView({block:'center', behavior:'smooth'}); });
+    toast('已高亮：' + right.a + ' · ' + right.c);
+  }
+}
+$('bStart').addEventListener('click', () => { seconds = 0; paintStats(); resetDrill(); toast('已重新抽题'); });
+$('bNext').addEventListener('click', () => { if (cur) nextQuestion(); });
+$('bSkip').addEventListener('click', skip);
+$('bHint').addEventListener('click', hint);
+$('bPause').addEventListener('click', () => { paused = !paused; $('bPause').textContent = paused ? '继续' : '暂停'; toast(paused ? '已暂停' : '继续'); });
+$('bClear').addEventListener('click', () => {
+  st = {total:0, correct:0, wrong:0, streak:0, best:0, wrongIds:{}, perCtrl:{}}; seconds = 0;
+  save(); paintStats(); buildQueue(); nextQuestion(); toast('记录已清空');
+});
+['fZone','fCh','fDiff','fWrong','fTimed'].forEach(id => $(id).addEventListener('change', () => {
+  pref.zone = $('fZone').value; pref.ch = $('fCh').value; pref.diff = $('fDiff').value;
+  pref.wrongOnly = $('fWrong').checked; pref.timed = $('fTimed').checked;
+  save(); renderBoards(); renderCockpit(); resetDrill();
+}));
+document.addEventListener('keydown', e => {
+  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'h') hint();
+  else if (k === 's') skip();
+  else if (k === 'p') $('bPause').click();
+  else if (e.key === 'Enter' && cur) nextQuestion();
+});
+
+/* ---------- 流程训练 ---------- */
+function renderFlow(){
+  const f = FLOWS.find(x => x.id === pref.flow) || FLOWS[0];
+  flow = f; $('flowName').textContent = f.name; $('flowRef').textContent = f.ref;
+  $('flowSteps').innerHTML = f.steps.map((s,i) =>
+    '<li class="' + (i < flowStep ? 'done' : (i === flowStep ? 'cur' : '')) + '"><span>' + esc(s[0]) + '</span><span class="ref">' + esc(s[2]) + '</span></li>').join('');
+  $('flowDone').textContent = flowStep >= f.steps.length ? '✓ 流程完成：' + f.steps.length + ' 步全对。可以换一条，或把难度调到盲操再来一遍。' : '';
+  $('flowFb').className = 'feedback';
+}
+function flowAnswer(id, btn){
+  if (!flow || flowStep >= flow.steps.length) return;
+  const step = flow.steps[flowStep], right = BYID[step[1]], c = BYID[id];
+  const fb = $('flowFb');
+  if (id === step[1]){
+    flowStep++; fb.className = 'feedback show ok';
+    $('flowFbTitle').textContent = '✓ ' + right.a + ' · ' + right.c;
+    $('flowFbWhy').textContent = right.t;
+    if (btn) { btn.classList.add('hit'); setTimeout(() => btn.classList.remove('hit'), 700); }
+    st.correct = (st.correct || 0) + 1; st.total = (st.total || 0) + 1; st.streak = (st.streak || 0) + 1;
+    st.best = Math.max(st.best || 0, st.streak); paintStats(); save(); renderFlow();
+  } else {
+    fb.className = 'feedback show bad';
+    $('flowFbTitle').textContent = '这一步不是 ' + c.a + ' · ' + c.c;
+    $('flowFbWhy').textContent = '本步：' + step[0] + '（' + step[2] + '）。按「提示本步」可以看方位。';
+    st.wrong = (st.wrong || 0) + 1; st.total = (st.total || 0) + 1; st.streak = 0;
+    paintStats(); save();
+  }
+}
+$('fFlow').addEventListener('change', () => { pref.flow = $('fFlow').value; flowStep = 0; save(); renderFlow(); });
+$('fFlowDiff').addEventListener('change', () => { pref.flowDiff = $('fFlowDiff').value; save(); renderBoards(); });
+$('bFlowStart').addEventListener('click', () => { flowStep = 0; renderFlow(); toast('从第一步开始'); });
+$('bFlowHint').addEventListener('click', () => {
+  if (!flow || flowStep >= flow.steps.length) return;
+  const right = BYID[flow.steps[flowStep][1]];
+  document.querySelectorAll('#boardFlow .key[data-id="' + right.id + '"]').forEach(k => { k.classList.add('flash'); k.scrollIntoView({block:'center', behavior:'smooth'}); });
+  $('flowFb').className = 'feedback show';
+  $('flowFbTitle').textContent = '本步应点：' + right.a + ' · ' + right.c;
+  $('flowFbWhy').textContent = right.p + ' · ' + ZONES[right.z].name + ' ｜ ' + flow.steps[flowStep][2];
+});
+
+/* ---------- 控件速查 ---------- */
+function renderRef(){
+  const z = $('rZone').value, q = ($('rSearch').value || '').trim().toLowerCase();
+  let list = CTRL.filter(c => (z === 'all' || c.z === z) && (!q || (c.a + c.c + c.p + c.r + c.t).toLowerCase().includes(q)));
+  $('rCount').textContent = '共 ' + list.length + ' / ' + CTRL.length + ' 个控件';
+  $('refList').innerHTML = ZORDER.map(zone => {
+    const cs = list.filter(c => c.z === zone); if (!cs.length) return '';
+    const panels = [...new Set(cs.map(c => c.p))];
+    return '<section class="bay z-' + zone + '"><div class="spread"><h3>' + ZONES[zone].name + '</h3><span class="where">' + cs.length + ' 个控件 · ' + esc(ZONES[zone].where) + '</span></div>' +
+      panels.map(p => '<div style="margin:10px 0 4px"><h4>' + esc(p) + '</h4><div>' +
+        cs.filter(c => c.p === p).map(c =>
+          '<span class="ctl" data-id="' + c.id + '"><span class="ab">' + esc(c.a) + '</span><span>' + esc(c.c) + '</span>' +
+          '<span class="tag ' + (c.s === 'M' ? 'm' : c.s === 'S' ? 's' : 'd') + '">' + (c.s === 'M' ? '手册' : c.s === 'S' ? '软键' : '控件表') + '</span>' +
+          '<span class="faint mono">' + esc(c.r) + '</span></span>').join('') + '</div></div>').join('') +
+      '</section>';
+  }).join('') || '<div class="card muted">没有匹配的控件，换个词试试。</div>';
+}
+$('rZone').addEventListener('change', renderRef);
+$('rSearch').addEventListener('input', renderRef);
+
+/* 贴身浮层 */
+const pop = $('pop');
+function showPop(e, c){
+  pop.innerHTML = '<b>' + esc(c.a) + ' · ' + esc(c.c) + '</b><br>' + esc(c.t) +
+    '<br><span class="tag">' + esc(c.p) + '</span><span class="tag">' + ZONES[c.z].name + '</span>' +
+    (c.st ? '<span class="tag d">开车前 ' + esc(c.st) + '</span>' : '') +
+    '<span class="ref">' + esc(c.r) + '</span>';
+  pop.style.display = 'block';
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.max(8, Math.min(e.clientX + 14, innerWidth - w - 10)) + 'px';
+  pop.style.top = Math.max(8, Math.min(e.clientY + 14, innerHeight - h - 10)) + 'px';
+}
+$('refList').addEventListener('click', e => {
+  const el = e.target.closest('.ctl');
+  if (el && BYID[el.dataset.id]) { showPop(e, BYID[el.dataset.id]); e.stopPropagation(); }
+});
+document.addEventListener('click', e => { if (!e.target.closest('#pop') && !e.target.closest('.ctl')) pop.style.display = 'none'; });
+window.addEventListener('scroll', () => pop.style.display = 'none', {passive:true});
+
+/* ---------- 覆盖表 ---------- */
+function renderCover(){
+  document.querySelector('#coverTable tbody').innerHTML = COVER.map(r =>
+    '<tr><td><b>' + esc(r[0]) + '</b></td><td><span class="tag">' + esc(r[1]) + '</span></td><td>' + esc(r[2]) + '</td><td class="muted">' + esc(r[3]) + '</td></tr>').join('');
+}
+
+/* ==================== 简易座舱 · DOM 层 ==================== */
+let S = simInit();
+let simGuideCur = null, demoTimer = null;
+const SIM_COLORS = {front:'#58a6ff',left:'#d2a8ff',leftrear:'#f778ba',right:'#7ee787',rightrear:'#ffa657',hotas:'#79c0ff',seat:'#a5b4c4'};
+const SIM_ZN = {left:'左控制台',right:'右控制台',front:'前仪表台',bottom:'HOTAS / 座椅'};
+const SIM_SK_TOP = ['U1','U2','U3','U4','U5'], SIM_SK_BOT = ['D1','D2','D3','D4','D5'];
+const SIM_SK_SIDE = n => Array.from({length:8}, (_,i) => n + (i+1));
+const simC = id => BYID[id] || {a:id,c:'',p:'',r:'',t:''};
+
+function simDevHtml(d, dd){
+  const c = simC(d.id), v = S.v[d.id] || 0;
+  const cls = ['dev', d.k];
+  let lamp = '';
+  if (d.k === 'ind'){
+    const lit = d.id === 'oxy-blink' ? dd.oxyBlink
+      : d.id === 'dch-lamp' ? (S.chuteJett === 1 && dd.brt > 0)
+      : (S.speedBrake === 1 && dd.brt > 0);
+    if (lit){ cls.push('lit'); lamp = d.id === 'dch-lamp' ? '--lamp:var(--warn)' : '--lamp:var(--ok)'; }
+  }
+  const step = simGuideCur ? simGuideCur.steps[simGuideIndex(S, simGuideCur)] : null;
+  if (step && step[1] === d.id) cls.push('guide');
+  const rot = d.k === 'hat' ? [0,0,180,270,90][v] : (d.k === 'kn' ? (v * 40 - 40) : 0);
+  const title = c.a + ' · ' + c.c + ' ｜ ' + c.p + ' ｜ ' + c.r + '\n' + (c.t || d.note || '');
+  const val = d.k === 'ind' ? '只读'
+    : d.k === 'btn' ? ((S.pulses[d.id] || 0) ? '已按 ' + S.pulses[d.id] + ' 次' : '按压')
+    : (d.pos[v] || String(v));
+  return '<div class="' + cls.join(' ') + '" data-id="' + d.id + '" data-on="' + v + '"' +
+    (lamp ? ' style="' + lamp + '"' : (d.k === 'hat' || d.k === 'kn' ? ' style="--rot:' + rot + 'deg"' : '')) +
+    ' title="' + esc(title) + '">' +
+    '<span class="face"><i></i></span><b>' + esc(c.a) + '</b><small>' + esc(c.c.slice(0,12)) + '</small>' +
+    '<span class="val">' + esc(val) + '</span></div>';
+}
+
+function simBays(col){
+  return SIM_BAYS.filter(b => b.col === col).map(b => {
+    const devs = SIM_DEVS.filter(d => d.bay === b.id && !d.w);
+    if (!devs.length) return '';
+    const dd = simDerived(S);
+    if (col === 'bottom'){
+      return '<div class="sim-hotas" style="--zc:' + SIM_COLORS[b.z] + '"><h3>' + esc(b.name) +
+        ' <small class="faint">' + esc(b.w) + '</small></h3>' +
+        (b.id === 'seat' ? '' : '<div class="hotas-visual"></div>') +
+        '<div class="sim-devs">' + devs.map(d => simDevHtml(d, dd)).join('') + '</div></div>';
+    }
+    return '<div class="sim-bay z-' + b.z + '"><h3>' + esc(b.name) + ' <small>' + esc(b.w) + '</small></h3>' +
+      '<div class="sim-devs">' + devs.map(d => simDevHtml(d, dd)).join('') + '</div></div>';
+  }).join('');
+}
+function renderSimBays(){
+  $('simLeft').innerHTML = simBays('left');
+  $('simRight').innerHTML = simBays('right');
+  $('simFront').innerHTML = simBays('front');
+  $('simBottom').innerHTML = simBays('bottom');
+}
+
+function renderSimStatus(){
+  const d = simDerived(S);
+  const it = [
+    ['全机供电', d.power ? 'ON' : 'OFF', d.power ? 'on' : 'bad'],
+    ['航电 AAP', d.avion ? (d.full ? 'CMBT' : 'TRAIN') : 'OFF', d.avion ? 'on' : ''],
+    ['HUD / UFCP', (d.hudOn ? 'HUD ON' : 'HUD OFF') + ' / ' + (d.ufcpOn ? 'ON' : 'OFF'), d.hudOn ? 'on' : ''],
+    ['惯导', d.ins, d.ins.indexOf('NAV') === 0 ? 'on' : (d.ins.indexOf('FAST') === 0 ? 'warn' : '')],
+    ['雷达', d.radar, d.radar === 'OPR' ? 'on' : (d.radar === 'OFF' ? '' : 'warn')],
+    ['发动机', d.eng + ' · N2 ' + d.n2 + '%', d.eng === 'IDLE' ? 'on' : (d.eng === 'START' ? 'warn' : '')],
+    ['主模式', d.mode, 'on'],
+    ['主军械', d.arm ? 'ARM' : 'SAFE', d.arm ? 'bad' : ''],
+    ['起落 / 减速板', d.gear + ' / ' + d.brake, d.brake === 'OPEN' ? 'warn' : ''],
+    ['氧气 / DTC', d.oxy + ' / ' + d.dtc, d.oxy === '肺式供氧' ? 'on' : '']
+  ];
+  $('simStatus').innerHTML = it.map(x => '<div class="sim-chip ' + x[2] + '"><b>' + x[0] + '</b><span>' + esc(x[1]) + '</span></div>').join('');
+}
+
+function renderSimHud(){
+  const h = simHud(simDerived(S)), el = $('simHud');
+  el.className = 'sim-hud' + (h.on ? '' : ' off');
+  el.innerHTML = '<div class="hud-mode">' + esc(h.mode) + '</div>' +
+    '<div class="hud-spd">' + esc(h.spd) + '</div>' +
+    '<div class="hud-alt">' + esc(h.alt) + '</div>' +
+    '<div class="hud-reticle"></div><div class="hud-msg">' + esc(h.msg) + '</div>';
+}
+
+function renderSimMfds(){
+  const d = simDerived(S);
+  const key = (sk, i, label) => '<button class="scr-key' + (SK_CTRL[sk] ? ' hi' : '') + '" data-sk="' + sk + '" data-i="' + i + '" title="' +
+    esc(sk + (SK_NAME[sk] ? ' · ' + SK_NAME[sk] : ' · 周边键')) + '">' + label + '</button>';
+  const names = ['左 MFD · CMBT/SMS','中 MFD · 雷达','右 MFD · HSD'];
+  $('simMfds').innerHTML = [0,1,2].map(i => {
+    const sc = simScreen(d, i);
+    return '<div><div class="sim-screen' + (d.mfd[i] ? '' : ' off') + '">' +
+      '<div class="su">' + SIM_SK_TOP.map(k => key(k, i, k.slice(1))).join('') + '</div>' +
+      '<div class="sl">' + SIM_SK_SIDE('L').map(k => key(k, i, k.slice(1))).join('') + '</div>' +
+      '<div class="scr-body"><b>' + esc(sc.t) + '</b><span>' + esc(sc.l[0]) + '</span><span>' + esc(sc.l[1]) + '</span><em>' + esc(sc.e) + '</em></div>' +
+      '<div class="sr">' + SIM_SK_SIDE('R').map(k => key(k, i, k.slice(1))).join('') + '</div>' +
+      '<div class="sd">' + SIM_SK_BOT.map(k => key(k, i, k.slice(1))).join('') + '</div>' +
+      '</div><div class="screen-label">' + names[i] + '</div></div>';
+  }).join('');
+}
+
+function renderSimUfcp(){
+  const d = simDerived(S), w = simUfcp(d);
+  const keys = SIM_DEVS.filter(x => x.w === 'ufcp' && x.k === 'btn');
+  const knobs = SIM_DEVS.filter(x => x.w === 'ufcp' && x.k === 'kn');
+  $('simUfcp').innerHTML =
+    '<div class="ufcp-wins">' + w.map(x => '<div class="ufcp-win' + (d.ufcpOn ? '' : ' off') + '"><b>' + esc(x.b) + '</b>' + esc(x.s) + '</div>').join('') + '</div>' +
+    '<div class="ufcp-keys">' + keys.map(x => '<button class="ufcp-key' + ((S.pulses[x.id] || 0) ? ' hi' : '') + '" data-id="' + x.id + '" title="' +
+      esc(simC(x.id).c + ' ｜ ' + simC(x.id).r) + '">' + esc(simC(x.id).a) + '</button>').join('') + '</div>' +
+    '<div class="ufcp-knobs">' + knobs.map(x => {
+      const v = S.v[x.id] || 0;
+      return '<div class="ufcp-knob" data-id="' + x.id + '" style="--rot:' + (v * 40 - 40) + 'deg" title="' +
+        esc(simC(x.id).a + ' · 当前 ' + (x.pos[v] || v) + ' ｜ ' + simC(x.id).r) + '"><i></i><small>' + esc(simC(x.id).a) + '</small></div>';
+    }).join('') + '</div>';
+}
+
+function renderSimLamps(){
+  const d = simDerived(S);
+  $('simLamps').innerHTML = d.lamps.map(l => '<div class="lamp' + (l.on ? ' lit' : '') + '" style="--lc:' + l.c + '"><i></i><span>' + esc(l.n) + '</span></div>').join('');
+}
+
+function renderSimState(){
+  const d = simDerived(S), sum = simSummary(d);
+  $('simState').innerHTML = Object.keys(sum).map(k =>
+    '<div class="sim-state-row"><span>' + esc(k) + '</span><span>' + esc(sum[k]) + '</span></div>').join('') +
+    '<div class="faint" style="margin-top:7px">发射 ' + d.shots + ' 次 · 航炮 ' + d.rounds + ' 发 · 干扰弹 ' + (S.cm || 0) + ' 组</div>';
+}
+
+function renderSimLog(){
+  const h = S.history[0];
+  $('simLogHint').style.display = 'none';
+  $('simNow').innerHTML = h
+    ? '<b>刚刚：' + esc(h.act) + '</b><div>' + esc(h.eff) + '</div><small>手册依据：' + esc(h.ref) + '</small>'
+    : '<b>还没操作</b><div>点座舱里任意控件，这里会写出效果。</div>';
+  $('simNow').className = 'sim-now' + (h ? ' ' + (h.lv || '') : '');
+  $('simLog').innerHTML = S.history.map((x, i) =>
+    '<div class="log-item ' + (x.lv || '') + (i === 0 ? ' now' : '') + '" data-li="' + i + '">' +
+      '<span class="t">#' + esc(x.t) + ' · ' + (x.lv === 'bad' ? '条件不满足' : x.lv === 'warn' ? '说明' : '生效') + '</span>' +
+      '<b>' + esc(x.act) + '</b>' +
+      '<div class="e">' + esc(x.eff) + '</div>' +
+      '<div class="r">手册依据：' + esc(x.ref) + '</div>' +
+      (x.why ? '<div class="why" title="' + esc(x.why) + '"><b>手册要点：</b>' + esc(x.why) + '</div>' : '') +
+    '</div>').join('');
+}
+
+function renderSimCheck(){
+  const ol = $('simCheck');
+  if (!simGuideCur){
+    ol.innerHTML = '<li>未开始引导 · 选一条检查单后点「开始引导」</li>';
+    $('simCheckHint').textContent = '选一条流程并点「开始引导」，按提示在座舱里点对应控件；点错会提示、不会跳步。';
+    return;
+  }
+  const g = simGuideCur, idx = simGuideIndex(S, g);
+  $('simCheckHint').innerHTML = '<b>' + esc(g.name) + '</b><br>' + esc(g.ref) + '<br>当前第 ' + Math.min(idx + 1, g.steps.length) + ' / ' + g.steps.length + ' 步';
+  ol.innerHTML = g.steps.map((st, i) => '<li class="' + (i < idx ? 'done' : i === idx ? 'cur' : '') + '">' +
+    '<span>' + esc(st[0]) + '<br><span class="faint mono">' + esc(simC(st[1]).a) + ' · ' + esc(st[3]) + '</span></span></li>').join('') +
+    (idx >= g.steps.length ? '<li class="done">✓ 全部完成</li>' : '');
+}
+
+function renderSim(){
+  renderSimBays(); renderSimStatus(); renderSimHud(); renderSimMfds(); renderSimUfcp();
+  renderSimLamps(); renderSimState(); renderSimLog(); renderSimCheck();
+}
+
+function simGuideFeedback(id, before, opt){
+  if (!simGuideCur) return;
+  const g = simGuideCur, idx = simGuideIndex(S, g), last = S.history[0];
+  if (idx > before){
+    S = idx >= g.steps.length
+      ? simLog(S, 'ok', '引导完成 · ' + g.name, '全部 ' + g.steps.length + ' 步走完。可以换一条检查单，或点「一键演示」看完整开车。', g.ref, '对照右侧「当前飞机状态」核对每个系统。')
+      : simLog(S, 'ok', '引导 ✓ 第 ' + (before + 1) + ' 步完成', '下一步：' + g.steps[idx][0] + '（控件 ' + simC(g.steps[idx][1]).a + '）', g.steps[idx][3], '');
+  } else if (last && last.lv === 'bad'){
+    S = simLog(S, 'warn', '引导：这一步被系统挡下了', '先按上一条红字提示补齐前置条件，再继续第 ' + (before + 1) + ' 步。', g.steps[before] ? g.steps[before][3] : g.ref, '');
+  } else {
+    const st = g.steps[before];
+    if (!st) return;
+    if (st[1] !== id){
+      S = simLog(S, 'warn', '引导：这一步不是点这里', '第 ' + (before + 1) + ' 步应该点「' + st[0] + '」（' + simC(st[1]).a + '）。不跳步，继续找。', st[3], '按方位找：' + (simC(st[1]).p || '见控件速查'));
+    } else {
+      S = simLog(S, 'warn', '引导：档位还没到', '要求是「' + st[0] + '」，当前控件档位不满足，再拨一次。', st[3], '');
+    }
+  }
+}
+
+function simAct(id, val, opt){
+  if (demoTimer){ clearInterval(demoTimer); demoTimer = null; $('simDemo').textContent = '▶ 一键演示 · 冷舱开车'; }
+  const before = simGuideCur ? simGuideIndex(S, simGuideCur) : -1;
+  S = simApply(S, id, val, opt);
+  simGuideFeedback(opt && opt.sk ? '' : id, before, opt);
+  renderSim();
+}
+
+$('sec-sim').addEventListener('click', e => {
+  const dev = e.target.closest('.dev');
+  if (dev){ simAct(dev.dataset.id); return; }
+  const sk = e.target.closest('.scr-key');
+  if (sk){ simAct(SK_CTRL[sk.dataset.sk] || '', 0, {sk:sk.dataset.sk, i:Number(sk.dataset.i)}); return; }
+  const uk = e.target.closest('.ufcp-key');
+  if (uk){ simAct(uk.dataset.id); return; }
+  const kn = e.target.closest('.ufcp-knob');
+  if (kn){ simAct(kn.dataset.id); return; }
+});
+
+$('simLog').addEventListener('click', e => {
+  const li = e.target.closest('.log-item'); if (li) li.classList.toggle('open');
+});
+
+function simStopDemo(){
+  if (demoTimer){ clearInterval(demoTimer); demoTimer = null; }
+  $('simDemo').textContent = '▶ 一键演示 · 冷舱开车';
+}
+function simReset(){
+  simStopDemo(); simGuideCur = null; S = simInit();
+  S = simLog(S, '', '重置为冷舱', '全机断电、航电关闭、三块 MFD 与 HUD 全黑、发动机 N2 = 0%。', '§2.3.1 p137 · §2.2.2 p130', '所有状态回到起点，日志清空重来。');
+  S.history = S.history.slice(0, 1);
+  renderSim(); toast('已重置为冷舱');
+}
+function simDemo(){
+  simStopDemo(); simGuideCur = null; S = simInit();
+  S = simLog(S, '', '▶ 一键演示开始 · 冷舱开车', '按手册 §2.3 顺序：上电 → 航电 → 惯导 / DTC → 开车 → 武器 HOTAS。每一步的「操作 / 效果 / 依据」会逐条写进日志。', '§2.3 p137–156 · §2.2.2 p130', '演示期间点任意控件会中断自动播放，改由你手动操作。');
+  let i = 0;
+  $('simDemo').textContent = '⏸ 演示中…（点任意控件可中断）';
+  renderSim();
+  demoTimer = setInterval(() => {
+    if (i >= SIM_DEMO_SEQ.length){
+      simStopDemo();
+      const d = simDerived(S);
+      S = simLog(S, 'ok', '▶ 演示完成 · 冷舱 → 可作战状态',
+        '全机供电 ON · 航电 CMBT · HUD/三 MFD 点亮 · 惯导 ' + d.ins + ' · 雷达 ' + d.radar +
+        ' · 发动机 ' + d.eng + ' (N2 ' + d.n2 + '%) · 主模式 ' + d.mode + ' · 主军械 ' + (d.arm ? 'ARM' : 'SAFE') + ' · ' + d.weapon + '。',
+        '§2.3 正常程序 p137–156 · §2.2.2 p130',
+        '想自己走一遍就点「重置为冷舱」，或选一条引导检查单按提示点；每一步的效果都会写进日志。');
+      renderSim();
+      return;
+    }
+    const [id, val] = SIM_DEMO_SEQ[i++];
+    S = simApply(S, id, val);
+    renderSim();
+  }, 210);
+}
+function simGuideStart(){
+  simStopDemo();
+  const g = SIM_GUIDES.find(x => x.id === $('simFlow').value);
+  if (!g) return;
+  simGuideCur = g;
+  S = simPreset(simInit(), g.preset);
+  simGuideCur = g;
+  renderSim(); toast('引导开始：' + g.name);
+}
+function simBoot(){
+  $('simFlow').innerHTML = SIM_GUIDES.map(g => '<option value="' + g.id + '">' + esc(g.name) + '</option>').join('');
+  $('simDemo').addEventListener('click', simDemo);
+  $('simReset').addEventListener('click', simReset);
+  $('simGuide').addEventListener('click', simGuideStart);
+  renderSim();
+}
+
+/* ---------- 启动 ---------- */
+function boot(){
+  initSelects(); renderCockpit(); renderBoards(); renderRef(); renderCover(); renderFlow(); simBoot();
+  paintStats(); buildQueue();
+  const errs = checkData();
+  $('selfCheck').textContent = errs.length
+    ? '自检发现问题：' + errs.join('；')
+    : '自检通过：' + CTRL.length + ' 个控件 ID 唯一 · ' + buildQuestions().length + ' 道题答案全部存在 · ' + FLOWS.length + ' 条流程 ' + FLOWS.reduce((n,f)=>n+f.steps.length,0) + ' 步全部有对应控件 · 10 章均有落点。';
+  $('qText').textContent = '点「开始 / 重置」抽题，然后在下方虚拟座舱里点对应控件。';
+  if (pref.zone !== 'all') $('qMeta').innerHTML = '<span class="tag">上次范围：' + ZONES[pref.zone].name + '</span>';
+}
+window.addEventListener('beforeprint', () => document.querySelectorAll('details').forEach(d => d.open = true));
+boot();
+</script>
+</body>
+</html>
