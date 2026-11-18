@@ -404,8 +404,12 @@ def main() -> int:
             "--report", f"http://127.0.0.1:{args.port}",
         ]))
     if args.mock:
+        # --target 必须跟着 --udp-in 走：mock_export 的默认目标写死 5010，
+        # 不显式传的话，换了 --udp-in 就变成「beacon 在 15010 等，mock 往 5010 发」，
+        # 页面上一个数都不动，看着像桥接坏了。
         children.append(Child("mock", [
             py, "-u", os.path.join("tools", "mock_export.py"),
+            "--target", f"127.0.0.1:{args.udp_in}",
             "--profile", "maneuver", "--rate", "60",
         ]))
 

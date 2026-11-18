@@ -83,9 +83,22 @@ body{ touch-action:none; }
        padding:6px 12px; pointer-events:auto; }
 .chip.on{ color:#d9fff6; background:rgba(111,227,203,.16); border-color:var(--cyan);
           box-shadow:0 0 16px rgba(111,227,203,.18); }
-/* 上锁是最重要的一条状态：用洋红，和画面里唯一的暖色强调对得上 */
-#armBtn{ border-color:rgba(227,63,146,.45); color:#ffd3e8; }
-#armBtn.on{ background:rgba(111,227,203,.16); border-color:var(--cyan); color:#d9fff6; }
+/* 上锁 / 解锁：全页最重要的一个开关，所以不跟那排 chip 待在顶上。
+   放左下角、做成 100px 的大圆 —— 拇指落在屏幕左下就够得着，不用瞄。
+   洋红 = 已上锁（不发任何操纵量），青 = 已解锁。 */
+#armBtn{ position:absolute; left:22px; bottom:56px; width:100px; height:100px;
+         z-index:12; pointer-events:auto; border-radius:50%; background:none;
+         display:flex; flex-direction:column; align-items:center; justify-content:center;
+         gap:7px; border:1px solid rgba(227,63,146,.55); color:#ffd3e8;
+         -webkit-tap-highlight-color:transparent; }
+#armBtn b{ font-weight:400; font-size:19px; letter-spacing:.10em; line-height:1; }
+#armBtn i{ font-style:normal; font-size:9px; letter-spacing:.13em; line-height:1;
+           color:rgba(255,211,232,.58); }
+#armBtn:active{ transform:scale(.96); }
+#armBtn.on{ border-color:var(--cyan); color:#d9fff6;
+            box-shadow:inset 0 0 26px rgba(111,227,203,.14),
+                       0 0 22px rgba(111,227,203,.12); }
+#armBtn.on i{ color:rgba(217,255,246,.56); }
 
 #tip{ position:absolute; left:50%; bottom:86px; transform:translateX(-50%); z-index:12;
       font-size:12px; letter-spacing:.06em; color:var(--amber); pointer-events:none;
@@ -172,7 +185,11 @@ body{ touch-action:none; }
 #dotk.on{ opacity:1; }
 
 /* 左：油门（竖条 + 骑在上面的圆徽章，照那套画面的 % 圆做） */
-#thr{ position:absolute; left:24px; top:140px; width:64px; height:500px; }
+/* 竖条高度要留给左下角那颗上锁键：10.9 吋那种 768 高的屏上，
+   固定 500px 会一路压到解锁圆上，所以短屏自己缩（834 高时仍是 500） */
+#thr{ position:absolute; left:24px; top:140px; width:64px;
+      height:min(500px, calc(100vh - 330px));
+      height:min(500px, calc(100dvh - 330px)); }
 #thr::before{ content:""; position:absolute; left:50%; top:0; bottom:0; width:1px;
               margin-left:-.5px; background:rgba(168,200,228,.16); }
 #ticks{ position:absolute; left:0; top:0; bottom:0; width:9px; pointer-events:none;
@@ -344,7 +361,6 @@ body{ touch-action:none; }
   </div>
 
   <div id="ops">
-    <button class="chip" id="armBtn" title="上锁时不发任何操纵量">解锁</button>
     <button class="chip" id="trimBtn" title="把当前杆位记成配平（直升机用）">配平</button>
     <button class="chip" id="trimClr" style="display:none">清配平</button>
     <button class="chip" id="tiltBtn">体感</button>
@@ -353,7 +369,12 @@ body{ touch-action:none; }
   </div>
 
   <div id="deck">
-    <div id="lockHint">已上锁 · 点左上角「解锁」才开始发操纵量</div>
+    <div id="lockHint">已上锁 · 点左下角「解锁」才开始发操纵量</div>
+
+    <!-- 上锁 / 解锁：左下角的大圆，拇指落在角落就够得着 -->
+    <button id="armBtn" title="上锁时不发任何操纵量">
+      <b id="armTxt">解锁</b><i id="armSub">不发操纵量</i>
+    </button>
 
     <!-- 杆盘常驻：起降页和战斗页都要推杆，所以它不随页翻走 -->
     <div id="colPad">
@@ -649,11 +670,13 @@ body{ touch-action:none; }
   };
   var trimOn = store.get("trimOn", true);   // 配平按钮默认显示，飞固定翼可以关掉
 
-  var armBtn = $("#armBtn"), appEl = $("#app");
+  var armBtn = $("#armBtn"), armTxt = $("#armTxt"), armSub = $("#armSub");
+  var appEl = $("#app");
 
   function armUi(){
     armBtn.classList.toggle("on", armed);
-    armBtn.textContent = armed ? "已解锁" : "解锁";
+    armTxt.textContent = armed ? "已解锁" : "解锁";
+    armSub.textContent = armed ? "正在发操纵量" : "不发操纵量";
     appEl.classList.toggle("locked", !armed);
   }
 

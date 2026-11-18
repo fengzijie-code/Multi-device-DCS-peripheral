@@ -122,6 +122,21 @@ with sync_playwright() as p:
     check("脚舵不压按钮列", rl["top"] >= rl["colBottom"] - 1, str(rl))
     check("脚舵不压读数条", rl["top"] + 76 <= rl["stripTop"] + 1, str(rl))
 
+    # 解锁键在左下角、做成大圆 —— 用户实测：原来那颗顶部 chip 不好上锁
+    ab = pg.evaluate("""() => {
+      const b = s => document.querySelector(s).getBoundingClientRect();
+      const a = b('#armBtn'), th = b('#thr'), st = b('#strip'), pd = b('#pad');
+      return {left: Math.round(a.left), bottom: Math.round(innerHeight - a.bottom),
+              w: Math.round(a.width), h: Math.round(a.height),
+              top: Math.round(a.top), thrBottom: Math.round(th.bottom),
+              stripTop: Math.round(st.top), padLeft: Math.round(pd.left)};
+    }""")
+    check("解锁键贴左下角", ab["left"] <= 32 and ab["bottom"] <= 80
+          and ab["left"] + ab["w"] <= ab["padLeft"], str(ab))
+    check("解锁键够大（拇指不用瞄）", ab["w"] >= 96 and ab["h"] >= 96, str(ab))
+    check("解锁键不压油门杆", ab["top"] >= ab["thrBottom"] - 1, str(ab))
+    check("解锁键不压读数条", ab["top"] + ab["h"] <= ab["stripTop"] + 1, str(ab))
+
     # ---- 四页（照 Pixel：仪表/起降/战斗/校准）
     def page_of():
         return pg.eval_on_selector("#app", "el=>el.getAttribute('data-page')")
@@ -194,7 +209,7 @@ with sync_playwright() as p:
     cx, cy = box["x"] + box["w"] / 2, box["y"] + box["h"] / 2
 
     # ---- 上锁：默认不发任何操纵量（和 Pixel 端一致）
-    check("默认上锁", pg.inner_text("#armBtn").strip() == "解锁", pg.inner_text("#armBtn"))
+    check("默认上锁", pg.inner_text("#armTxt").strip() == "解锁", pg.inner_text("#armTxt"))
     touch("start", cx, cy)
     touch("move", cx, cy - box["h"] * 0.2)
     time.sleep(0.18)
@@ -204,7 +219,7 @@ with sync_playwright() as p:
     touch("end", 0, 0)
     pg.click("#armBtn")
     time.sleep(0.2)
-    check("点一下即解锁", "已解锁" in pg.inner_text("#armBtn"), pg.inner_text("#armBtn"))
+    check("点一下即解锁", "已解锁" in pg.inner_text("#armTxt"), pg.inner_text("#armTxt"))
 
     touch("start", cx, cy)
     touch("move", cx, cy - box["h"] * 0.2)

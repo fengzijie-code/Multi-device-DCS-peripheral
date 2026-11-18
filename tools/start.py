@@ -249,7 +249,9 @@ def check_ports(port: int, tls_port: int, vjoy_port: int, no_vjoy: bool) -> bool
         if who:
             bad.append(f"{p}（{what}）← " + "、".join(who))
     if bad:
-        pids = re.findall(r"PID (\d+)", " ".join(bad))
+        # 同一个进程经常同时占着 8080 和 8443（beacon 两个都开），
+        # 所以 PID 要去重，否则印出 "/PID 5452 /PID 5452"
+        pids = list(dict.fromkeys(re.findall(r"PID (\d+)", " ".join(bad))))
         hint = "上一次那个窗口多半还没关。关掉它，或者直接重启一次电脑。"
         if pids:
             hint += "\n只想强杀的话：taskkill /F /PID " + " /PID ".join(pids)
@@ -377,6 +379,8 @@ def main() -> int:
                     help="ipad（默认）/ mock / phone")
     ap.add_argument("--phone", action="store_true", help="手机 USB 模式")
     ap.add_argument("--port", type=int, default=8080)
+    ap.add_argument("--udp-in", type=int, default=5010,
+                    help="遥测 UDP 入口端口（同一台机上跑第二套时改掉）")
     ap.add_argument("--tls-port", type=int, default=8443)
     ap.add_argument("--vjoy-port", type=int, default=5011)
     ap.add_argument("--no-vjoy", action="store_true", help="不启动 vJoy 输出")
@@ -416,7 +420,8 @@ def main() -> int:
     # 会一直阻塞在自己的等待循环里，没有"启动完成"的回调可以挂。
     threading.Thread(target=show_card, args=(args.port,), daemon=True).start()
 
-    argv = ["--port", str(args.port), "--tls-port", str(args.tls_port),
+    argv = ["--port", str(args.port), "--udp-in", str(args.udp_in),
+            "--tls-port", str(args.tls_port),
             "--vjoy-port", str(args.vjoy_port)]
     if not phone:
         argv += ["--no-usb", "--no-watch"]
