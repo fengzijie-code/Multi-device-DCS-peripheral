@@ -141,6 +141,28 @@ def tls_log(line: str) -> None:
     except OSError:
         pass
 
+
+def _safe_close(sock) -> None:
+    """体面地关连接：TLS 上先发 close_notify，再关 socket。
+
+    `socketserver.shutdown_request()` 走的是 `shutdown(SHUT_WR)`，也就是
+    一个**不带 close_notify 的 FIN**。多数客户端无所谓，但 iOS 的
+    NSURLSession 会把这种收尾当成「网络连接已丢失」—— 于是页面其实
+    已经收到了，用户却看到一个网络错误。所以这里手工收尾。
+    """
+    try:
+        if isinstance(sock, ssl.SSLSocket):
+            try:
+                sock.settimeout(2)      # 别为了等对方的 close_notify 把线程吊住
+                sock.unwrap()
+            except (ssl.SSLError, OSError):
+                pass
+    finally:
+        try:
+            sock.close()
+        except OSError:
+            pass
+
 _page_cache: dict[str, tuple[float, bytes]] = {}
 
 
@@ -1078,6 +1100,10 @@ class TLS4Server(V4Server):
 
     所以这里只 accept 裸 TCP，把握手丢进线程池的线程里做：
     一个握手慢/失败只毁掉它自己那条连接。
+
+    同一个端口还兼收**明文 HTTP**：地址栏里只写 `ip:8443` 时 Safari 默认按
+    http 发，请求会被当成坏 TLS 记录掐掉，用户看到的就是「打不开网页」。
+    TLS 记录的第一个字节固定是 0x16，一眼就分得出来，所以两种都收。
     """
     ssl_ctx: ssl.SSLContext | None = None
 
@@ -1086,40 +1112,59 @@ class TLS4Server(V4Server):
                          daemon=True).start()
 
     def _tls_serve(self, request, client_address):
+        # 先偷看一个字节再决定怎么伺候：
+        #   0x16 = TLS handshake record → 正常 HTTPS
+        #   其它（'G' 'P' 'H' ...）= 明文 HTTP 打到了这个端口上
+        #
+        # 为什么需要后一种：iOS 的地址栏里只写 `192.168.137.1:8443` 时，
+        # Safari **默认按 http 发**（它不会给非 443 端口自动升 https）。
+        # 而 8443 只讲 TLS，于是明文请求被当成坏记录直接掐断，
+        # 用户在屏幕上看到的就是「打不开网页」/「已丢失网络连接」。
+        # 同源的两件事：被"跳回 http"、以及这个端口看起来彻底不通。
+        # 既然一个字节就能分辨，那就两种都收 —— 明文进来照样给页面，
+        # 页面自己会用顶栏的 http 标记 + 体感引导告诉用户该怎么换。
         try:
-            # 握手最多等 20 秒：正常局域网握手 <50ms，等这么久还没握上就是对方的问题。
             request.settimeout(20)
-            conn = self.ssl_ctx.wrap_socket(request, server_side=True)
-            # 握手后放宽到 180 秒 —— yoke 是 50Hz 长连接，本来就不会空闲这么久；
-            # 但用户切后台忘了关时，别让线程和连接永远挂着。
-            conn.settimeout(180)
-        except ssl.SSLError as e:
-            # 这一类才值得追：证书被拒、协议/密码套件谈不拢、iOS 判证书不合规。
-            tls_log(f"FAIL  {client_address[0]} SSLError: {e}")
-            try:
-                request.close()
-            except OSError:
-                pass
-            return
+            first = request.recv(1, socket.MSG_PEEK)
         except OSError as e:
-            # 10053/10054 之类 = 对端自己断开（浏览器预连接被取消是常态），
-            # 和「证书被拒」是两回事，别混在一起看。
             tls_log(f"ABORT {client_address[0]} {type(e).__name__}")
-            try:
-                request.close()
-            except OSError:
-                pass
+            _safe_close(request)
             return
-        tls_log(f"OK    {client_address[0]} {conn.version()} {conn.cipher()[0]}")
+        if not first:
+            _safe_close(request)
+            return
+
+        if first[0] == 0x16:
+            try:
+                conn = self.ssl_ctx.wrap_socket(request, server_side=True)
+            except ssl.SSLError as e:
+                # 这一类才值得追：证书被拒、协议/密码套件谈不拢、iOS 判证书不合规。
+                tls_log(f"FAIL  {client_address[0]} SSLError: {e}")
+                _safe_close(request)
+                return
+            except OSError as e:
+                # 10053/10054 之类 = 对端自己断开（浏览器预连接被取消是常态），
+                # 和「证书被拒」是两回事，别混在一起看。
+                tls_log(f"ABORT {client_address[0]} {type(e).__name__}")
+                _safe_close(request)
+                return
+            tls_log(f"OK    {client_address[0]} {conn.version()} {conn.cipher()[0]}")
+        else:
+            conn = request
+            tls_log(f"PLAIN {client_address[0]} http-on-tls-port")
+
+        try:
+            # 180 秒：yoke 是 50Hz 长连接，本来不会空闲这么久；
+            # 用户切后台忘了关时，别让线程和连接永远挂着。
+            conn.settimeout(180)
+        except OSError:
+            pass
         try:
             self.finish_request(conn, client_address)
         except Exception:
             pass          # 客户端半路断开是常态，别刷屏
         finally:
-            try:
-                self.shutdown_request(conn)
-            except OSError:
-                pass
+            _safe_close(conn)
 
     def handle_error(self, request, client_address):
         # 超时/断连走这里。默认实现会打一整段 traceback，一条一条淹掉有用的日志。

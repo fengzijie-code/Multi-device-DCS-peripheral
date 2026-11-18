@@ -167,6 +167,10 @@ with sync_playwright() as p:
             check("有哑连接占着时 HTTPS 仍能服务", dt < 3.0, f"{dt*1000:.0f}ms")
         finally:
             stuck.close()
+        # 同一端口还得吃得下明文：地址栏只写 ip:8443 时 Safari 按 http 发，
+        # 只认 TLS 的话表现就是「打不开网页」。
+        with urllib.request.urlopen(f"http://{_host}:{_port}/yoke", timeout=5) as r:
+            check("TLS 端口也收明文 HTTP", r.status == 200, str(r.status))
         def orient(beta, gamma):
             cdp.send("DeviceOrientation.setDeviceOrientationOverride",
                      {"alpha": 0, "beta": beta, "gamma": gamma})

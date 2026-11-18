@@ -180,6 +180,9 @@
   .ts-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:11px; }
   .ts-note{ margin-top:10px; font-size:12.5px; line-height:1.7; color:var(--dim2); }
   .ts-note b{ color:var(--fg); font-weight:500; }
+  .ts-note code{ font:400 12px ui-monospace,SFMono-Regular,Menlo,monospace;
+                 color:var(--fg); background:#0b1017; border:1px solid var(--line);
+                 border-radius:4px; padding:1px 4px; }
 
   /* 竖屏只是能凑合用，横屏才是设计目标 */
   @media (orientation:portrait){
@@ -308,6 +311,7 @@
       </ol>
       <p class="ts-p" style="color:var(--dim2);font-size:12.5px">
         第 3 步最容易漏：只安装、不开信任开关，证书还是「不受信任」，下一步照样报警告。
+        装完回来刷新这个页面；如果仍然提示不安全，就是这一条没做。
       </p>
     </div>
 
@@ -321,8 +325,10 @@
         <a class="ts-btn pri" id="tsGo" href="#">打开 https 版</a>
       </div>
       <div class="ts-note" id="tsCopyNote">
-        同一台 iPad、同一个网络。IP 是 PC 的地址，端口就是 HTTPS 那个。<br>
-        如果还提示「不是私密连接」：点 <b>显示详细信息 → 访问此网站</b> 就能进去。
+        地址栏里<b>必须带 <code>https://</code></b> —— 只写 IP 和端口，Safari 会当成 http 发，
+        而这个端口讲的是 TLS，表现就是「打不开网页 / 已丢失网络连接」。<br>
+        同一台 iPad、同一个网络。如果还提示「不是私密连接」：
+        点 <b>显示详细信息 → 访问此网站</b> 就能进去。
         <b>别点「取消」</b> —— 取消会退回上一个页面，也就是 http 那版，看着就像被跳回去了。
       </div>
     </div>
