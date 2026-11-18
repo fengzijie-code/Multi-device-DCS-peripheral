@@ -70,24 +70,65 @@
   #strip .m b{ font-size:15px; font-weight:500; color:var(--fg); }
   #strip .m i{ font-style:normal; font-size:10px; color:var(--dim2); }
   #strip.nodata .m b{ color:var(--dim2); }
-  #adi{ position:relative; flex:0 0 auto; width:26px; height:26px; border-radius:50%;
+  /* 姿态球做成类而不是 id：仪表条上那颗 26px、仪表页上那颗 300px，
+     结构完全一样，只有尺寸和"每度几像素"不同。 */
+  .adi{ position:relative; flex:0 0 auto; width:26px; height:26px; border-radius:50%;
         overflow:hidden; border:1px solid var(--line2); background:#0b1017; }
-  #adiDisc{ position:absolute; left:0; width:100%; height:200%; top:-50%;
-            transition:transform .12s linear; }
-  #adiDisc .sky{ position:absolute; top:0; height:50%; width:100%; background:#1c3f5e; }
-  #adiDisc .gnd{ position:absolute; bottom:0; height:50%; width:100%; background:#4a3a26; }
-  #adiDisc .ln{ position:absolute; top:50%; left:0; width:100%; height:1px;
-                background:#c9d1d9; margin-top:-0.5px; }
-  #adiFix{ position:absolute; left:50%; top:50%; width:11px; height:1px;
-           background:var(--amber); margin:-0.5px 0 0 -5.5px; }
+  .adi .disc{ position:absolute; left:0; width:100%; height:200%; top:-50%;
+              transition:transform .12s linear; }
+  .adi .disc .sky{ position:absolute; top:0; height:50%; width:100%; background:#1c3f5e; }
+  .adi .disc .gnd{ position:absolute; bottom:0; height:50%; width:100%; background:#4a3a26; }
+  .adi .disc .ln{ position:absolute; top:50%; left:0; width:100%; height:1px;
+                  background:#c9d1d9; margin-top:-0.5px; }
+  .adi .fix{ position:absolute; left:50%; top:50%; width:11px; height:1px;
+             background:var(--amber); margin:-0.5px 0 0 -5.5px; }
+  .adi.big{ width:clamp(220px, 56vh, 460px); height:clamp(220px, 56vh, 460px);
+            border-width:2px; }
+  .adi.big .fix{ width:34px; height:3px; margin:-1.5px 0 0 -17px; }
 
-  /* ---------- 手感面板 ---------- */
-  #setSheet{ position:fixed; inset:0; z-index:80; display:none;
-             background:var(--bg); overflow-y:auto; -webkit-overflow-scrolling:touch;
-             touch-action:pan-y;
-             padding:calc(env(safe-area-inset-top) + 16px) 18px
-                    calc(env(safe-area-inset-bottom) + 20px); }
-  #setSheet.show{ display:block; }
+  /* ---------- 页签 ---------- */
+  /* 照 Pixel 的四页（仪表/起降/战斗/校准）。但在平板上不是"整页换掉"，
+     而是「中间的杆盘常驻、左右两列换内容」—— 起降和战斗都要推杆，
+     把杆盘翻走等于这一页没法飞。 */
+  #tabs{ flex:0 0 auto; display:flex; gap:8px; padding:6px 10px;
+         background:var(--panel); border-bottom:1px solid var(--line); }
+  #tabs .tb{ flex:1 1 0; min-height:32px; padding:0 6px; border-radius:9px;
+             font-size:13px; color:var(--dim); background:var(--panel2);
+             border:1px solid var(--line); display:flex; align-items:center;
+             justify-content:center; gap:6px; white-space:nowrap; }
+  #tabs .tb.on{ color:#0b1017; background:var(--blue); border-color:var(--blue);
+                font-weight:600; }
+  /* 「校准」不是飞行页，分隔一下，免得飞的时候误点 */
+  #tabs .tb.sep{ margin-left:8px; flex:0 0 84px; }
+
+  /* ---------- 整页：仪表 / 校准 ---------- */
+  #pagePfd, #pageCalib{ flex:1 1 auto; min-height:0; display:none; }
+  #app[data-page="pfd"] #pagePfd{ display:flex; flex-direction:column; }
+  #app[data-page="calib"] #pageCalib{ display:block; overflow-y:auto;
+             -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+  /* 这两页没有杆盘，所以把 deck 整个收起来 */
+  #app[data-page="pfd"] #deck, #app[data-page="calib"] #deck{ display:none; }
+  .pg-wrap{ max-width:760px; margin:0 auto; padding:16px 18px
+            calc(env(safe-area-inset-bottom) + 28px); }
+
+  /* 仪表页：把 34px 的条放大成整屏 —— 平板当 MFD 立在旁边时看这个 */
+  #pagePfd .pfd-h{ flex:0 0 auto; display:flex; align-items:baseline; gap:10px;
+                   padding:12px 18px 0; }
+  #pagePfd .pfd-h b{ font-size:12px; font-weight:400; color:var(--dim2); }
+  #pfdMain{ flex:1 1 auto; display:flex; align-items:center; justify-content:center;
+            gap:clamp(20px, 4vw, 60px); padding:10px 18px 18px; min-height:0; }
+  /* 让瓦片吃掉剩余宽度，否则 grid 会缩成两份 112px 贴在右边 */
+  #pfdGrid{ flex:1 1 320px; max-width:460px;
+            display:grid; grid-template-columns:repeat(2, minmax(112px, 1fr));
+            gap:10px 14px; }
+  #pfdGrid .pd{ display:flex; flex-direction:column; gap:1px; padding:8px 12px;
+                border-radius:10px; background:var(--panel); border:1px solid var(--line); }
+  #pfdGrid .pd span{ font-size:11px; letter-spacing:.06em; color:var(--dim2); }
+  #pfdGrid .pd b{ font-size:clamp(24px, 3.9vh, 38px); font-weight:500; color:var(--fg);
+                  font-variant-numeric:tabular-nums; line-height:1.05; }
+  #pfdGrid .pd i{ font-style:normal; font-size:11px; color:var(--dim2); }
+  #pagePfd.nodata #pfdGrid .pd b{ color:var(--dim2); }
+
   .setRow{ display:flex; align-items:center; gap:12px; margin:11px 0; }
   .setRow label{ flex:0 0 98px; font-size:13px; color:var(--dim); }
   .setRow input[type=range]{ flex:1 1 auto; min-width:0; height:34px; margin:0;
@@ -104,10 +145,20 @@
   .ts-btn.sw.on{ background:#1f4d2b; border-color:#2f7340; color:#e8f5ec; }
 
   /* ---------- 主体 ---------- */
+  /* 两列：左（控制面板，按页换内容）/ 右（杆盘，常驻）。
+     起降页和战斗页都要推杆，所以杆盘不跟着翻页走。
+     #colL 的宽度是写死的 45vw，两个页面级面板在它内部互相顶替 ——
+     换页时杆盘一个像素都不挪，正在推杆也不会被甩一下。
+     45vw 这个数是被下面量出来的：再窄，起降键就成细柱；再宽，杆盘太小。 */
   #deck{ flex:1 1 auto; display:flex; min-height:0; }
-
-  /* 左：油门 + 脚舵 + 起降 */
-  #colL{ flex:0 0 30vw; display:flex; min-width:0; }
+  #colL{ flex:0 0 45vw; display:flex; min-width:0; }
+  #colPad{ flex:1 1 auto; display:grid; place-items:center; min-width:0; min-height:0;
+           container-type:size; }
+  #colTakeoff{ flex:1 1 auto; display:flex; min-width:0; }
+  #colCombat{ flex:1 1 auto; display:none; flex-direction:column; gap:10px;
+              padding:10px; min-width:0; }
+  #app[data-page="combat"] #colTakeoff{ display:none; }
+  #app[data-page="combat"] #colCombat{ display:flex; }
   #thr{ position:relative; flex:0 0 100px; margin:10px 0 10px 10px;
         background:linear-gradient(#0f151c,#0a0f14);
         border:1px solid var(--line); border-radius:var(--r);
@@ -154,14 +205,11 @@
   #gear{ flex:1 1 0; display:grid; grid-template-columns:repeat(2,1fr);
          grid-template-rows:repeat(3,1fr); gap:10px; min-height:0; }
 
-  /* 右：武器 + 杆盘 + 雷达 */
-  #colR{ flex:1 1 auto; display:grid; grid-template-columns:1fr 30%;
-         grid-template-rows:34% 1fr; gap:10px; padding:10px; min-width:0; }
-  #padWrap{ grid-column:1; grid-row:1 / span 2; display:grid; place-items:center;
-            min-width:0; min-height:0; container-type:size; }
-  #wep{ grid-column:2; grid-row:1; display:grid; grid-template-columns:1fr 1fr;
+  /* 右列（战斗页）：武器 + 雷达。原来这里跟杆盘挤在一个 grid 里，
+     现在杆盘独立成中间一列，武器/雷达拿到整列高度，键位自然变大。 */
+  #wep{ flex:0 0 40%; display:grid; grid-template-columns:1fr 1fr;
         grid-template-rows:1fr 1fr; gap:10px; min-height:0; }
-  #radar{ grid-column:2; grid-row:2; display:flex; flex-direction:column; gap:10px;
+  #radar{ flex:1 1 auto; display:flex; flex-direction:column; gap:10px;
           min-height:0; }
 
   /* ---------- 通用按键 ---------- */
@@ -260,17 +308,30 @@
                  color:var(--fg); background:#0b1017; border:1px solid var(--line);
                  border-radius:4px; padding:1px 4px; }
 
+  /* 宽屏横屏时校准页分两栏：三组 + 按钮一屏放下，不用滚。
+     设置是落地才改的东西，但"改一项要滚三次"照样烦人。 */
+  @media (orientation:landscape) and (min-width:900px){
+    #pageCalib .pg-wrap{ max-width:980px; display:grid;
+                         grid-template-columns:1fr 1fr; gap:0 16px; align-items:start; }
+    #pageCalib .pg-wrap > h1,
+    #pageCalib .pg-wrap > p.ts-p,
+    #pageCalib .pg-wrap > .ts-row{ grid-column:1 / -1; }
+    #pageCalib .pg-wrap > .ts-step:last-of-type{ grid-column:1 / -1; }
+  }
+
   /* 竖屏只是能凑合用，横屏才是设计目标。
      750px 宽塞不下 4 个 chip + 4 个计数器 + 提示 + "建议横屏"，
      不收敛就会像截图里那样把 chip 挤成两行、提示被截断成"体感已…"。
      这里让诊断用的计数器和连接文字先让位 —— 它们横屏随时能看到。 */
   @media (orientation:portrait){
-    #colL{ flex:0 0 42vw; }
+    #colL{ flex:0 0 38vw; }
     #thr{ flex-basis:84px; }
     #hud #stext, #hud .meter{ display:none; }
     #tip{ max-width:22vw; }
     .chip{ white-space:nowrap; flex:0 0 auto; }
-    #colR{ grid-template-columns:1fr 34%; }
+    #tabs .tb{ font-size:12px; }
+    #tabs .tb.sep{ flex:0 0 68px; margin-left:4px; }
+    #pfdGrid{ grid-template-columns:repeat(2, minmax(88px, 1fr)); }
     #hud::after{ content:"建议横屏"; font-size:11px; color:var(--amber);
                  white-space:nowrap; flex:0 0 auto;
                  border:1px solid #4a3a1a; border-radius:999px; padding:4px 8px; }
@@ -278,7 +339,7 @@
 </style>
 </head>
 <body>
-<div id="app">
+<div id="app" data-page="takeoff">
   <div id="hud">
     <div id="dot"></div>
     <div id="stext">未连接</div>
@@ -298,9 +359,9 @@
   </div>
 
   <div id="strip" class="nodata">
-    <div id="adi">
-      <div id="adiDisc"><div class="sky"></div><div class="gnd"></div><div class="ln"></div></div>
-      <div id="adiFix"></div>
+    <div class="adi" id="adi">
+      <div class="disc" id="adiDisc"><div class="sky"></div><div class="gnd"></div><div class="ln"></div></div>
+      <div class="fix"></div>
     </div>
     <div class="m"><span>IAS</span><b id="sIas">--</b><i>kt</i></div>
     <div class="m"><span>ALT</span><b id="sAlt">--</b><i>ft</i></div>
@@ -310,9 +371,19 @@
     <div class="m"><span>FUEL</span><b id="sFuel">--</b><i id="sFuelU">%</i></div>
   </div>
 
+  <div id="tabs">
+    <button class="tb" data-page="pfd">仪表</button>
+    <button class="tb" data-page="takeoff">起降</button>
+    <button class="tb" data-page="combat">战斗</button>
+    <button class="tb sep" data-page="calib">校准</button>
+  </div>
+
   <div id="deck">
     <div id="lockHint">已上锁 · 点右上角「解锁」才开始发操纵量</div>
     <div id="colL">
+      <!-- 起降页与战斗页在左列里互相顶替。宽度由 #colL 固定，
+           所以换页时右边的杆盘一个像素都不挪。 -->
+      <div id="colTakeoff">
       <div id="thr" class="idle">
         <div id="thrFill"></div>
         <div id="ticks"></div>
@@ -338,36 +409,126 @@
           <div class="k hold" data-bit="14">轮刹<span class="sub">按住 · BTN15</span></div>
         </div>
       </div>
+      </div><!-- /colTakeoff -->
+
+      <div id="colCombat">
+        <div id="wep">
+          <div class="k red big hold" data-bit="11">机炮<span class="sub">BTN12</span></div>
+          <div class="k red big hold" data-bit="6">投放<span class="sub">BTN7</span></div>
+          <div class="k amber wide" data-bit="10">干扰弹<span class="sub">BTN11</span></div>
+          <div class="k wide" data-bit="3">武器切换<span class="sub">BTN4</span></div>
+        </div>
+
+        <div id="radar">
+          <div id="lockWrap">
+            <div class="k hold" data-bit="5" style="flex:1">雷达锁定<span class="sub">BTN6</span></div>
+          </div>
+          <div id="tdc">
+            <div class="k up" data-bit="7">▲</div>
+            <div class="k left" data-bit="9">◀</div>
+            <div class="mid">TDC</div>
+            <div class="k right" data-bit="4">▶</div>
+            <div class="k down" data-bit="8">▼</div>
+          </div>
+        </div>
+      </div><!-- /colCombat -->
+    </div><!-- /colL -->
+
+    <!-- 杆盘常驻：起降页和战斗页都保留它 —— 两页都要推杆，
+         把杆盘翻走等于这一页没法飞 -->
+    <div id="colPad">
+      <div id="pad">
+        <div class="cross cx"></div><div class="cross cy"></div><div class="lim"></div>
+        <div id="ring"></div><div id="dotk"></div>
+        <div id="padVal">0.00 / 0.00</div>
+        <div id="padTag">杆量 · 触点浮动</div>
+      </div>
     </div>
+  </div>
 
-    <div id="colR">
-      <div id="padWrap">
-        <div id="pad">
-          <div class="cross cx"></div><div class="cross cy"></div><div class="lim"></div>
-          <div id="ring"></div><div id="dotk"></div>
-          <div id="padVal">0.00 / 0.00</div>
-          <div id="padTag">杆量 · 触点浮动</div>
+  <!-- ---------- 仪表页：把顶栏那条 34px 放大成整屏 ----------
+       平板立在显示器旁边当 MFD 用时看这个；飞行时用不着，所以单独一页。 -->
+  <div id="pagePfd" class="nodata">
+    <div class="pfd-h">
+      <b>仪表 · 来自 /state，1Hz</b><b id="pfdSrc"></b>
+    </div>
+    <div id="pfdMain">
+      <div class="adi big" id="bAdi">
+        <div class="disc" id="bAdiDisc">
+          <div class="sky"></div><div class="gnd"></div><div class="ln"></div>
         </div>
+        <div class="fix"></div>
+      </div>
+      <div id="pfdGrid">
+        <div class="pd"><span>IAS</span><b id="pIas">--</b><i>kt</i></div>
+        <div class="pd"><span>ALT</span><b id="pAlt">--</b><i>ft</i></div>
+        <div class="pd"><span>VS</span><b id="pVs">--</b><i>fpm</i></div>
+        <div class="pd"><span>AGL</span><b id="pAgl">--</b><i>ft</i></div>
+        <div class="pd"><span>HDG</span><b id="pHdg">--</b><i>°</i></div>
+        <div class="pd"><span>G</span><b id="pG">--</b></div>
+        <div class="pd"><span>MACH</span><b id="pMach">--</b></div>
+        <div class="pd"><span>AOA</span><b id="pAoa">--</b><i>°</i></div>
+        <div class="pd"><span>RPM</span><b id="pRpm">--</b><i>%</i></div>
+        <div class="pd"><span>FUEL</span><b id="pFuel">--</b><i id="pFuelU">%</i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- 校准页：原「手感」弹窗 + 体感校准 ----------
+       设置是"落地才改"的东西，占一整页比占一个随时会挡住杆盘的浮层好。 -->
+  <div id="pageCalib">
+    <div class="pg-wrap">
+      <h1 style="font-size:19px;margin:0 0 6px">手感与校准</h1>
+      <p class="ts-p">改动立刻生效并保存在这台 iPad 上。默认值取自 Pixel 端实飞调出来的那一组。</p>
+
+      <div class="ts-step">
+        <h2><i>1</i>体感行程</h2>
+        <div class="setRow"><label>死区</label>
+          <input type="range" id="rDead" min="0" max="8" step="0.5"><b id="vDead"></b></div>
+        <div class="setRow"><label>满行程</label>
+          <input type="range" id="rRange" min="12" max="40" step="1"><b id="vRange"></b></div>
+        <div class="setRow"><label>曲线</label>
+          <input type="range" id="rExpo" min="0" max="1" step="0.05"><b id="vExpo"></b></div>
+        <p class="ts-p" style="font-size:12.5px;color:var(--dim2);margin-bottom:0">
+          死区吃掉手持微抖；满行程是「倾斜多少度算满杆」，越小越灵敏也越累；
+          曲线 0 = 线性，越大中位越细、末端越陡。只影响体感，杆盘始终线性。
+        </p>
       </div>
 
-      <div id="wep">
-        <div class="k red big hold" data-bit="11">机炮<span class="sub">BTN12</span></div>
-        <div class="k red big hold" data-bit="6">投放<span class="sub">BTN7</span></div>
-        <div class="k amber wide" data-bit="10">干扰弹<span class="sub">BTN11</span></div>
-        <div class="k wide" data-bit="3">武器切换<span class="sub">BTN4</span></div>
+      <div class="ts-step">
+        <h2><i>2</i>方向与开关</h2>
+        <div class="setRow"><label>横滚 X</label>
+          <button class="ts-btn sw" id="invX">关</button></div>
+        <div class="setRow"><label>俯仰 Y</label>
+          <button class="ts-btn sw" id="invY">关</button></div>
+        <div class="setRow"><label>油门</label>
+          <button class="ts-btn sw" id="invT">关</button></div>
+        <div class="setRow"><label>配平按钮</label>
+          <button class="ts-btn sw" id="swTrim">开</button></div>
+        <p class="ts-p" style="font-size:12.5px;color:var(--dim2);margin-bottom:0">
+          右边写着「开」就表示这条轴被反向。<b>配平按钮</b>只在飞直升机时有用
+          （把当前杆位锁住、松手不回中）；飞固定翼可以关掉，顶栏会少两个按钮。
+        </p>
       </div>
 
-      <div id="radar">
-        <div id="lockWrap">
-          <div class="k hold" data-bit="5" style="flex:1">雷达锁定<span class="sub">BTN6</span></div>
+      <div class="ts-step">
+        <h2><i>3</i>体感校准</h2>
+        <div class="setRow"><label>传感器</label>
+          <b id="tilSt" style="flex:1;text-align:left">—</b></div>
+        <div class="setRow"><label>当前姿态</label>
+          <b id="tilNow" style="flex:1;text-align:left">—</b></div>
+        <div class="ts-row">
+          <button class="ts-btn" id="calZero">校零 · 把当前姿态记作中位</button>
         </div>
-        <div id="tdc">
-          <div class="k up" data-bit="7">▲</div>
-          <div class="k left" data-bit="9">◀</div>
-          <div class="mid">TDC</div>
-          <div class="k right" data-bit="4">▶</div>
-          <div class="k down" data-bit="8">▼</div>
-        </div>
+        <p class="ts-p" style="font-size:12.5px;color:var(--dim2);margin-bottom:0">
+          把 iPad 摆成你实际握着的姿势，再点校零。体感只在 <b>https</b> 下能拿到数据，
+          http 下这一栏会显示「不可用」。
+        </p>
+      </div>
+
+      <div class="ts-row" style="margin-top:16px">
+        <button class="ts-btn" id="setReset">恢复默认</button>
+        <button class="ts-btn pri" id="setClose">返回起降</button>
       </div>
     </div>
   </div>
@@ -450,50 +611,6 @@
 
     <div class="ts-row" style="margin-top:16px">
       <button class="ts-btn pri" id="tsClose">知道了</button>
-    </div>
-  </div>
-</div>
-
-<!-- 手感面板。参数和 Pixel 端 YokeSettings 是同一组默认值，
-     调完立刻生效并存在本机 —— 手感不对时不用改代码、也不用等我。 -->
-<div id="setSheet" aria-hidden="true">
-  <div class="ts-wrap">
-    <div class="ts-h"><h1>手感</h1></div>
-    <p class="ts-p">改动立刻生效并保存在这台 iPad 上。默认值取自 Pixel 端实飞调出来的那一组。</p>
-
-    <div class="ts-step">
-      <h2><i>1</i>体感行程</h2>
-      <div class="setRow"><label>死区</label>
-        <input type="range" id="rDead" min="0" max="8" step="0.5"><b id="vDead"></b></div>
-      <div class="setRow"><label>满行程</label>
-        <input type="range" id="rRange" min="12" max="40" step="1"><b id="vRange"></b></div>
-      <div class="setRow"><label>曲线</label>
-        <input type="range" id="rExpo" min="0" max="1" step="0.05"><b id="vExpo"></b></div>
-      <p class="ts-p" style="font-size:12.5px;color:var(--dim2);margin-bottom:0">
-        死区吃掉手持微抖；满行程是「倾斜多少度算满杆」，越小越灵敏也越累；
-        曲线 0 = 线性，越大中位越细、末端越陡。只影响体感，杆盘始终线性。
-      </p>
-    </div>
-
-    <div class="ts-step">
-      <h2><i>2</i>方向与开关</h2>
-      <div class="setRow"><label>横滚 X</label>
-        <button class="ts-btn sw" id="invX">关</button></div>
-      <div class="setRow"><label>俯仰 Y</label>
-        <button class="ts-btn sw" id="invY">关</button></div>
-      <div class="setRow"><label>油门</label>
-        <button class="ts-btn sw" id="invT">关</button></div>
-      <div class="setRow"><label>配平按钮</label>
-        <button class="ts-btn sw" id="swTrim">开</button></div>
-      <p class="ts-p" style="font-size:12.5px;color:var(--dim2);margin-bottom:0">
-        右边写着「开」就表示这条轴被反向。<b>配平按钮</b>只在飞直升机时有用
-        （把当前杆位锁住、松手不回中）；飞固定翼可以关掉，顶栏会少两个按钮。
-      </p>
-    </div>
-
-    <div class="ts-row" style="margin-top:16px">
-      <button class="ts-btn" id="setReset">恢复默认</button>
-      <button class="ts-btn pri" id="setClose">关闭</button>
     </div>
   </div>
 </div>
@@ -828,8 +945,33 @@
   bindToggle("invY", "y");
   bindToggle("invT", "t");
 
-  // ---------------------------------------------------------------- 手感面板
-  var setSheet = $("#setSheet");
+  // ---------------------------------------------------------------- 页切换
+  // 四页照 Pixel（仪表/起降/战斗/校准），但语义不同：起降和战斗两页共用
+  // 中间那颗杆盘，只换左右两列的内容 —— 两页都要推杆，把杆盘翻走就没法飞了。
+  var appEl = $("#app"), PAGE_KEY = "page";
+  var PAGES = { pfd:1, takeoff:1, combat:1, calib:1 };
+
+  function setPage(name, quiet){
+    if (!PAGES[name]) name = "takeoff";
+    appEl.setAttribute("data-page", name);
+    document.querySelectorAll("#tabs .tb").forEach(function(b){
+      b.classList.toggle("on", b.getAttribute("data-page") === name);
+    });
+    store.set(PAGE_KEY, name);
+    // 校准页是唯一需要滚动的页，切进去时顺手把参数刷一遍
+    if (name === "calib") paintTune();
+    if (!quiet && name !== "calib") tipEl.textContent = "";
+  }
+
+  document.querySelectorAll("#tabs .tb").forEach(function(b){
+    b.addEventListener("click", function(){ setPage(b.getAttribute("data-page")); });
+  });
+  // 顶栏「手感」和校准页指的是同一个地方：留着它是因为飞的时候手在杆上，
+  // 少一次"先看页签在哪"的寻找。
+  $("#setBtn").addEventListener("click", function(){ setPage("calib"); });
+  $("#setClose").addEventListener("click", function(){ setPage("takeoff"); });
+
+  // ---------------------------------------------------------------- 手感
   var rDead = $("#rDead"), rRange = $("#rRange"), rExpo = $("#rExpo");
 
   function paintTune(){
@@ -855,12 +997,6 @@
   bindRange(rRange, "range");
   bindRange(rExpo, "expo");
 
-  $("#setBtn").addEventListener("click", function(){
-    paintTune(); setSheet.classList.add("show");
-  });
-  $("#setClose").addEventListener("click", function(){
-    setSheet.classList.remove("show");
-  });
   $("#setReset").addEventListener("click", function(){
     tune.dead = DEFAULT_TUNE.dead; tune.range = DEFAULT_TUNE.range; tune.expo = DEFAULT_TUNE.expo;
     store.set("tune", tune); paintTune(); tip("已恢复默认手感");
@@ -934,6 +1070,7 @@
   // 所以这里先把 isSecureContext 检查一遍，直接告诉用户原因，别让人对着没反应的按钮猜。
   var tilt = { on:false, x:0, y:0, baseP:null, baseR:null, rawP:null, rawR:null };
   var tiltBtn = $("#tiltBtn"), zeroBtn = $("#zeroBtn"), tipEl = $("#tip");
+  var tilSt = $("#tilSt"), tilNow = $("#tilNow");
   var padTag = $("#padTag");
   var tipTimer = null;
 
@@ -948,6 +1085,11 @@
     tiltBtn.textContent = tilt.on ? "体感 开" : "体感";
     zeroBtn.style.display = tilt.on ? "" : "none";
     if (!tilt.on) padTag.textContent = "杆量 · 触点浮动";
+    if (tilSt){
+      tilSt.textContent = tilt.on ? "已开（正在读数）"
+                        : (window.isSecureContext ? "未开 · 点顶栏「体感」"
+                                                  : "不可用 · 缺 HTTPS");
+    }
   }
 
   // 把「当前姿态 - 基准」算成轴。单独抽出来，是为了让「校零」能立刻生效：
@@ -974,6 +1116,12 @@
 
     showAxes();
     padTag.textContent = "体感 " + degX.toFixed(0) + "° / " + degY.toFixed(0) + "°";
+    // 校准页要能看见"现在到底读到多少度"，否则校零只能闭着眼点。
+    // 只在那一页可见时写 DOM —— 60Hz 刷一个隐藏元素是白烧电。
+    if (tilNow && appEl.getAttribute("data-page") === "calib"){
+      var txt = "X " + degX.toFixed(1) + "° / Y " + degY.toFixed(1) + "°";
+      if (tilNow.textContent !== txt) tilNow.textContent = txt;
+    }
   }
 
   function onOrient(e){
@@ -1023,12 +1171,14 @@
   }
 
   tiltBtn.addEventListener("click", enableTilt);
-  zeroBtn.addEventListener("click", function(){
+  function doZero(){
     if (tilt.rawP === null){ tip("还没收到传感器数据"); return; }
     tilt.baseP = tilt.rawP; tilt.baseR = tilt.rawR;   // 立刻用当前姿态当新中位
     applyTilt();
     tip("已校零");
-  });
+  }
+  zeroBtn.addEventListener("click", doZero);
+  $("#calZero").addEventListener("click", doZero);
   window.addEventListener("orientationchange", function(){
     tilt.baseP = null; tilt.baseR = null;   // 转屏后旧基准不成立了
     applyTilt();
@@ -1129,9 +1279,26 @@
   var stripEl = $("#strip"), adiDisc = $("#adiDisc");
   var sIas = $("#sIas"), sAlt = $("#sAlt"), sVs = $("#sVs"), sG = $("#sG"),
       sHdg = $("#sHdg"), sFuel = $("#sFuel"), sFuelU = $("#sFuelU");
+  // 仪表页同一份数据的放大版
+  var pagePfd = $("#pagePfd"), bAdiDisc = $("#bAdiDisc");
+  var pIas = $("#pIas"), pAlt = $("#pAlt"), pVs = $("#pVs"), pAgl = $("#pAgl"),
+      pHdg = $("#pHdg"), pG = $("#pG"), pMach = $("#pMach"), pAoa = $("#pAoa"),
+      pRpm = $("#pRpm"), pFuel = $("#pFuel"), pFuelU = $("#pFuelU");
 
   function put(el, v, dp){
     el.textContent = (typeof v === "number" && isFinite(v)) ? v.toFixed(dp) : "--";
+  }
+
+  // 姿态球：滚转整体旋转、俯仰上下平移。两颗球结构一样，只是尺寸差，
+  // 所以按「相对 26px 那颗放大几倍」算，而不是写死两套常数。
+  function paintAdi(disc, f){
+    if (!disc) return;
+    var box = disc.parentNode.getBoundingClientRect();
+    if (box.height < 4) return;          // 这一页没显示，量不到尺寸
+    var s = box.height, k = s / 26, lim = s * 0.46;
+    var py = clamp(f.pitch * 180 / Math.PI * 1.2 * k, -lim, lim);
+    var bk = -f.bank * 180 / Math.PI;
+    disc.style.transform = "translateY(" + py.toFixed(1) + "px) rotate(" + bk.toFixed(1) + "deg)";
   }
 
   function pollState(){
@@ -1142,9 +1309,15 @@
         sIas.textContent = sAlt.textContent = sVs.textContent = "--";
         sG.textContent = sHdg.textContent = sFuel.textContent = "--";
         adiDisc.style.transform = "translateY(0px) rotate(0deg)";
+        pagePfd.classList.add("nodata");
+        [pIas, pAlt, pVs, pAgl, pHdg, pG, pMach, pAoa, pRpm, pFuel].forEach(function(el){
+          el.textContent = "--";
+        });
+        bAdiDisc.style.transform = "translateY(0px) rotate(0deg)";
         return;
       }
       stripEl.classList.remove("nodata");
+      pagePfd.classList.remove("nodata");
       // 米/秒 → 节、英尺、英尺每分钟：DCS 玩家的习惯口径，和 /panel 保持一致
       put(sIas, f.ias * 1.94384, 0);
       put(sAlt, f.alt * 3.28084, 0);
@@ -1164,9 +1337,25 @@
                           ? "var(--red)" : "";
 
       // 姿态球：滚转整体旋转、俯仰上下平移。1° 俯仰 ≈ 1.2px，够看出抬头低头。
-      var py = clamp(f.pitch * 180 / Math.PI * 1.2, -12, 12);
-      var bk = -f.bank * 180 / Math.PI;
-      adiDisc.style.transform = "translateY(" + py.toFixed(1) + "px) rotate(" + bk.toFixed(1) + "deg)";
+      paintAdi(adiDisc, f);
+
+      // 仪表页：同样的口径，多的四个数（AGL / MACH / AOA / RPM）只有大页才放得下
+      var hd = (((f.hdg * 180 / Math.PI) % 360) + 360) % 360;
+      put(pIas, f.ias * 1.94384, 0);
+      put(pAlt, f.alt * 3.28084, 0);
+      put(pVs, f.vs * 196.85, 0);
+      put(pAgl, f.agl * 3.28084, 0);
+      put(pHdg, hd, 0);
+      put(pG, f.g, 1);
+      put(pMach, f.mach, 2);
+      put(pAoa, f.aoa * 180 / Math.PI, 1);
+      put(pRpm, Math.max(f.rpm_l || 0, f.rpm_r || 0), 0);
+      if (fuel > 1.01){ put(pFuel, fuel, 0); pFuelU.textContent = "kg"; }
+      else { put(pFuel, fuel * 100, 0); pFuelU.textContent = "%"; }
+      pVs.style.color = sVs.style.color;
+      pG.style.color = sG.style.color;
+      pFuel.style.color = sFuel.style.color;
+      paintAdi(bAdiDisc, f);
     }).catch(function(){ stripEl.classList.add("nodata"); });
   }
   pollState();
@@ -1187,8 +1376,9 @@
   window.addEventListener("blur", clearAll);
   window.addEventListener("pagehide", clearAll);
   document.addEventListener("touchmove", function(e){
-    // 整页禁滚是为了防止拖杆时把页面拖走；但 HTTPS 引导页是要上下翻着读的。
-    if (tlsSheet.contains(e.target) || setSheet.contains(e.target)) return;
+    // 整页禁滚是为了防止拖杆时把页面拖走；但 HTTPS 引导页和校准页
+    // 是要上下翻着读/调的，这两页放行。
+    if (tlsSheet.contains(e.target) || $("#pageCalib").contains(e.target)) return;
     if (e.cancelable) e.preventDefault();
   }, { passive: false });
   document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
@@ -1206,6 +1396,11 @@
   document.addEventListener("pointerdown", function once(){
     keepAwake();
   }, { once: true });
+
+  // ---------------- 开场：恢复上次那一页 + 把各块 UI 先画一遍
+  $("#pfdSrc").textContent = location.host;
+  tiltChip();
+  setPage(store.get(PAGE_KEY, "takeoff"), true);
 })();
 </script>
 </body>

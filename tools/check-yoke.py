@@ -91,6 +91,61 @@ with sync_playwright() as p:
     }""")
     check("仪表条不压杆区", geo["sBottom"] <= geo["dTop"] + 1 and 30 <= geo["h"] <= 40, str(geo))
 
+    # ---- 四页（照 Pixel：仪表/起降/战斗/校准）
+    def page_of():
+        return pg.eval_on_selector("#app", "el=>el.getAttribute('data-page')")
+
+    def pad_rect():
+        return pg.eval_on_selector("#pad", "el=>{const r=el.getBoundingClientRect();"
+                                            "return [Math.round(r.x),Math.round(r.y),"
+                                            "Math.round(r.width)]}")
+
+    tabs = pg.eval_on_selector_all(
+        "#tabs .tb", "els=>els.map(e=>e.getAttribute('data-page'))")
+    check("四个页签齐全", tabs == ["pfd", "takeoff", "combat", "calib"], str(tabs))
+
+    r_to = pad_rect()
+    pg.click('#tabs .tb[data-page="combat"]')
+    time.sleep(0.3)
+    r_cb = pad_rect()
+    check("切到战斗页", page_of() == "combat", page_of())
+    # 这条是整个四页设计的硬约束：换页只换左列内容，杆盘坐标必须一个像素都不动，
+    # 否则正在推杆时切页会把杆量甩一下。
+    check("切页后杆盘不挪位", r_to == r_cb, f"{r_to} vs {r_cb}")
+    vis = pg.evaluate("""() => {
+      const d = s => getComputedStyle(document.querySelector(s)).display;
+      return {to: d('#colTakeoff'), cb: d('#colCombat')};
+    }""")
+    check("战斗页只显示战斗面板", vis["to"] == "none" and vis["cb"] == "flex", str(vis))
+
+    pg.click('#tabs .tb[data-page="takeoff"]')
+    time.sleep(0.3)
+    vis = pg.evaluate("""() => {
+      const d = s => getComputedStyle(document.querySelector(s)).display;
+      return {to: d('#colTakeoff'), cb: d('#colCombat')};
+    }""")
+    check("起降页只显示起降面板", vis["to"] == "flex" and vis["cb"] == "none", str(vis))
+
+    # 仪表页：同一份 /state 数据要落到大表上，而且这一页不该有杆盘
+    pg.click('#tabs .tb[data-page="pfd"]')
+    time.sleep(2.2)
+    pfd = pg.evaluate("""() => {
+      const g = s => document.querySelector(s);
+      const ids = ['#pIas','#pAlt','#pVs','#pAgl','#pHdg','#pG','#pMach','#pAoa','#pRpm','#pFuel'];
+      return {vals: ids.map(s => g(s).textContent.trim()),
+              tf: getComputedStyle(g('#bAdiDisc')).transform,
+              deck: getComputedStyle(g('#deck')).display};
+    }""")
+    live = [v for v in pfd["vals"] if v not in ("--", "")]
+    check("仪表页十个数字都有读数", len(live) == 10, str(pfd["vals"]))
+    check("仪表页姿态球有姿态",
+          pfd["tf"] not in ("", "none", "matrix(1, 0, 0, 1, 0, 0)"), pfd["tf"])
+    check("仪表页收起杆盘", pfd["deck"] == "none", pfd["deck"])
+    pg.screenshot(path=".tmp/yoke-pfd.png")
+
+    pg.click('#tabs .tb[data-page="takeoff"]')
+    time.sleep(0.3)
+
 
     cdp = ctx.new_cdp_session(pg)
 
@@ -159,10 +214,10 @@ with sync_playwright() as p:
     s = snap()
     check("清配平后回中", abs(s["axes"]["x"]) < 0.02, f"x={s['axes']['x']:.2f}")
 
-    # ---- 手感面板
+    # ---- 校准页（原来是「手感」弹窗，现在是一整页）
     pg.click("#setBtn")
-    time.sleep(0.25)
-    check("手感面板能打开", pg.is_visible("#setSheet"), "")
+    time.sleep(0.3)
+    check("校准页能打开", pg.is_visible("#pageCalib") and page_of() == "calib", page_of())
     pg.screenshot(path=".tmp/yoke-set.png")
     pg.eval_on_selector("#rRange",
                         "el=>{el.value=40;el.dispatchEvent(new Event('input',{bubbles:true}))}")
@@ -172,10 +227,14 @@ with sync_playwright() as p:
     time.sleep(0.12)
     check("恢复默认", pg.inner_text("#vRange").strip() == "22°", pg.inner_text("#vRange"))
     pg.click("#setClose")
-    time.sleep(0.25)
-    check("手感面板能关闭", not pg.is_visible("#setSheet"), "")
+    time.sleep(0.3)
+    check("校准页能退回起降页",
+          not pg.is_visible("#pageCalib") and page_of() == "takeoff", page_of())
 
     # ---- 按钮最短脉冲：DCS 按模拟帧采样，20ms 的快速点按会丢
+    # 机炮在战斗页，先切过去
+    pg.click('#tabs .tb[data-page="combat"]')
+    time.sleep(0.3)
     gb0 = pg.eval_on_selector('[data-bit="11"]',
                               "el=>{const r=el.getBoundingClientRect();"
                               "return {x:r.x+r.width/2,y:r.y+r.height/2}}")
@@ -188,6 +247,10 @@ with sync_playwright() as p:
     time.sleep(0.30)
     s = snap()
     check("脉冲到点后自动松开", not (s["buttons"] & (1 << 11)), f"b={s['buttons']}")
+
+    # 回到起降页，后面全是油门/脚舵
+    pg.click('#tabs .tb[data-page="takeoff"]')
+    time.sleep(0.3)
 
     # ---- 油门：还没碰过时不能发 t（否则飞机被拽到慢车）
     check("未接管时不发 t", "t" not in s["axes"] or s["axes"]["t"] is None,
@@ -215,7 +278,9 @@ with sync_playwright() as p:
     check("解锁后油门值还在", s["axes"].get("t") is not None
           and abs(s["axes"]["t"] - 0.75) < 0.05, str(s["axes"].get("t")))
 
-    # ---- 按钮：机炮 BTN12 = bit11
+    # ---- 按钮：机炮 BTN12 = bit11（战斗页）
+    pg.click('#tabs .tb[data-page="combat"]')
+    time.sleep(0.3)
     gb = pg.eval_on_selector('[data-bit="11"]', "el=>{const r=el.getBoundingClientRect();"
                                                "return {x:r.x+r.width/2,y:r.y+r.height/2}}")
     touch("start", gb["x"], gb["y"], tid=3)
@@ -226,6 +291,9 @@ with sync_playwright() as p:
     time.sleep(0.18)
     s = snap()
     check("机炮松开 = 清零", not (s["buttons"] & (1 << 11)), f"b={s['buttons']}")
+
+    pg.click('#tabs .tb[data-page="takeoff"]')
+    time.sleep(0.3)
 
     # ---- 脚舵：比例滑块（不是两个满舵按钮），松手回中
     rb = pg.eval_on_selector("#rud", "el=>{const r=el.getBoundingClientRect();"
