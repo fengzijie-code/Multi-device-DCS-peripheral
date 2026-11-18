@@ -12,8 +12,9 @@
 
 `/yoke` 是给 **「添加到主屏幕」** 用的。做法：
 
-1. PC 上双击 **`tools\start-ipad.bat`**（不等手机、不建 adb 隧道，只起 beacon + vjoy）
-2. iPad Safari 打开 `http://<PC的IP>:8080/yoke`
+1. PC 上双击 **`tools\start-ipad.bat`**（不等手机、不建 adb 隧道，只起 beacon + vjoy；
+   证书存在时会自动多开一个 8443 的 HTTPS）
+2. iPad Safari 打开 `http://<PC的IP>:8080/yoke`（要体感就用 `https://<PC的IP>:8443/yoke`）
 3. 分享 → **添加到主屏幕** → 命名为「DCS 杆」
 4. **从桌面那个图标启动**（不是从 Safari 里的书签）
 
@@ -108,12 +109,71 @@ adb shell am force-stop com.fengzijie.dcsperipheral
 
 ---
 
+## 四、体感（陀螺仪）
+
+能做，但 iOS 有一道硬门槛，不是代码问题。
+
+### 为什么必须 HTTPS
+
+iOS 13 起，**传感器（方向 / 运动）只在安全上下文里可用**。WebKit 工程师在
+[webkit.org/b/203287](https://webkit.org/b/203287#c5) 的原话：
+
+> "I think also changed behavior in iOS 13 to require a secure context
+> (file protocol, https or loopback), no HTTP."
+
+也就是说 `http://192.168.137.1:8080/yoke` 上点「体感」永远不会来数据。
+Chrome 更直接：非安全上下文里 `DeviceOrientationEvent` 整个从 `window` 上摘掉。
+页面把这条检查放在最前面，点了会直接告诉你「体感需要 HTTPS」，不让你对着没反应的按钮猜。
+
+### 装一次根证书（之后就不用管了）
+
+局域网 IP 拿不到公信证书，所以走本地 CA：
+
+```bat
+python tools\make-cert.py                 :: 生成 CA + 服务端证书 + 描述文件
+python tools\make-cert.py --ip 192.168.50.1   :: 换网段时把新 IP 追加进去再签
+```
+
+然后在 iPad 上：
+
+1. Safari 打开 `http://<PC的IP>:8080/ca.mobileconfig`（beacon 直接提供这个文件）
+2. 设置 → 通用 → VPN 与设备管理 → 安装该描述文件
+3. 设置 → 通用 → 关于本机 → **证书信任设置** → 打开「DCS Peripheral Local CA」
+4. 打开 `https://<PC的IP>:8443/yoke`，地址栏不再报警告
+
+第 3 步最容易漏 —— 只安装不信任，证书依旧是「不受信任」，WebSocket/传感器照样被拦。
+`tools/certs/` 已 gitignore，私钥不会进仓库；换了电脑或在仓库外重装要先跑一次 `make-cert.py`。
+
+> **为什么非要装证书而不是点「继续访问」**：自签警告在「添加到主屏幕」的 standalone
+> 窗口里没有"继续"按钮，页面会直接白屏。必须让证书真的被信任。
+
+### 怎么用
+
+顶栏点「体感」→ 首次会弹授权（必须由点击触发，这是 Apple 的规矩；拒绝过后要先去
+Safari 设置里重置该站点权限）→ 开起来后**把 iPad 放平时点一下「校零」**。
+
+- 满行程 = **25°** 偏转，超过就夹在 ±1
+- 输出 = 体感 + 杆盘，两者相加再夹住 —— 杆盘还留着当微调，松手回 0
+- 转屏会重置基准（`orientationchange`），因为横竖屏的 beta/gamma 角色是互换的
+- 方向反了用顶栏的 `X 反` / `Y 反`，别改代码
+
+### 一个物理上的实话
+
+体感要**拿着平板转**才有意义。11 吋 444g，双手握住时拇指只够得到屏幕两侧边缘 ——
+所以体感模式下中间那个大圆盘是够不着的（它这时候也确实只剩读数作用），
+油门（最左竖条）、脚舵（左上）、按钮（右上）都在边缘，这才是能摸到的那部分。
+
+如果你发现举着它飞十分钟就累，那就退回触摸模式 —— 这也是我把两者做成相加而不是
+二选一的原因：随时可以只关体感。
+
+---
+
 ## 五、已知限制
 
 | 限制 | 说明 |
 |---|---|
 | 没有配平 | 手机端那个配平是直升机用的开关（固定翼默认关），iPad 这版没做 |
-| 没有体感倾斜 | 页面上拿不到可靠的 DeviceMotion（要用户手势授权、http 下能否拿到看 iOS 版本），而且 444g 的平板拿手上转不是个好交互 |
+| 体感要走 HTTPS | 且要装一次根证书（见上一节）；每次重开页面要重新授权一次 |
 | 竖屏只是凑合 | 按钮会变两列，能按但不舒服 |
 | 断线就回中 | `vjoy_out.py` 的 531ms 看门狗兜底，页面自己 3 次失败会显示 `断开 · 重试中` |
 
@@ -125,17 +185,31 @@ adb shell am force-stop com.fengzijie.dcsperipheral
 ## 六、验收
 
 ```bat
-python tools\beacon.py --port 8096 --ipv4-only
-python tools\check-yoke.py 8096
+:: 另起一个隔离端口，别和 iPad 正在用的 8080 抢 /input
+python tools\beacon.py --port 8097 --ipv4-only --udp-in 0 --input-out none ^
+       --tls-port 8444 --tls-cert tools/certs/server.crt --tls-key tools/certs/server.key
+
+python tools\check-yoke.py https://127.0.0.1:8444/yoke   :: 24 项，含体感
+python tools\check-yoke.py http://<本机IP>:8097/yoke      :: 19 项，验"会说缺 HTTPS"
 ```
 
 `tools/check-yoke.py` 用 playwright + 系统 Chrome，在 1194×834 的 iPad 横屏视口里**真的发触摸事件**
-（CDP `Input.dispatchTouchEvent`），然后回头查 `/input` 收到了什么 —— 18 项断言：
+（CDP `Input.dispatchTouchEvent`），https 下还用 `DeviceOrientation.setDeviceOrientationOverride`
+假造倾斜，然后回头查 `/input` 收到了什么：
 
 - 杆盘是正方形、≥400px、推过头仍夹在 1.0、松手回中
 - 未碰油门时 `/input` 里**没有** `t` 字段
 - 油门 1/4 处 ≈ 0.75，松手保持
 - 机炮按下 = bit11，松开清零；左舵 = `r` 负
+- 体感：右倾 15° ≈ x 0.6、前倾 12° ≈ y −0.48、校零回 0、超行程夹 1.0、关掉回 0
+- http 下点体感会明确提示缺 HTTPS
 - 无 console 报错、无元素溢出视口
 
-截图落在 `.tmp/yoke-ipad.png`（横）、`.tmp/yoke-ipad-port.png`（竖）。
+截图落在 `.tmp/yoke-ipad.png`（横）、`.tmp/yoke-ipad-port.png`（竖）、`.tmp/yoke-tilt.png`（体感）。
+
+> **注意 localhost 不算数**：`http://127.0.0.1` 在浏览器眼里是安全上下文，
+> 拿它测不出「http 拿不到传感器」。要验那条分支必须用局域网 IP（如 `192.168.137.1`）。
+
+> **测试时务必独占 `/input`**：iPad 上开着 `/yoke` 的话，它会和测试页以各 50Hz 交替喂数据，
+> 读出来一半是你的值一半是它的值。beacon 会打印 `[input] 操纵量来源 → <IP>`，
+> 出现两个来源就是两路在抢。

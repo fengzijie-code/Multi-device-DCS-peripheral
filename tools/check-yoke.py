@@ -1,26 +1,33 @@
 """对 /yoke 做一次真渲染 + 真触摸验收（需要 playwright + 本机 Chrome）。
 
 用法：
-    python tools/check-yoke.py            # 默认 8080
-    python tools/check-yoke.py 8096       # 指定端口
+    python tools/check-yoke.py                        # 默认 http://127.0.0.1:8080/yoke
+    python tools/check-yoke.py https://127.0.0.1:8443/yoke
 
 验的是「手指推上去，/input 里到底收到了什么」—— 截图只能看版面，
 触摸语义（上推是不是拉杆、松手有没有回中、油门有没有被误发 0）必须看数据。
+https 下还会用 CDP 的 DeviceOrientation 假造倾斜，验体感那条轴；
+http 下则验「点体感会明确告诉你缺 HTTPS」。
 """
 import json
+import ssl
 import sys
 import time
 import urllib.request
 
 from playwright.sync_api import sync_playwright
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
-URL = f"http://127.0.0.1:{PORT}/yoke"
+URL = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8080/yoke"
+BASE = URL.rsplit("/yoke", 1)[0]
 W, H = 1194, 834          # 11 吋 iPad Pro 横屏的 CSS 视口
+
+_SSL = ssl.create_default_context()
+_SSL.check_hostname = False
+_SSL.verify_mode = ssl.CERT_NONE
 
 
 def snap():
-    with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/input") as r:
+    with urllib.request.urlopen(f"{BASE}/input", context=_SSL) as r:
         return json.load(r)
 
 
@@ -35,7 +42,8 @@ with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome")
     ctx = b.new_context(viewport={"width": W, "height": H},
                         device_scale_factor=2, has_touch=True,
-                        is_mobile=False, locale="zh-CN")
+                        is_mobile=False, locale="zh-CN",
+                        ignore_https_errors=True)
     pg = ctx.new_page()
     errs = []
     pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
@@ -127,6 +135,46 @@ with sync_playwright() as p:
     s = snap()
     check("左舵 = r 负", s["axes"]["r"] < -0.9, f"r={s['axes']['r']}")
     touch("end", 0, 0, tid=4)
+
+    # ---- 体感：https 下用 CDP 假造倾斜；http 下验"会说缺 HTTPS"
+    secure = pg.evaluate("window.isSecureContext")
+    pg.click("#tiltBtn")
+    time.sleep(0.25)
+    if secure:
+        def orient(beta, gamma):
+            cdp.send("DeviceOrientation.setDeviceOrientationOverride",
+                     {"alpha": 0, "beta": beta, "gamma": gamma})
+            time.sleep(0.22)
+
+        orient(0, 0)                       # 基准
+        check("体感开启后不复位", pg.inner_text("#padTag").startswith("体感"),
+              pg.inner_text("#padTag"))
+        orient(0, 15)                      # 右倾 15° -> x = 15/25
+        s = snap()
+        check("右倾 15° ≈ x 0.6", abs(s["axes"]["x"] - 0.6) < 0.06, f"x={s['axes']['x']:.3f}")
+        orient(-12, 15)
+        s = snap()
+        check("前倾 12° ≈ y -0.48", abs(s["axes"]["y"] + 0.48) < 0.08, f"y={s['axes']['y']:.3f}")
+
+        pg.click("#zeroBtn")               # 当前姿态记为中立
+        time.sleep(0.25)
+        s = snap()
+        check("校零后回 0", abs(s["axes"]["x"]) < 0.03 and abs(s["axes"]["y"]) < 0.03,
+              f"x={s['axes']['x']:.3f} y={s['axes']['y']:.3f}")
+
+        orient(0, 60)                      # 超过行程
+        s = snap()
+        check("体感超行程夹在 1.0", 0.95 <= s["axes"]["x"] <= 1.0, f"x={s['axes']['x']:.3f}")
+
+        pg.click("#tiltBtn")               # 关掉
+        time.sleep(0.3)
+        s = snap()
+        check("关体感后 x 回 0", abs(s["axes"]["x"]) < 0.03, f"x={s['axes']['x']:.3f}")
+        cdp.send("DeviceOrientation.clearDeviceOrientationOverride")
+    else:
+        check("http 下点体感会说明缺 HTTPS",
+              "HTTPS" in pg.inner_text("#tip") or "安全" in pg.inner_text("#tip"),
+              pg.inner_text("#tip"))
 
     # ---- 各区域不能溢出视口
     over = pg.evaluate("""() => {

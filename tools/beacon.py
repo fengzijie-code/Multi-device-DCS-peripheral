@@ -29,6 +29,7 @@ import json
 import math
 import socket
 import socketserver
+import ssl
 import sys
 import threading
 import time
@@ -677,6 +678,7 @@ class InputHub:
 
 
 INPUT = InputHub()
+_last_input_peer: str | None = None
 
 
 class Recorder:
@@ -868,6 +870,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, yoke_body(), "text/html; charset=utf-8")
             return
 
+        # 描述文件走 HTTP 下载：装证书这一步本身不需要 https，
+        # 而让 iPad 直接打开链接去装，比 AirDrop/邮件少折腾一次。
+        if path in ("/ca.mobileconfig", "/profile.mobileconfig", "/ca"):
+            prof = Path(__file__).resolve().parent / "certs" / "dcs-peripheral-ca.mobileconfig"
+            if not prof.is_file():
+                self._send(404, b"no profile: run python tools/make-cert.py",
+                           "text/plain; charset=utf-8")
+                return
+            self._send(200, prof.read_bytes(), "application/x-apple-aspen-config")
+            return
+
         # 404 也给人话：把可用入口列出来，拼错了能自己看出来
         self._send(404, not_found_html(self.path), "text/html; charset=utf-8")
 
@@ -949,6 +962,14 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         st = INPUT.feed(obj)
+        # 「谁在喂操纵量」只在来源变化时打一行。
+        # 这条是为了一个很贵的坑：手机 App 没关、iPad 页面又开着，两边同时 POST，
+        # 杆量会一半被覆盖成别人的值，现象是「杆一顿一顿回中」，光看数字查不出来。
+        # 打一次来源，一眼就能看出有几个客户端在抢。
+        global _last_input_peer
+        if self.client_address[0] != _last_input_peer:
+            _last_input_peer = self.client_address[0]
+            print(f"  [input] 操纵量来源 → {_last_input_peer}")
         # 顺手把 vJoy 的状态塞进回包：手机每帧都会读这个响应，于是
         # 「虚拟摇杆没起来 / 缺轴」不用额外查询、不用额外轮询，顺路就
         # 送到屏幕上了。多几个字节，省一个接口。
@@ -975,7 +996,9 @@ class V6Server(socketserver.ThreadingTCPServer):
 
 # ---------------------------------------------------------------- 启动
 
-def start_servers(port: int, ipv4_only: bool) -> list:
+def start_servers(port: int, ipv4_only: bool,
+                  tls_port: int = 0, tls_cert: str | None = None,
+                  tls_key: str | None = None) -> list:
     servers = []
 
     try:
@@ -993,6 +1016,23 @@ def start_servers(port: int, ipv4_only: bool) -> list:
         except OSError as e:
             print(f"  [–] IPv6 :{port} 不可用（{e}），仅 IPv4 运行")
 
+    # HTTPS 单独一个端口：8080 继续留给 vjoy_out 的内部回报（它写死了 http），
+    # 8443 才是 iPad 用的那个。iOS 只对安全上下文发传感器数据，所以体感必须有它。
+    if tls_port and tls_cert and tls_key:
+        try:
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+            ctx.load_cert_chain(tls_cert, tls_key)
+            st = V4Server(("0.0.0.0", tls_port), Handler)
+            # 换掉监听 socket 后，握手发生在 accept 里（单线程），
+            # 一个客户端时无所谓；将来真变多客户端再改成握手丢进线程。
+            st.socket = ctx.wrap_socket(st.socket, server_side=True)
+            threading.Thread(target=st.serve_forever, daemon=True).start()
+            servers.append(("HTTPS", st))
+        except Exception as e:
+            print(f"  [x] HTTPS :{tls_port} 起不来 —— {e}")
+            print("      （证书缺失或过期？python tools/make-cert.py）")
+
     return servers
 
 
@@ -1007,6 +1047,10 @@ def main() -> int:
     ap.add_argument("--input-out", metavar="HOST:PORT", default="127.0.0.1:5011",
                     help="把手机发来的操纵量转成 UDP 发给 vjoy_out.py"
                          "（默认 127.0.0.1:5011，给 none 关闭转发）")
+    ap.add_argument("--tls-port", type=int, default=0,
+                    help="额外开一个 HTTPS 端口（iPad 体感必须有 https），如 8443")
+    ap.add_argument("--tls-cert", default=None, help="服务端证书 PEM")
+    ap.add_argument("--tls-key", default=None, help="服务端私钥 PEM")
     args = ap.parse_args()
 
     stop = threading.Event()
@@ -1025,7 +1069,8 @@ def main() -> int:
     print("  可达性信标 · 用手机浏览器打开下面任意一个地址")
     print("═" * 62)
 
-    servers = start_servers(args.port, args.ipv4_only)
+    servers = start_servers(args.port, args.ipv4_only,
+                            args.tls_port, args.tls_cert, args.tls_key)
     if not servers:
         print("  [x] 没有成功监听任何地址，检查端口是否被占用")
         return 1
@@ -1060,6 +1105,19 @@ def main() -> int:
         n += 1
     if n == 0:
         print("  （没找到可用地址，检查 Wi-Fi 连接）")
+
+    if args.tls_port and any(name == "HTTPS" for name, _ in servers):
+        print()
+        print("· HTTPS（iPad 体感 / 陀螺仪必须走这个）")
+        for a in enumerate_ipv4():
+            if a.get("virtual"):
+                continue
+            print(f"  https://{a['ip']}:{args.tls_port}/yoke")
+        print("  [i] 第一次用要把根证书装到 iPad 并信任，步骤见 docs/YOKE-IPAD.md")
+        print(f"      iPad Safari 打开 http://<本机IP>:{args.port}/ca.mobileconfig 即可下载")
+    elif args.tls_port:
+        print()
+        print("  [!] HTTPS 没起来 —— 体感将不可用（http 下 iOS 不给传感器数据）")
 
     print()
     print("· 提示")

@@ -32,6 +32,7 @@ import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
 for _s in (sys.stdout, sys.stderr):
     try:
@@ -299,6 +300,9 @@ def main() -> int:
                     help="跳过手机/USB 隧道检查（只跑桥接与摇杆输出）")
     ap.add_argument("--no-watch", action="store_true",
                     help="不启动 adb 隧道看守（iPad 走网线时用，配合 --no-usb）")
+    ap.add_argument("--tls-port", type=int, default=8443,
+                    help="HTTPS 端口（iPad 体感需要；证书不存在则自动跳过）")
+    ap.add_argument("--no-tls", action="store_true", help="不开 HTTPS")
     ap.add_argument("--vjoy-port", type=int, default=5011,
                     help="操纵量内部转发端口")
     args = ap.parse_args()
@@ -376,10 +380,18 @@ def main() -> int:
         return 2
 
     children: list[Child] = []
-    children.append(Child("beacon", [
+    beacon_args = [
         py, "-u", os.path.join("tools", "beacon.py"),
         "--port", str(args.port), "--ipv4-only", "--udp-in", str(args.udp_in),
-    ]))
+    ]
+    certs = Path("tools") / "certs"
+    if not args.no_tls and (certs / "server.crt").is_file() and (certs / "server.key").is_file():
+        beacon_args += [
+            "--tls-port", str(args.tls_port),
+            "--tls-cert", str(certs / "server.crt"),
+            "--tls-key", str(certs / "server.key"),
+        ]
+    children.append(Child("beacon", beacon_args))
     if not args.no_watch:
         children.append(Child("watch", [
             py, "-u", os.path.join("tools", "usb-watchdog.py"),

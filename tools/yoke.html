@@ -39,6 +39,8 @@
   .meter{ font-size:12px; color:var(--dim2); font-variant-numeric:tabular-nums; }
   .meter b{ color:var(--dim); font-weight:400; }
   #hud .sp{ flex:1; }
+  #tip{ font-size:12px; color:var(--amber); max-width:38vw; overflow:hidden;
+        text-overflow:ellipsis; white-space:nowrap; }
   .chip{ font-size:12px; color:var(--dim); background:var(--panel2);
          border:1px solid var(--line); border-radius:999px; padding:5px 10px; }
   .chip.on{ color:#0d1117; background:var(--amber); border-color:var(--amber); }
@@ -151,6 +153,9 @@
     <div class="meter">收 <b id="hz">—</b> Hz</div>
     <div class="meter">vJoy <b id="vj">--</b></div>
     <div class="sp"></div>
+    <div id="tip"></div>
+    <button class="chip" id="tiltBtn">体感</button>
+    <button class="chip" id="zeroBtn" style="display:none">校零</button>
     <button class="chip" id="invX">X 反</button>
     <button class="chip" id="invY">Y 反</button>
     <button class="chip" id="invT">油门反</button>
@@ -277,10 +282,19 @@
     if (e && e.pointerId !== padId) return;
     padId = null; st.x = 0; st.y = 0; dotk.classList.remove("on");
     ring.style.display = "none";
-    padVal.textContent = "0.00 / 0.00";
+    showAxes();
   }
   pad.addEventListener("pointerup", endPad);
   pad.addEventListener("pointercancel", endPad);
+
+  // 盘上的读数是"实际送出去的轴"，体感开着时要把体感的量算进去，
+  // 否则一边飞一边看到 0.00/0.00 会以为杆量没生效。
+  function showAxes(){
+    var tx = tilt.on ? tilt.x : 0;
+    var ty = tilt.on ? tilt.y : 0;
+    padVal.textContent = clamp(st.x + tx, -1, 1).toFixed(2) + " / " +
+                         clamp(st.y + ty, -1, 1).toFixed(2);
+  }
 
   function drawPad(){
     ring.style.display = "block";
@@ -288,7 +302,7 @@
     ring.style.top = ay + "px";
     dotk.style.left = (ax + dx) + "px";
     dotk.style.top = (ay + dy) + "px";
-    padVal.textContent = st.x.toFixed(2) + " / " + st.y.toFixed(2);
+    showAxes();
   }
 
   // ---------------------------------------------------------------- 轴：油门
@@ -381,6 +395,99 @@
   bindToggle("invY", "y");
   bindToggle("invT", "t");
 
+  // ---------------------------------------------------------------- 体感
+  // iOS 只在安全上下文（https / localhost）里发传感器数据，http 下永远收不到 ——
+  // 所以这里先把 isSecureContext 检查一遍，直接告诉用户原因，别让人对着没反应的按钮猜。
+  var TILT_RANGE = 25;      // 度：偏转多少算满行程
+  var tilt = { on:false, x:0, y:0, baseP:null, baseR:null, rawP:null, rawR:null };
+  var tiltBtn = $("#tiltBtn"), zeroBtn = $("#zeroBtn"), tipEl = $("#tip");
+  var padTag = $("#padTag");
+  var tipTimer = null;
+
+  function tip(msg){
+    tipEl.textContent = msg || "";
+    if (tipTimer) clearTimeout(tipTimer);
+    if (msg) tipTimer = setTimeout(function(){ tipEl.textContent = ""; }, 6000);
+  }
+
+  function tiltChip(){
+    tiltBtn.classList.toggle("on", tilt.on);
+    tiltBtn.textContent = tilt.on ? "体感 开" : "体感";
+    zeroBtn.style.display = tilt.on ? "" : "none";
+    if (!tilt.on) padTag.textContent = "杆量 · 触点浮动";
+  }
+
+  // 把「当前姿态 - 基准」算成轴。单独抽出来，是为了让「校零」能立刻生效：
+  // 只清基准、等下一帧的话，静止不动时（浏览器不一定还发事件）会一直用旧输出。
+  function applyTilt(){
+    if (tilt.rawP === null) return;
+    if (tilt.baseP === null){ tilt.baseP = tilt.rawP; tilt.baseR = tilt.rawR; }
+    var degX = tilt.rawR - tilt.baseR;
+    var degY = tilt.rawP - tilt.baseP;
+    tilt.x = clamp(degX / TILT_RANGE, -1, 1) * (inv.x ? -1 : 1);
+    tilt.y = clamp(degY / TILT_RANGE, -1, 1) * (inv.y ? -1 : 1);
+    showAxes();
+    padTag.textContent = "体感 " + degX.toFixed(0) + "° / " + degY.toFixed(0) + "°";
+  }
+
+  function onOrient(e){
+    if (e.beta === null || e.gamma === null) return;
+    // 屏幕转 90° 后 beta/gamma 的角色互换，用 screen.orientation 把坐标搬回"屏幕"。
+    var ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    if (ang === 90) { tilt.rawR = e.beta; tilt.rawP = -e.gamma; }
+    else if (ang === -90 || ang === 270) { tilt.rawR = -e.beta; tilt.rawP = e.gamma; }
+    else if (ang === 180) { tilt.rawR = -e.gamma; tilt.rawP = -e.beta; }
+    else { tilt.rawR = e.gamma; tilt.rawP = e.beta; }
+    applyTilt();
+  }
+
+  function startTilt(){
+    tilt.on = true;
+    tilt.baseP = null; tilt.baseR = null; tilt.rawP = null; tilt.rawR = null;
+    window.addEventListener("deviceorientation", onOrient);
+    tiltChip();
+    tip("体感已开 · 放平再校零");
+  }
+
+  function enableTilt(){
+    if (tilt.on){
+      tilt.on = false;
+      window.removeEventListener("deviceorientation", onOrient);
+      tiltChip(); tip("体感已关");
+      return;
+    }
+    // 顺序要紧：非安全上下文里 Chrome 直接把 DeviceOrientationEvent 从 window 上摘掉，
+    // 先判 isSecureContext 才能给出「缺 HTTPS」而不是误导人的「没有传感器」。
+    if (!window.isSecureContext){
+      tip("体感需要 HTTPS —— http 下浏览器不给传感器数据（见 docs/YOKE-IPAD.md）");
+      return;
+    }
+    if (typeof window.DeviceOrientationEvent === "undefined"){ tip("此浏览器没有方向传感器接口"); return; }
+    var req = window.DeviceOrientationEvent.requestPermission;
+    if (typeof req === "function"){
+      try {
+        req.call(window.DeviceOrientationEvent).then(function(s){
+          if (s === "granted") startTilt();
+          else tip("体感被拒绝 —— 该站点的权限被记住，需要去 Safari 设置里重置");
+        }).catch(function(){ tip("体感授权失败（必须由点击触发）"); });
+      } catch(err){ tip("体感授权失败：" + err.message); }
+    } else {
+      startTilt();          // 桌面 Chrome / 安卓不需要授权
+    }
+  }
+
+  tiltBtn.addEventListener("click", enableTilt);
+  zeroBtn.addEventListener("click", function(){
+    if (tilt.rawP === null){ tip("还没收到传感器数据"); return; }
+    tilt.baseP = tilt.rawP; tilt.baseR = tilt.rawR;   // 立刻用当前姿态当新中位
+    applyTilt();
+    tip("已校零");
+  });
+  window.addEventListener("orientationchange", function(){
+    tilt.baseP = null; tilt.baseR = null;   // 转屏后旧基准不成立了
+    applyTilt();
+  });
+
   // ---------------------------------------------------------------- 发送
   var dot = $("#dot"), stext = $("#stext"), rttEl = $("#rtt"),
       hzEl = $("#hz"), vjEl = $("#vj");
@@ -388,7 +495,16 @@
       rttAvg = 0, seq = 0;
 
   function payload(){
-    var o = { x: +st.x.toFixed(4), y: +st.y.toFixed(4), r: +st.r.toFixed(4), b: st.b };
+    // 体感是基准，杆盘是微调：两个相加再夹住。杆盘松手回 0，所以净效果就是
+    // 「体感给主行程，手指还能临时补一点」。
+    var tx = tilt.on ? tilt.x : 0;
+    var ty = tilt.on ? tilt.y : 0;
+    var o = {
+      x: +clamp(st.x + tx, -1, 1).toFixed(4),
+      y: +clamp(st.y + ty, -1, 1).toFixed(4),
+      r: +st.r.toFixed(4),
+      b: st.b
+    };
     if (st.t !== null) o.t = +st.t.toFixed(4);
     return JSON.stringify(o);
   }
