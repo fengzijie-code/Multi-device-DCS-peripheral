@@ -87,6 +87,20 @@ with sync_playwright() as p:
     check("杆盘是正方形", abs(box["w"] - box["h"]) < 2, f"{box['w']:.0f}x{box['h']:.0f}")
     check("杆盘够大（>=400px）", box["w"] >= 400, f"{box['w']:.0f}px")
     cx, cy = box["x"] + box["w"] / 2, box["y"] + box["h"] / 2
+
+    # ---- 上锁：默认不发任何操纵量（和 Pixel 端一致）
+    check("默认上锁", pg.inner_text("#armBtn").strip() == "解锁", pg.inner_text("#armBtn"))
+    touch("start", cx, cy)
+    touch("move", cx, cy - box["h"] * 0.2)
+    time.sleep(0.18)
+    s = snap()
+    check("上锁时推杆无输出",
+          abs(s["axes"]["x"]) < 0.01 and abs(s["axes"]["y"]) < 0.01, str(s["axes"]))
+    touch("end", 0, 0)
+    pg.click("#armBtn")
+    time.sleep(0.2)
+    check("点一下即解锁", "已解锁" in pg.inner_text("#armBtn"), pg.inner_text("#armBtn"))
+
     touch("start", cx, cy)
     touch("move", cx, cy - box["h"] * 0.2)
     time.sleep(0.18)
@@ -111,6 +125,35 @@ with sync_playwright() as p:
     check("松手回中 x/y=0", abs(s["axes"]["x"]) < 0.02 and abs(s["axes"]["y"]) < 0.02,
           str(s["axes"]))
 
+    # ---- 配平：推住杆 → 记配平 → 松手应当「保持」，而不是回中
+    touch("start", cx, cy)
+    touch("move", cx + box["w"] * 0.2, cy)
+    time.sleep(0.15)
+    pg.evaluate("document.querySelector('#trimBtn').click()")
+    time.sleep(0.1)
+    touch("end", 0, 0)
+    time.sleep(0.22)
+    s = snap()
+    check("配平后松手保持杆位", s["axes"]["x"] > 0.3, f"x={s['axes']['x']:.2f}")
+    pg.evaluate("document.querySelector('#trimClr').click()")
+    time.sleep(0.22)
+    s = snap()
+    check("清配平后回中", abs(s["axes"]["x"]) < 0.02, f"x={s['axes']['x']:.2f}")
+
+    # ---- 按钮最短脉冲：DCS 按模拟帧采样，20ms 的快速点按会丢
+    gb0 = pg.eval_on_selector('[data-bit="11"]',
+                              "el=>{const r=el.getBoundingClientRect();"
+                              "return {x:r.x+r.width/2,y:r.y+r.height/2}}")
+    touch("start", gb0["x"], gb0["y"], tid=5)
+    touch("end", 0, 0, tid=5)          # 立刻抬起，中间不留时间
+    time.sleep(0.06)
+    s = snap()
+    check("快速点按仍被按下（最短 120ms）", bool(s["buttons"] & (1 << 11)),
+          f"b={s['buttons']}")
+    time.sleep(0.30)
+    s = snap()
+    check("脉冲到点后自动松开", not (s["buttons"] & (1 << 11)), f"b={s['buttons']}")
+
     # ---- 油门：还没碰过时不能发 t（否则飞机被拽到慢车）
     check("未接管时不发 t", "t" not in s["axes"] or s["axes"]["t"] is None,
           str(s["axes"].get("t")))
@@ -125,6 +168,17 @@ with sync_playwright() as p:
     time.sleep(0.25)
     s = snap()
     check("油门松手保持", abs(s["axes"]["t"] - 0.75) < 0.05, f"t={s['axes']['t']:.2f}")
+
+    # ---- 上锁时油门字段必须消失（缺 t = 别动油门，发 0 = 拽到慢车）
+    pg.click("#armBtn")
+    time.sleep(0.25)
+    s = snap()
+    check("上锁后不再发 t", s["axes"].get("t") is None, str(s["axes"].get("t")))
+    pg.click("#armBtn")
+    time.sleep(0.25)
+    s = snap()
+    check("解锁后油门值还在", s["axes"].get("t") is not None
+          and abs(s["axes"]["t"] - 0.75) < 0.05, str(s["axes"].get("t")))
 
     # ---- 按钮：机炮 BTN12 = bit11
     gb = pg.eval_on_selector('[data-bit="11"]', "el=>{const r=el.getBoundingClientRect();"
@@ -179,12 +233,19 @@ with sync_playwright() as p:
         orient(0, 0)                       # 基准
         check("体感开启后不复位", pg.inner_text("#padTag").startswith("体感"),
               pg.inner_text("#padTag"))
-        orient(0, 15)                      # 右倾 15° -> x = 15/25
+        # 曲线按 Pixel 端默认值：死区 2.5°、行程 22°、expo 0.35
+        #   15° → v=(15-2.5)/19.5=0.641 → 0.641*0.65 + 0.641³*0.35 ≈ 0.509
+        orient(0, 15)                      # 右倾 15°
         s = snap()
-        check("右倾 15° ≈ x 0.6", abs(s["axes"]["x"] - 0.6) < 0.06, f"x={s['axes']['x']:.3f}")
+        check("右倾 15° ≈ x 0.51", abs(s["axes"]["x"] - 0.509) < 0.06, f"x={s['axes']['x']:.3f}")
+        # 12° → v=(12-2.5)/19.5=0.487 → 0.487*0.65 + 0.487³*0.35 ≈ 0.357
         orient(-12, 15)
         s = snap()
-        check("前倾 12° ≈ y -0.48", abs(s["axes"]["y"] + 0.48) < 0.08, f"y={s['axes']['y']:.3f}")
+        check("前倾 12° ≈ y -0.36", abs(s["axes"]["y"] + 0.357) < 0.08, f"y={s['axes']['y']:.3f}")
+        # 死区内必须严格为 0：手持微抖不该让杆一直轻颤
+        orient(0, 1.5)
+        s = snap()
+        check("死区内输出为 0", abs(s["axes"]["x"]) < 0.01, f"x={s['axes']['x']:.3f}")
 
         pg.click("#zeroBtn")               # 当前姿态记为中立
         time.sleep(0.25)

@@ -48,6 +48,15 @@
   .chip{ font-size:12px; color:var(--dim); background:var(--panel2);
          border:1px solid var(--line); border-radius:999px; padding:5px 10px; }
   .chip.on{ color:#0d1117; background:var(--amber); border-color:var(--amber); }
+  /* 上锁/解锁是最重要的一条状态，做得比别的 chip 更响 */
+  #armBtn{ border-color:#5c2727; color:#ffd9d9; background:#3a1a1a; }
+  #armBtn.on{ background:#1f4d2b; border-color:#2f7340; color:#e8f5ec; }
+  #lockHint{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+             z-index:6; pointer-events:none; display:none;
+             padding:10px 16px; border-radius:999px; font-size:13px;
+             color:#ffd9d9; background:rgba(58,26,26,.94); border:1px solid #5c2727;
+             box-shadow:0 6px 20px rgba(0,0,0,.5); }
+  #app.locked #lockHint{ display:block; }
 
   /* ---------- 主体 ---------- */
   #deck{ flex:1 1 auto; display:flex; min-height:0; }
@@ -206,6 +215,9 @@
     <div class="meter">vJoy <b id="vj">--</b></div>
     <div class="sp"></div>
     <div id="tip"></div>
+    <button class="chip" id="armBtn" title="上锁时不发任何操纵量">解锁</button>
+    <button class="chip" id="trimBtn" title="把当前杆位记成配平（直升机用）">配平</button>
+    <button class="chip" id="trimClr" style="display:none">清配平</button>
     <button class="chip" id="tiltBtn">体感</button>
     <button class="chip" id="zeroBtn" style="display:none">校零</button>
     <button class="chip" id="invX">X 反</button>
@@ -214,6 +226,7 @@
   </div>
 
   <div id="deck">
+    <div id="lockHint">已上锁 · 点右上角「解锁」才开始发操纵量</div>
     <div id="colL">
       <div id="thr" class="idle">
         <div id="thrFill"></div>
@@ -369,6 +382,86 @@
   var st = { x:0, y:0, r:0, t:null, b:0 };
   var inv = { x: store.get("invX", false), y: store.get("invY", false), t: store.get("invT", false) };
 
+  // ---------------------------------------------------------------- 上锁 / 配平 / 曲线
+  // 这一块是从 Pixel 端（android/…/input/YokeController.kt）照搬的，那边每个决定的
+  // 理由都写在代码里，值是实飞调出来的，这里保持一致，手感才不会「换个设备又要重新适应」。
+  //
+  // 上锁：默认不动飞机。页面加载、断线重连、网络恢复的瞬间都**不能**把上一次的杆量
+  //   重放一遍 —— 那是这类控制器最容易摔机的一种意外。所以默认锁着，并且每次打开
+  //   页面都重新锁（不持久化）。
+  // 配平：平板是「绝对位置」映射，松手 = 杆回中立。固定翼没问题（中位就是平飞点），
+  //   但直升机的中立周期变距不是平飞位 —— 悬停要一直顶着杆。真机靠 force trim
+  //   把杆位锁住，我们没有力反馈杆，只能在软件里补这一层。
+  var armed = false;
+  var TRIM_MAX = 0.7;        // 满杆配平等于一起飞就压到底，不给到 1.0
+  var trim = { x: store.get("trimX", 0) || 0, y: store.get("trimY", 0) || 0 };
+  var MIN_PULSE_MS = 120;    // 按钮最短按下时长，见 press()/release()
+  var pulseUntil = {};
+  var tiltOverSince = 0;
+
+  var armBtn = $("#armBtn"), appEl = $("#app");
+
+  function armUi(){
+    armBtn.classList.toggle("on", armed);
+    armBtn.textContent = armed ? "已解锁" : "解锁";
+    appEl.classList.toggle("locked", !armed);
+  }
+
+  function setArmed(on, why){
+    armed = on;
+    armUi();
+    tip(why || (on ? "已解锁" : "已上锁"));
+  }
+
+  armBtn.addEventListener("click", function(){ setArmed(!armed); });
+
+  function trimUi(){
+    var mag = Math.max(Math.abs(trim.x), Math.abs(trim.y));
+    var on = mag > 0.001;
+    $("#trimBtn").classList.toggle("on", on);
+    $("#trimBtn").textContent = on ? "配平 " + mag.toFixed(2) : "配平";
+    $("#trimClr").style.display = on ? "" : "none";
+  }
+
+  // 取「当前实际输出」当新偏移（已含旧配平），所以连按两次是继续微调，不会翻倍。
+  function captureTrim(){
+    var ox = clamp(st.x + (tilt.on ? tilt.x : 0) + trim.x, -1, 1);
+    var oy = clamp(st.y + (tilt.on ? tilt.y : 0) + trim.y, -1, 1);
+    trim.x = clamp(ox, -TRIM_MAX, TRIM_MAX);
+    trim.y = clamp(oy, -TRIM_MAX, TRIM_MAX);
+    store.set("trimX", trim.x); store.set("trimY", trim.y);
+    trimUi(); showAxes();
+    tip(Math.max(Math.abs(trim.x), Math.abs(trim.y)) < 0.001 ? "配平已清零" : "已配平，松手保持");
+  }
+
+  function clearTrim(){
+    trim.x = 0; trim.y = 0;
+    store.set("trimX", 0); store.set("trimY", 0);
+    trimUi(); showAxes(); tip("配平已清零");
+  }
+
+  $("#trimBtn").addEventListener("click", captureTrim);
+  $("#trimClr").addEventListener("click", clearTrim);
+
+  /**
+   * 死区 → 重新归一 → 指数曲线。
+   *
+   * 死区之后要**重新归一**（除以 range−deadband 而不是 range），否则刚出死区
+   * 就到 12% 杆量，边界上有个跳变；接近中位修正时特别难受。
+   * 曲线用经典 RC 指数：(1−e)·v + e·v³ —— 端点仍是 0 和 1，中间被压细。
+   */
+  function curve(raw, deadband, range, expo){
+    var a = Math.abs(raw);
+    if (a <= deadband) return 0;
+    var span = Math.max(range - deadband, 1);
+    var v = Math.min((a - deadband) / span, 1);
+    var out = v * (1 - expo) + v * v * v * expo;
+    return raw < 0 ? -out : out;
+  }
+
+  armUi(); trimUi();
+
+
   var bitCount = {};   // 同一个按钮被多指按住时，别让先松的手指清掉位
 
   // ---------------------------------------------------------------- 轴：杆盘
@@ -424,8 +517,8 @@
   function showAxes(){
     var tx = tilt.on ? tilt.x : 0;
     var ty = tilt.on ? tilt.y : 0;
-    padVal.textContent = clamp(st.x + tx, -1, 1).toFixed(2) + " / " +
-                         clamp(st.y + ty, -1, 1).toFixed(2);
+    padVal.textContent = clamp(st.x + tx + trim.x, -1, 1).toFixed(2) + " / " +
+                         clamp(st.y + ty + trim.y, -1, 1).toFixed(2);
   }
 
   function drawPad(){
@@ -483,6 +576,8 @@
       var bit = parseInt(el.dataset.bit, 10);
       bitCount[bit] = (bitCount[bit] || 0) + 1;
       st.b |= (1 << bit);
+      // 记一个「最少按到什么时候」。见 release()。
+      pulseUntil[bit] = performance.now() + MIN_PULSE_MS;
     }
     el.classList.add("on");
   }
@@ -493,7 +588,19 @@
     } else {
       var bit = parseInt(el.dataset.bit, 10);
       bitCount[bit] = Math.max(0, (bitCount[bit] || 0) - 1);
-      if (!bitCount[bit]) st.b &= ~(1 << bit);
+      if (!bitCount[bit]){
+        // DCS 在每个模拟帧采样一次按钮状态。触摸屏上一次快速点按可能只有 20ms，
+        // 落在两次采样之间这一下就**丢了** —— 现象是「按了没反应，得多按几下」。
+        // 所以按下时长不足 120ms 的，先替用户按满再松。
+        var left = (pulseUntil[bit] || 0) - performance.now();
+        if (left > 0){
+          setTimeout(function(){
+            if (!bitCount[bit]) st.b &= ~(1 << bit);
+          }, left);
+        } else {
+          st.b &= ~(1 << bit);
+        }
+      }
     }
     el.classList.remove("on");
   }
@@ -581,7 +688,9 @@
   // ---------------------------------------------------------------- 体感
   // iOS 只在安全上下文（https / localhost）里发传感器数据，http 下永远收不到 ——
   // 所以这里先把 isSecureContext 检查一遍，直接告诉用户原因，别让人对着没反应的按钮猜。
-  var TILT_RANGE = 25;      // 度：偏转多少算满行程
+  // 手感参数取自 Pixel 端 YokeSettings 的默认值（那边是实飞调出来的）：
+  // 死区 2.5° 吃掉手持微抖，行程 22° 到满杆，expo 0.35 让中间变细、末端仍满。
+  var TILT_DEAD = 2.5, TILT_RANGE = 22, TILT_EXPO = 0.35;
   var tilt = { on:false, x:0, y:0, baseP:null, baseR:null, rawP:null, rawR:null };
   var tiltBtn = $("#tiltBtn"), zeroBtn = $("#zeroBtn"), tipEl = $("#tip");
   var padTag = $("#padTag");
@@ -607,8 +716,21 @@
     if (tilt.baseP === null){ tilt.baseP = tilt.rawP; tilt.baseR = tilt.rawR; }
     var degX = tilt.rawR - tilt.baseR;
     var degY = tilt.rawP - tilt.baseP;
-    tilt.x = clamp(degX / TILT_RANGE, -1, 1) * (inv.x ? -1 : 1);
-    tilt.y = clamp(degY / TILT_RANGE, -1, 1) * (inv.y ? -1 : 1);
+    tilt.x = curve(degX, TILT_DEAD, TILT_RANGE, TILT_EXPO) * (inv.x ? -1 : 1);
+    tilt.y = curve(degY, TILT_DEAD, TILT_RANGE, TILT_EXPO) * (inv.y ? -1 : 1);
+
+    // 姿态异常兜底：只有「相对校零点翻过 180°」这种物理上不可能的姿态才算异常。
+    // 正常拉过载时 tilt 到 90°+ 是合法的满杆输入，不能当成掉手机（Pixel 那边
+    // 早期用 55° 阈值，大过载机动会把人直接踢掉，已改）。持续 1.2 秒才上锁：
+    // 够活人换个握法，不够让飞机飞走；超限期间输出为零，飞机只是杆回中。
+    if (Math.abs(degX) > 180 || Math.abs(degY) > 180){
+      var now = performance.now();
+      if (!tiltOverSince) tiltOverSince = now;
+      else if (now - tiltOverSince > 1200 && armed) setArmed(false, "姿态异常，已自动上锁");
+    } else {
+      tiltOverSince = 0;
+    }
+
     showAxes();
     padTag.textContent = "体感 " + degX.toFixed(0) + "° / " + degY.toFixed(0) + "°";
   }
@@ -678,13 +800,18 @@
       rttAvg = 0, rttPeak = 0, seq = 0;
 
   function payload(){
+    // 上锁：一律发零，而且**不发 t** —— beacon 把缺失的 t 解释成「这次别动油门」。
+    // 发 0 会把进近中的飞机直接拽到慢车，这是「上锁」最容易做错的地方。
+    if (!armed) return '{"x":0,"y":0,"r":0,"b":0}';
+
     // 体感是基准，杆盘是微调：两个相加再夹住。杆盘松手回 0，所以净效果就是
-    // 「体感给主行程，手指还能临时补一点」。
+    // 「体感给主行程，手指还能临时补一点」。配平最后叠加 —— 它代表「用户想要的
+    // 输出」，不是「手的位置」，所以和发送值在同一侧。
     var tx = tilt.on ? tilt.x : 0;
     var ty = tilt.on ? tilt.y : 0;
     var o = {
-      x: +clamp(st.x + tx, -1, 1).toFixed(4),
-      y: +clamp(st.y + ty, -1, 1).toFixed(4),
+      x: +clamp(st.x + tx + trim.x, -1, 1).toFixed(4),
+      y: +clamp(st.y + ty + trim.y, -1, 1).toFixed(4),
       r: +st.r.toFixed(4),
       b: st.b
     };
@@ -736,6 +863,9 @@
         vjEl.style.color = "";
         secEl.textContent = "--";
         secEl.style.color = "";
+        // 连着 3 帧发不出去就上锁：链路恢复的瞬间若把断线前的杆量重放一遍，
+        // 那就是一次没人接手的满舵。单次抖动不算 —— 不该打断正在做的机动。
+        if (armed) setArmed(false, "发送失败，已自动上锁");
       }
     }).then(function(){
       inflight = false;
