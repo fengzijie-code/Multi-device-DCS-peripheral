@@ -12,13 +12,29 @@
 
 `/yoke` 是给 **「添加到主屏幕」** 用的。做法：
 
-1. PC 上照旧双击 `tools\start-usb.bat`
+1. PC 上双击 **`tools\start-ipad.bat`**（不等手机、不建 adb 隧道，只起 beacon + vjoy）
 2. iPad Safari 打开 `http://<PC的IP>:8080/yoke`
 3. 分享 → **添加到主屏幕** → 命名为「DCS 杆」
 4. **从桌面那个图标启动**（不是从 Safari 里的书签）
 
 这样启动的是 iPadOS 的 standalone 窗口：没有地址栏、没有工具栏、没有下拉刷新，
 全屏铺满，和 app 的观感一致。`apple-mobile-web-app-capable` 那几个 meta 就是干这个的。
+
+### 两个会让人以为「功能没做」的坑
+
+**① 改完 `beacon.py` 必须重启进程。** 它是常驻服务，进程里跑的是启动那一刻的代码。
+症状很好认：新路由一直 404，而且 404 页只列着旧的三个入口。
+`start-ipad.bat` / `start-usb.bat` 的窗口关掉重开即可（监管进程会连带重启子服务）。
+
+**② 手机上那个 App 必须关掉。** 它还活着的话会继续以 50Hz 往 `/input` 灌数据
+（经 adb reverse 隧道，看起来是 `127.0.0.1`），和 iPad 抢同一个输入源 ——
+表现是杆量一顿一顿地回中。关掉：
+
+```bat
+adb shell am force-stop com.fengzijie.dcsperipheral
+```
+
+`start-ipad.bat` 不建隧道，但**已经存在的** `adb reverse` 不会自动拆，所以还是要手动关 app。
 
 ### 为什么不打包成真 app
 

@@ -297,6 +297,8 @@ def main() -> int:
     ap.add_argument("--no-vjoy", action="store_true", help="不启动虚拟摇杆输出")
     ap.add_argument("--no-usb", action="store_true",
                     help="跳过手机/USB 隧道检查（只跑桥接与摇杆输出）")
+    ap.add_argument("--no-watch", action="store_true",
+                    help="不启动 adb 隧道看守（iPad 走网线时用，配合 --no-usb）")
     ap.add_argument("--vjoy-port", type=int, default=5011,
                     help="操纵量内部转发端口")
     args = ap.parse_args()
@@ -378,10 +380,11 @@ def main() -> int:
         py, "-u", os.path.join("tools", "beacon.py"),
         "--port", str(args.port), "--ipv4-only", "--udp-in", str(args.udp_in),
     ]))
-    children.append(Child("watch", [
-        py, "-u", os.path.join("tools", "usb-watchdog.py"),
-        "--port", str(args.port), "--interval", "2",
-    ]))
+    if not args.no_watch:
+        children.append(Child("watch", [
+            py, "-u", os.path.join("tools", "usb-watchdog.py"),
+            "--port", str(args.port), "--interval", "2",
+        ]))
     if not args.no_vjoy:
         children.append(Child("vjoy", [
             py, "-u", os.path.join("tools", "vjoy_out.py"),
@@ -399,8 +402,12 @@ def main() -> int:
         c.start()
 
     print()
-    print(f"  {GREEN}[✓]{RESET} 已启动 {len(children)} 个服务。"
-          f"手机摇杆页顶部应显示「虚拟摇杆就绪」。")
+    if args.no_usb:
+        print(f"  {GREEN}[✓]{RESET} 已启动 {len(children)} 个服务。"
+              f"iPad 打开 http://<本机IP>:{args.port}/yoke")
+    else:
+        print(f"  {GREEN}[✓]{RESET} 已启动 {len(children)} 个服务。"
+              f"手机摇杆页顶部应显示「虚拟摇杆就绪」。")
     print(f"  {DIM}Ctrl+C 或关闭本窗口 = 全部停止（会先让杆回中）。{RESET}")
     print("═" * 70)
     print()
