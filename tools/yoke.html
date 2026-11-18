@@ -127,10 +127,32 @@
 
   #colL2{ flex:1 1 auto; display:flex; flex-direction:column; gap:10px;
           padding:10px; min-width:0; }
-  #rud{ flex:1.35 1 0; display:flex; flex-direction:column; gap:10px; min-height:0; }
-  #rud .k{ flex:1 1 0; }
-  #gear{ flex:1 1 0; display:grid; grid-template-columns:repeat(3,1fr);
-         grid-template-rows:repeat(2,1fr); gap:10px; min-height:0; }
+  /* 脚舵：横向比例滑块。
+     为什么不是两个「左舵/右舵」按钮：按钮只能给 ∓1（满舵），
+     而滑行、侧风落地、机炮微调要的恰恰是**中间那些值**。
+     真机脚蹬也是比例 + 松手回中，这里照它做。 */
+  #rud{ position:relative; flex:0 0 104px; border-radius:var(--r);
+        background:linear-gradient(#0f151c,#0a0f14);
+        border:1px solid var(--line); overflow:hidden; touch-action:none; }
+  #rudTrack{ position:absolute; left:10px; right:10px; top:50%; height:3px;
+             margin-top:-1.5px; border-radius:2px; background:#232a33; }
+  /* 填充和把手只占中间一条带，不盖住上面的数值和下面的说明 */
+  #rudFill{ position:absolute; top:calc(50% - 26px); height:52px; left:50%; width:0;
+            background:#2b6cb0; opacity:.85; border-radius:3px; }
+  #rudC{ position:absolute; left:50%; top:calc(50% - 30px); height:60px; width:1px;
+         background:#3a424c; }
+  #rudKnob{ position:absolute; top:calc(50% - 26px); height:52px; width:4px; left:50%;
+            margin-left:-2px; background:var(--fg); border-radius:2px; opacity:.55; }
+  #rudVal{ position:absolute; left:0; right:0; top:7px; text-align:center;
+           font-size:15px; font-variant-numeric:tabular-nums; color:var(--fg);
+           text-shadow:0 1px 3px #000; pointer-events:none; }
+  #rudTag{ position:absolute; left:0; right:0; bottom:5px; text-align:center;
+           font-size:10px; color:var(--dim2); pointer-events:none; }
+  /* 2 列 3 行而不是 3 列 2 行：脚舵从「两个大块」改成一条滑轨之后，
+     左侧空出来的高度会把 3 列的格子拉成又高又窄的柱子。2 列让它们接近方形，
+     顺便把触摸面积做大 —— 这几个键是起降时盲按的。 */
+  #gear{ flex:1 1 0; display:grid; grid-template-columns:repeat(2,1fr);
+         grid-template-rows:repeat(3,1fr); gap:10px; min-height:0; }
 
   /* 右：武器 + 杆盘 + 雷达 */
   #colR{ flex:1 1 auto; display:grid; grid-template-columns:1fr 30%;
@@ -238,12 +260,19 @@
                  color:var(--fg); background:#0b1017; border:1px solid var(--line);
                  border-radius:4px; padding:1px 4px; }
 
-  /* 竖屏只是能凑合用，横屏才是设计目标 */
+  /* 竖屏只是能凑合用，横屏才是设计目标。
+     750px 宽塞不下 4 个 chip + 4 个计数器 + 提示 + "建议横屏"，
+     不收敛就会像截图里那样把 chip 挤成两行、提示被截断成"体感已…"。
+     这里让诊断用的计数器和连接文字先让位 —— 它们横屏随时能看到。 */
   @media (orientation:portrait){
     #colL{ flex:0 0 42vw; }
-    #gear{ grid-template-columns:repeat(2,1fr); grid-template-rows:repeat(3,1fr); }
     #thr{ flex-basis:84px; }
+    #hud #stext, #hud .meter{ display:none; }
+    #tip{ max-width:22vw; }
+    .chip{ white-space:nowrap; flex:0 0 auto; }
+    #colR{ grid-template-columns:1fr 34%; }
     #hud::after{ content:"建议横屏"; font-size:11px; color:var(--amber);
+                 white-space:nowrap; flex:0 0 auto;
                  border:1px solid #4a3a1a; border-radius:999px; padding:4px 8px; }
   }
 </style>
@@ -293,8 +322,12 @@
       </div>
       <div id="colL2">
         <div id="rud">
-          <div class="k big hold" data-axis="r" data-dir="-1">左舵<span class="sub">按住</span></div>
-          <div class="k big hold" data-axis="r" data-dir="1">右舵<span class="sub">按住</span></div>
+          <div id="rudTrack"></div>
+          <div id="rudFill"></div>
+          <div id="rudC"></div>
+          <div id="rudKnob"></div>
+          <div id="rudVal">0.00</div>
+          <div id="rudTag">L ←→ R · 松手回中</div>
         </div>
         <div id="gear">
           <div class="k" data-bit="0">襟翼<span class="sub">收 · BTN1</span></div>
@@ -680,39 +713,84 @@
   thr.addEventListener("pointerup", thrEnd);
   thr.addEventListener("pointercancel", thrEnd);
 
-  // ---------------------------------------------------------------- 按钮 + 脚舵
-  function press(el){
-    var axis = el.dataset.axis;
-    if (axis){                       // 脚舵：两个按住键直接写轴（反了在 DCS 里 Invert）
-      st[axis] = parseFloat(el.dataset.dir);
+  // ---------------------------------------------------------------- 轴：脚舵（比例滑块）
+  // 和油门那条不同：脚舵**松手回中**（真机脚蹬也回中），油门是保持型。
+  // 所以这里不复用 setThr 那套逻辑，避免哪天有人把「保持」误改成两边通用。
+  var rud = $("#rud"), rudFill = $("#rudFill"), rudKnob = $("#rudKnob"),
+      rudVal = $("#rudVal"), rudTag = $("#rudTag");
+  var rudId = null;
+
+  function drawRud(){
+    var w = rud.getBoundingClientRect().width;
+    if (!w) return;
+    var mid = w / 2, span = Math.max(mid - 8, 1), v = st.r;
+    if (v >= 0){
+      rudFill.style.left = mid + "px";
+      rudFill.style.width = (v * span) + "px";
+      rudFill.style.background = "#2b6cb0";
     } else {
-      var bit = parseInt(el.dataset.bit, 10);
-      bitCount[bit] = (bitCount[bit] || 0) + 1;
-      st.b |= (1 << bit);
-      // 记一个「最少按到什么时候」。见 release()。
-      pulseUntil[bit] = performance.now() + MIN_PULSE_MS;
+      rudFill.style.left = (mid + v * span) + "px";
+      rudFill.style.width = (-v * span) + "px";
+      rudFill.style.background = "#8a6a1f";
     }
+    rudKnob.style.left = (mid + v * span) + "px";
+    rudKnob.style.opacity = Math.abs(v) > 0.005 ? "1" : ".55";
+    rudVal.textContent = Math.abs(v) < 0.005 ? "0.00"
+                       : (v > 0 ? "R " : "L ") + Math.abs(v).toFixed(2);
+  }
+
+  function setRud(e){
+    var r = rud.getBoundingClientRect();
+    var span = Math.max(r.width / 2 - 8, 1);
+    st.r = clamp((e.clientX - (r.left + r.width / 2)) / span, -1, 1);
+    drawRud();
+  }
+
+  rud.addEventListener("pointerdown", function(e){
+    e.preventDefault();
+    rudId = e.pointerId;
+    try { rud.setPointerCapture(e.pointerId); } catch(err){}
+    setRud(e);
+  });
+  rud.addEventListener("pointermove", function(e){
+    if (e.pointerId !== rudId) return;
+    e.preventDefault();
+    setRud(e);
+  });
+  function rudEnd(e){
+    if (e && e.pointerId !== rudId) return;
+    rudId = null;
+    st.r = 0;
+    drawRud();
+  }
+  rud.addEventListener("pointerup", rudEnd);
+  rud.addEventListener("pointercancel", rudEnd);
+  window.addEventListener("resize", drawRud);
+  drawRud();
+
+  // ---------------------------------------------------------------- 按钮
+  function press(el){
+    var bit = parseInt(el.dataset.bit, 10);
+    bitCount[bit] = (bitCount[bit] || 0) + 1;
+    st.b |= (1 << bit);
+    // 记一个「最少按到什么时候」。见 release()。
+    pulseUntil[bit] = performance.now() + MIN_PULSE_MS;
     el.classList.add("on");
   }
   function release(el){
-    var axis = el.dataset.axis;
-    if (axis){
-      st[axis] = 0;
-    } else {
-      var bit = parseInt(el.dataset.bit, 10);
-      bitCount[bit] = Math.max(0, (bitCount[bit] || 0) - 1);
-      if (!bitCount[bit]){
-        // DCS 在每个模拟帧采样一次按钮状态。触摸屏上一次快速点按可能只有 20ms，
-        // 落在两次采样之间这一下就**丢了** —— 现象是「按了没反应，得多按几下」。
-        // 所以按下时长不足 120ms 的，先替用户按满再松。
-        var left = (pulseUntil[bit] || 0) - performance.now();
-        if (left > 0){
-          setTimeout(function(){
-            if (!bitCount[bit]) st.b &= ~(1 << bit);
-          }, left);
-        } else {
-          st.b &= ~(1 << bit);
-        }
+    var bit = parseInt(el.dataset.bit, 10);
+    bitCount[bit] = Math.max(0, (bitCount[bit] || 0) - 1);
+    if (!bitCount[bit]){
+      // DCS 在每个模拟帧采样一次按钮状态。触摸屏上一次快速点按可能只有 20ms，
+      // 落在两次采样之间这一下就**丢了** —— 现象是「按了没反应，得多按几下」。
+      // 所以按下时长不足 120ms 的，先替用户按满再松。
+      var left = (pulseUntil[bit] || 0) - performance.now();
+      if (left > 0){
+        setTimeout(function(){
+          if (!bitCount[bit]) st.b &= ~(1 << bit);
+        }, left);
+      } else {
+        st.b &= ~(1 << bit);
       }
     }
     el.classList.remove("on");
@@ -1099,7 +1177,7 @@
     st.x = 0; st.y = 0; st.r = 0; st.b = 0;
     bitCount = {};
     document.querySelectorAll(".k.on").forEach(function(el){ el.classList.remove("on"); });
-    endPad(); thrId = null;
+    endPad(); thrId = null; rudId = null; drawRud();
   }
 
   document.addEventListener("visibilitychange", function(){

@@ -227,14 +227,25 @@ with sync_playwright() as p:
     s = snap()
     check("机炮松开 = 清零", not (s["buttons"] & (1 << 11)), f"b={s['buttons']}")
 
-    # ---- 脚舵：左舵 = r 负
-    rb = pg.eval_on_selector('[data-axis="r"]', "el=>{const r=el.getBoundingClientRect();"
-                                              "return {x:r.x+r.width/2,y:r.y+r.height/2}}")
-    touch("start", rb["x"], rb["y"], tid=4)
+    # ---- 脚舵：比例滑块（不是两个满舵按钮），松手回中
+    rb = pg.eval_on_selector("#rud", "el=>{const r=el.getBoundingClientRect();"
+                                   "return {x:r.x,y:r.y,w:r.width,h:r.height}}")
+    check("脚舵是横向滑块", rb["w"] > rb["h"] * 1.5, f"{rb['w']:.0f}x{rb['h']:.0f}")
+    rx, ry = rb["x"] + rb["w"] / 2, rb["y"] + rb["h"] / 2
+    touch("start", rx, ry, tid=4)
+    touch("move", rx + rb["w"] * 0.40, ry, tid=4)     # 滑到约 80% 右
     time.sleep(0.18)
     s = snap()
-    check("左舵 = r 负", s["axes"]["r"] < -0.9, f"r={s['axes']['r']}")
+    check("脚舵右滑 = r 正且是比例值", 0.5 < s["axes"]["r"] <= 1.0,
+          f"r={s['axes']['r']:.2f}")
+    touch("move", rx - rb["w"] * 0.40, ry, tid=4)
+    time.sleep(0.18)
+    s = snap()
+    check("脚舵左滑 = r 负", -1.0 <= s["axes"]["r"] < -0.5, f"r={s['axes']['r']:.2f}")
     touch("end", 0, 0, tid=4)
+    time.sleep(0.2)
+    s = snap()
+    check("脚舵松手回中", abs(s["axes"]["r"]) < 0.03, f"r={s['axes']['r']:.3f}")
 
     # ---- 体感：https 下用 CDP 假造倾斜；http 下验"会说缺 HTTPS"
     secure = pg.evaluate("window.isSecureContext")
@@ -355,9 +366,35 @@ with sync_playwright() as p:
     }""")
     check("没有元素溢出视口", not over, str(over))
 
+    # ---- 脚舵：数值在上、滑轨带在中、说明在下，三者不能叠（曾经 fill 用 top/bottom:9px 把字盖了）
+    rg = pg.evaluate("""() => {
+      const v = document.querySelector('#rudVal').getBoundingClientRect();
+      const t = document.querySelector('#rudTag').getBoundingClientRect();
+      const f = document.querySelector('#rudFill').getBoundingClientRect();
+      return {vB: Math.round(v.bottom), fT: Math.round(f.top),
+              fB: Math.round(f.bottom), tT: Math.round(t.top)};
+    }""")
+    check("脚舵数值/说明不被滑轨压住",
+          rg["fT"] >= rg["vB"] - 1 and rg["fB"] <= rg["tT"] + 1, str(rg))
+
     # 竖屏也照一张（万一有人竖着放）
     pg.set_viewport_size({"width": 834, "height": 1194})
     time.sleep(0.4)
+
+    # ---- 竖屏：750px 宽塞不下「4 chip + 4 计数器 + 提示 + 建议横屏」，
+    #      不收敛就会把 chip 挤成两行、提示截成「体感已…」（截图里真出现过）
+    hud = pg.evaluate("""() => {
+      const h = document.querySelector('#hud');
+      const chips = [...document.querySelectorAll('#hud .chip')];
+      return {
+        over: h.scrollWidth - h.clientWidth,
+        multi: chips.filter(c => c.getBoundingClientRect().height > 30)
+                    .map(c => c.id || c.textContent.trim()).slice(0, 4)
+      };
+    }""")
+    check("竖屏顶栏不横向溢出", hud["over"] <= 1, str(hud["over"]))
+    check("竖屏 chip 不换行", not hud["multi"], str(hud["multi"]))
+
     pg.screenshot(path=".tmp/yoke-ipad-port.png")
     pg.set_viewport_size({"width": W, "height": H})
     time.sleep(0.3)
