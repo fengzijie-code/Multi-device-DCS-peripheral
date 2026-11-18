@@ -84,12 +84,21 @@ with sync_playwright() as p:
     check("航向有读数", hdg.isdigit() and 0 <= int(hdg) <= 360, f"hdg={hdg}")
     tf = pg.evaluate("getComputedStyle(document.querySelector('#adiDisc')).transform")
     check("姿态球有姿态", tf not in ("", "none", "matrix(1, 0, 0, 1, 0, 0)"), tf)
+    # 玻璃 HUD：状态/读数/按钮全是浮在画面上的，deck 铺满全屏。
+    # 所以"不压"要看它们跟杆盘的关系，而不是跟 deck 的盒子关系。
     geo = pg.evaluate("""() => {
-      const s = document.querySelector('#strip').getBoundingClientRect();
-      const d = document.querySelector('#deck').getBoundingClientRect();
-      return {sBottom: Math.round(s.bottom), dTop: Math.round(d.top), h: Math.round(s.height)};
+      const b = s => document.querySelector(s).getBoundingClientRect();
+      const st = b('#strip'), pd = b('#pad'), hud = b('#hud');
+      const kn = document.querySelector('#thrKnob').getBoundingClientRect();
+      return {stripH: Math.round(st.height), padBottom: Math.round(pd.bottom),
+              stripTop: Math.round(st.top), hudBottom: Math.round(hud.bottom),
+              padTop: Math.round(pd.top),
+              knobInThr: kn.top >= b('#thr').top - 30 && kn.bottom <= b('#thr').bottom + 30};
     }""")
-    check("仪表条不压杆区", geo["sBottom"] <= geo["dTop"] + 1 and 30 <= geo["h"] <= 40, str(geo))
+    check("底部读数条不压杆盘", geo["padBottom"] <= geo["stripTop"] + 1, str(geo))
+    check("顶部状态行不压杆盘", geo["padTop"] >= geo["hudBottom"] - 1, str(geo))
+    check("读数条高度合理", 36 <= geo["stripH"] <= 64, str(geo["stripH"]))
+    check("油门圆徽章骑在竖条上", geo["knobInThr"], str(geo))
 
     # ---- 四页（照 Pixel：仪表/起降/战斗/校准）
     def page_of():
@@ -445,25 +454,8 @@ with sync_playwright() as p:
     check("脚舵数值/说明不被滑轨压住",
           rg["fT"] >= rg["vB"] - 1 and rg["fB"] <= rg["tT"] + 1, str(rg))
 
-    # 竖屏也照一张（万一有人竖着放）
-    pg.set_viewport_size({"width": 834, "height": 1194})
-    time.sleep(0.4)
-
-    # ---- 竖屏：750px 宽塞不下「4 chip + 4 计数器 + 提示 + 建议横屏」，
-    #      不收敛就会把 chip 挤成两行、提示截成「体感已…」（截图里真出现过）
-    hud = pg.evaluate("""() => {
-      const h = document.querySelector('#hud');
-      const chips = [...document.querySelectorAll('#hud .chip')];
-      return {
-        over: h.scrollWidth - h.clientWidth,
-        multi: chips.filter(c => c.getBoundingClientRect().height > 30)
-                    .map(c => c.id || c.textContent.trim()).slice(0, 4)
-      };
-    }""")
-    check("竖屏顶栏不横向溢出", hud["over"] <= 1, str(hud["over"]))
-    check("竖屏 chip 不换行", not hud["multi"], str(hud["multi"]))
-
-    pg.screenshot(path=".tmp/yoke-ipad-port.png")
+    # 这套皮只做横屏（用户明确：不会有竖排），所以不再拍竖屏。
+    pg.screenshot(path=".tmp/yoke-ipad-land2.png")
     pg.set_viewport_size({"width": W, "height": H})
     time.sleep(0.3)
     pg.screenshot(path=".tmp/yoke-ipad-land2.png")
