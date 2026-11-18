@@ -1,7 +1,9 @@
 # iPad 输入端（`/yoke`）
 
 > 2026-11-18 · 用 iPad Pro 11"(M4) 替代 Pixel 当杆/油门/脚舵/按钮
-> 页面：`tools/yoke.html`　路由：`http://<PC>:8080/yoke`
+> 页面：`tools/yoke.html`
+> 入口：`https://<PC>:8443/yoke`（要体感就用这个）· `http://<PC>:8080/yoke`（备用，无体感）
+> 8443 同时吃得下明文和 TLS，所以两种写法都能打开页面，顶栏会显示当前是哪个。
 
 手机（Pixel 6a）当摇杆的问题是**太小**：杆位区、油门条、发射键挤在 6.1 寸里，
 盲操基本靠记位置。11 寸 iPad 有 1210×834 的可用面积，同一套通道能摆得很开。
@@ -210,6 +212,15 @@ Safari 设置里重置该站点权限）→ 开起来后**把 iPad 放平时点�
 avg 20.0 ms   max 21.5 ms   rate 50.0 Hz   RTT 1.9 ms (峰 2)
 ```
 
+**iPad Pro 11" 走 Windows 移动热点 + HTTPS 的实测**（就是本机的真实工况）：
+
+```
+avg 20.6 ms   max 30.4 ms   rate 48.4 Hz   secure=true
+```
+
+Wi-Fi 只把峰值从 21.5 抬到 30.4，帧率掉到 48.4 —— 落在「能飞」那一档，
+**不需要买 USB-C 转 RJ45**。真到密集机动觉得不对劲时，先回来看这个峰有没有越过 45。
+
 也就是说 20 ms 一帧是 `setInterval(20)` 的固有条距，不是延迟 —— 别拿它当"网络慢"。
 页面刚加载的头一两百毫秒会出现一次 90ms 级的峰，那是首帧和脚本编译，不是链路。
 
@@ -218,16 +229,46 @@ avg 20.0 ms   max 21.5 ms   rate 50.0 Hz   RTT 1.9 ms (峰 2)
 ```bat
 curl http://127.0.0.1:8080/input
 :: "gap_ms": {"avg_ms": 20.0, "max_ms": 21.5, "rate_hz": 50.0, "window": 100}
+:: "secure": true          ← 这一帧是从 https 还是 http 进来的
 ```
 
 ---
 
-## 七、已知限制
+## 七、打不开 / 连不上：先看 `tools/.tls.log`
+
+iOS 在证书不被接受时**不会给浏览器任何提示**，直接在握手层断开，
+Safari 只会说「打不开网页」或「已丢失网络连接」—— 这两个词指向完全不同的原因，
+照着猜会浪费一整晚。所以 https 侧每次握手都落一行到这个文件（已 gitignore）：
+
+| 日志行 | 含义 | 该干什么 |
+|---|---|---|
+| `OK ... TLSv1.3` + `REQ ... TLS 200 /yoke` | 通了 | 没事 |
+| `FAIL ... SSLV3_ALERT_CERTIFICATE_UNKNOWN` | 握手成功，**客户端不认证书** | iPad 上装描述文件，并打开「证书信任设置」的开关 |
+| `FAIL ... [SSL: HTTP_REQUEST] http request` | 对方发的是**明文**，端口讲的是 TLS | 地址栏必须带 `https://`（见下） |
+| `PLAIN ... http-on-tls-port` + `200` | 明文请求，被双模端口正常服务了 | 能用，但体感不会有数据 |
+| `ABORT ... ConnectionAborted` | 对端自己断开（浏览器预连接取消） | 忽略 |
+| **整份日志里没有那台设备的 IP** | 请求根本没到 | 这才轮到查网络/防火墙 |
+
+三个已经踩过的坑，都记在这里：
+
+1. **Safari 对非 443 端口不会自动升 https。** 地址栏只写 `192.168.137.1:8443`
+   它会按 `http://` 发，明文打到 TLS 端口上直接被掐 —— 现象就是「打不开网页」。
+   现在 8443 **两种都收**（首字节 `0x16` 走 TLS，否则当明文 HTTP 服务），
+   任何写法都能打开页面；但体感仍然只有 https 才有数据，顶栏那个 `http` 红字就是提醒。
+2. **服务端证书有效期不能超过 398 天。** 苹果的硬性规定，超规的连接在握手层被拒，
+   同样表现为网络错误。`make-cert.py` 现在签 365 天，并且会自己验、超了直接报错。
+   根 CA 不受这条限制，所以**重签 leaf 不需要在 iPad 上重装描述文件**。
+3. **TLS 收尾要发 close_notify。** `socketserver.shutdown_request()` 只发一个裸 FIN，
+   iOS 的 `NSURLSession` 会把它当成「网络连接已丢失」—— 页面其实已经收到了。
+
+---
+
+## 八、已知限制
 
 | 限制 | 说明 |
 |---|---|
 | 没有配平 | 手机端那个配平是直升机用的开关（固定翼默认关），iPad 这版没做 |
-| 体感要走 HTTPS | 且要装一次根证书（见上一节）；每次重开页面要重新授权一次 |
+| 体感要走 HTTPS | 且要装一次根证书（见第五节）；每次重开页面要重新授权一次 |
 | 竖屏只是凑合 | 按钮会变两列，能按但不舒服 |
 | 断线就回中 | `vjoy_out.py` 的 531ms 看门狗兜底，页面自己 3 次失败会显示 `断开 · 重试中` |
 
@@ -236,15 +277,15 @@ curl http://127.0.0.1:8080/input
 
 ---
 
-## 八、验收
+## 九、验收
 
 ```bat
 :: 另起一个隔离端口，别和 iPad 正在用的 8080 抢 /input
 python tools\beacon.py --port 8097 --ipv4-only --udp-in 0 --input-out none ^
        --tls-port 8444 --tls-cert tools/certs/server.crt --tls-key tools/certs/server.key
 
-python tools\check-yoke.py https://127.0.0.1:8444/yoke   :: 24 项，含体感
-python tools\check-yoke.py http://<本机IP>:8097/yoke      :: 19 项，验"会说缺 HTTPS"
+python tools\check-yoke.py https://127.0.0.1:8444/yoke   :: 30 项，含体感
+python tools\check-yoke.py http://<本机IP>:8097/yoke      :: 28 项，验引导页
 ```
 
 `tools/check-yoke.py` 用 playwright + 系统 Chrome，在 1194×834 的 iPad 横屏视口里**真的发触摸事件**
@@ -256,10 +297,14 @@ python tools\check-yoke.py http://<本机IP>:8097/yoke      :: 19 项，验"会�
 - 油门 1/4 处 ≈ 0.75，松手保持
 - 机炮按下 = bit11，松开清零；左舵 = `r` 负
 - 体感：右倾 15° ≈ x 0.6、前倾 12° ≈ y −0.48、校零回 0、超行程夹 1.0、关掉回 0
-- http 下点体感会明确提示缺 HTTPS
+- https 下**不弹**引导页；故意占两条哑 TCP 连接，https 仍须 3s 内响应
+- TLS 端口同时吃得下明文 HTTP（地址栏只写 `ip:8443` 的那种请求）
+- http 下点体感弹出整屏引导页，地址等于 `https://<host>:<真实端口>/yoke`，描述文件两个别名都能下载
 - 无 console 报错、无元素溢出视口
 
-截图落在 `.tmp/yoke-ipad.png`（横）、`.tmp/yoke-ipad-port.png`（竖）、`.tmp/yoke-tilt.png`（体感）。
+当前计数：**https 分支 30 项、http 分支 28 项**，全过才算验收通过。
+
+截图落在 `.tmp/yoke-ipad.png`（横）、`.tmp/yoke-ipad-port.png`（竖）、`.tmp/yoke-tilt.png`（体感）、`.tmp/yoke-tls.png`（引导页）。
 
 > **注意 localhost 不算数**：`http://127.0.0.1` 在浏览器眼里是安全上下文，
 > 拿它测不出「http 拿不到传感器」。要验那条分支必须用局域网 IP（如 `192.168.137.1`）。
