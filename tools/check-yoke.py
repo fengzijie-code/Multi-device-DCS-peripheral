@@ -100,6 +100,28 @@ with sync_playwright() as p:
     check("读数条高度合理", 36 <= geo["stripH"] <= 64, str(geo["stripH"]))
     check("油门圆徽章骑在竖条上", geo["knobInThr"], str(geo))
 
+    # iPad 主屏模式下状态栏（时间 / 电量）会盖在页面顶上，
+    # 顶上一排必须整体让开 —— 这条是用户实测撞出来的，别再挪回去。
+    topmost = pg.evaluate("""() => {
+      const els = [...document.querySelectorAll('#hud > *, #tabs > *, #ops > *')]
+        .filter(e => e.getBoundingClientRect().width > 0);   // 跳过 display:none 的隐藏 chip
+      return Math.min(...els.map(e => e.getBoundingClientRect().top));
+    }""")
+    check("顶部留出让开状态栏", topmost >= 34, f"top={topmost:.0f}px")
+
+    # 脚舵在右下：贴右边缘、在右侧按钮列下面、并且不压底部读数条
+    rl = pg.evaluate("""() => {
+      const b = s => document.querySelector(s).getBoundingClientRect();
+      const r = b('#rud'), col = b('#colTakeoff'), st = b('#strip'), pd = b('#pad');
+      return {right: Math.round(innerWidth - r.right), top: Math.round(r.top),
+              colBottom: Math.round(col.bottom), stripTop: Math.round(st.top),
+              padRight: Math.round(pd.right), rudLeft: Math.round(r.left)};
+    }""")
+    check("脚舵贴右下角", rl["right"] <= 32 and rl["rudLeft"] > rl["padRight"],
+          str(rl))
+    check("脚舵不压按钮列", rl["top"] >= rl["colBottom"] - 1, str(rl))
+    check("脚舵不压读数条", rl["top"] + 76 <= rl["stripTop"] + 1, str(rl))
+
     # ---- 四页（照 Pixel：仪表/起降/战斗/校准）
     def page_of():
         return pg.eval_on_selector("#app", "el=>el.getAttribute('data-page')")
