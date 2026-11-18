@@ -123,29 +123,44 @@ iOS 13 起，**传感器（方向 / 运动）只在安全上下文里可用**。
 
 也就是说 `http://192.168.137.1:8080/yoke` 上点「体感」永远不会来数据。
 Chrome 更直接：非安全上下文里 `DeviceOrientationEvent` 整个从 `window` 上摘掉。
-页面把这条检查放在最前面，点了会直接告诉你「体感需要 HTTPS」，不让你对着没反应的按钮猜。
+
+所以点「体感」时如果不在安全上下文里，页面会弹出**整屏引导**（不是闪一下就消失的提示）：
+里面直接给出这台机器该用的 https 地址、一个「复制」按钮、一个「下载根证书」按钮，
+和四步安装说明。照着做一遍就行，不用回来翻这份文档。
 
 ### 装一次根证书（之后就不用管了）
 
-局域网 IP 拿不到公信证书，所以走本地 CA：
+局域网 IP 拿不到公信证书，所以走本地 CA。PC 上先生成一次：
 
 ```bat
-python tools\make-cert.py                 :: 生成 CA + 服务端证书 + 描述文件
-python tools\make-cert.py --ip 192.168.50.1   :: 换网段时把新 IP 追加进去再签
+python tools\make-cert.py                      :: 生成 CA + 服务端证书 + 描述文件
+python tools\make-cert.py --ip 192.168.50.1    :: 换网段时把新 IP 追加进去再签
 ```
 
-然后在 iPad 上：
+`start-ipad.bat` 发现 `tools/certs/` 里有证书就会自动带上 HTTPS（默认 8443）。之后在 iPad 上：
 
-1. Safari 打开 `http://<PC的IP>:8080/ca.mobileconfig`（beacon 直接提供这个文件）
-2. 设置 → 通用 → VPN 与设备管理 → 安装该描述文件
-3. 设置 → 通用 → 关于本机 → **证书信任设置** → 打开「DCS Peripheral Local CA」
-4. 打开 `https://<PC的IP>:8443/yoke`，地址栏不再报警告
+1. 打开 `http://<PC的IP>:8080/yoke`，点「体感」→ 弹出引导页
+2. 点页面上的**下载根证书**（就是 `http://<PC的IP>:8080/ca.mobileconfig`，
+   Content-Type 为 `application/x-apple-aspen-config`，Safari 会认出来这是描述文件，
+   不需要 AirDrop 也不需要发邮件）
+3. 设置 → 通用 → VPN 与设备管理 → 已下载的描述文件 → 安装（提示「未签名」是正常的）
+4. 设置 → 通用 → 关于本机 → 拉到最底 **证书信任设置** → 打开「DCS Peripheral Local CA」
+5. 回 Safari 打开引导页给出的 `https://<PC的IP>:8443/yoke`，地址栏不再报警告
 
-第 3 步最容易漏 —— 只安装不信任，证书依旧是「不受信任」，WebSocket/传感器照样被拦。
+同一个文件有四个别名，给不同客户端兜底：`/ca.mobileconfig`、`/ca-mobileconfig`、
+`/profile.mobileconfig`、`/ca`。
+
+第 4 步最容易漏 —— 只安装不信任，证书依旧是「不受信任」，传感器照样被拦。
 `tools/certs/` 已 gitignore，私钥不会进仓库；换了电脑或在仓库外重装要先跑一次 `make-cert.py`。
 
-> **为什么非要装证书而不是点「继续访问」**：自签警告在「添加到主屏幕」的 standalone
-> 窗口里没有"继续"按钮，页面会直接白屏。必须让证书真的被信任。
+> **为什么非要装证书，而不是点「继续访问」**：普通标签页里自签警告能点
+> 「显示详细信息 → 访问此网站」绕过去，体感也照样有数据（安全上下文看的是 scheme，
+> 不看证书是否可信）。但「添加到主屏幕」的 standalone 窗口没有这个按钮，页面会直接白屏。
+> 想长期用主屏图标，就必须让证书真的被信任。
+
+> **端口不是写死的**：引导页会问 `/info` 要 `https_port` 的真实值，所以 `--tls-port`
+> 改过也不会给出打不开的地址。`/info` 报 `0` 表示 PC 那边压根没开 HTTPS，引导页会把
+> 这一条单独摆出来，而不是给你一条死链。
 
 ### 怎么用
 

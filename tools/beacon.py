@@ -107,6 +107,11 @@ GREEN, YELLOW, RED, DIM, BOLD, RESET = (
 
 START_TIME = time.time()
 
+# 实际开着的 HTTPS 端口（0 = 没开）。/info 要把它报给页面：
+# yoke 的「体感需要 https」引导页得知道该让用户点哪个端口，
+# 写死 8443 在 --tls-port 改过之后就成了死链。
+TLS_PORT = 0
+
 
 # ---------------------------------------------------------------- 页面
 #
@@ -876,6 +881,9 @@ class Handler(BaseHTTPRequestHandler):
                 "ipv4": enumerate_ipv4(),
                 "ipv6": global_ipv6_addresses(),
                 "uptime_s": round(time.time() - START_TIME, 1),
+                # 0 表示这台机器没开 HTTPS —— 页面上就该提示「去重启成 https 版」，
+                # 而不是给一条打不开的链接。
+                "https_port": TLS_PORT,
             }, indent=2)
             self._send(200, body, "application/json")
             return
@@ -897,7 +905,8 @@ class Handler(BaseHTTPRequestHandler):
 
         # 描述文件走 HTTP 下载：装证书这一步本身不需要 https，
         # 而让 iPad 直接打开链接去装，比 AirDrop/邮件少折腾一次。
-        if path in ("/ca.mobileconfig", "/profile.mobileconfig", "/ca"):
+        # 连字符别名是给「某些客户端把点号吃掉」兜的，顺手也给 /ca。
+        if path in ("/ca.mobileconfig", "/ca-mobileconfig", "/profile.mobileconfig", "/ca"):
             prof = Path(__file__).resolve().parent / "certs" / "dcs-peripheral-ca.mobileconfig"
             if not prof.is_file():
                 self._send(404, b"no profile: run python tools/make-cert.py",
@@ -1029,6 +1038,7 @@ class V6Server(socketserver.ThreadingTCPServer):
 def start_servers(port: int, ipv4_only: bool,
                   tls_port: int = 0, tls_cert: str | None = None,
                   tls_key: str | None = None) -> list:
+    global TLS_PORT
     servers = []
 
     try:
@@ -1059,6 +1069,7 @@ def start_servers(port: int, ipv4_only: bool,
             st.socket = ctx.wrap_socket(st.socket, server_side=True)
             threading.Thread(target=st.serve_forever, daemon=True).start()
             servers.append(("HTTPS", st))
+            TLS_PORT = tls_port
         except Exception as e:
             print(f"  [x] HTTPS :{tls_port} 起不来 —— {e}")
             print("      （证书缺失或过期？python tools/make-cert.py）")

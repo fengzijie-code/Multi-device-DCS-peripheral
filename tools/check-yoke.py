@@ -152,6 +152,7 @@ with sync_playwright() as p:
     pg.click("#tiltBtn")
     time.sleep(0.25)
     if secure:
+        check("https 下不弹引导页", not pg.is_visible("#tlsSheet"), "")
         def orient(beta, gamma):
             cdp.send("DeviceOrientation.setDeviceOrientationOverride",
                      {"alpha": 0, "beta": beta, "gamma": gamma})
@@ -183,9 +184,33 @@ with sync_playwright() as p:
         check("关体感后 x 回 0", abs(s["axes"]["x"]) < 0.03, f"x={s['axes']['x']:.3f}")
         cdp.send("DeviceOrientation.clearDeviceOrientationOverride")
     else:
-        check("http 下点体感会说明缺 HTTPS",
-              "HTTPS" in pg.inner_text("#tip") or "安全" in pg.inner_text("#tip"),
-              pg.inner_text("#tip"))
+        # 缺 https 时不该只弹一句 6 秒就消失的 toast —— 要铺出能照着做的引导页。
+        with urllib.request.urlopen(f"{BASE}/info", context=_SSL) as r:
+            info = json.load(r)
+        port = info.get("https_port") or 0
+        check("http 下点体感弹出引导页", pg.is_visible("#tlsSheet"), "")
+        url_val = pg.input_value("#tsUrl")
+        host = pg.evaluate("location.hostname")
+        check("引导页给出 https 地址", url_val == f"https://{host}:{port}/yoke",
+              f"{url_val} port={port}")
+        check("引导页带证书下载入口",
+              "ca.mobileconfig" in (pg.get_attribute("#tsProf", "href") or ""), "")
+        pg.screenshot(path=".tmp/yoke-tls.png", full_page=False)
+        # 引导页要能滚（body 上 global 禁了 touchmove，这里必须放行）
+        check("引导页可滚动",
+              pg.evaluate("() => {const s=document.querySelector('#tlsSheet');"
+                          "return getComputedStyle(s).overflowY === 'auto' && s.scrollHeight > s.clientHeight}"),
+              "")
+        for p_ in ("/ca.mobileconfig", "/ca-mobileconfig"):
+            with urllib.request.urlopen(f"{BASE}{p_}", context=_SSL) as r:
+                ctype = r.headers.get("Content-Type", "")
+                body = r.read()
+            check(f"描述文件可直接下载 {p_}",
+                  "aspen-config" in ctype and b"PayloadType" in body,
+                  f"{ctype} {len(body)}B")
+        pg.click("#tsClose")
+        time.sleep(0.2)
+        check("关掉引导页", not pg.is_visible("#tlsSheet"), "")
 
     # ---- 各区域不能溢出视口
     over = pg.evaluate("""() => {

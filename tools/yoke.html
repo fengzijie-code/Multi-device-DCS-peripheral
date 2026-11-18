@@ -134,6 +134,48 @@
   .mid{ grid-area:2 / 2; display:flex; align-items:center; justify-content:center;
         font-size:10px; color:var(--dim2); }
 
+  /* ---------- HTTPS 引导页 ---------- */
+  /* 体感点下去没反应时铺满整屏。body 设了 touch-action:none（防页面被拖动），
+     这里要单独放开纵向滚动，否则这一页在 iPad 上滚不动、下面的步骤看不到。 */
+  #tlsSheet{ position:fixed; inset:0; z-index:80; display:none;
+             background:var(--bg); overflow-y:auto; -webkit-overflow-scrolling:touch;
+             touch-action:pan-y; -webkit-user-select:text; user-select:text;
+             padding:calc(env(safe-area-inset-top) + 16px) 18px
+                    calc(env(safe-area-inset-bottom) + 20px); }
+  #tlsSheet.show{ display:block; }
+  .ts-wrap{ max-width:700px; margin:0 auto; }
+  .ts-h{ display:flex; align-items:center; gap:10px; margin:0 0 2px; }
+  .ts-h h1{ font-size:20px; margin:0; font-weight:600; letter-spacing:.01em; }
+  .ts-p{ margin:10px 0; font-size:14px; line-height:1.7; color:var(--dim); }
+  .ts-p b{ color:var(--fg); font-weight:500; }
+  .ts-step{ border:1px solid var(--line); border-radius:var(--r); background:var(--panel);
+            padding:13px 15px; margin:12px 0; }
+  .ts-step h2{ font-size:13.5px; margin:0; color:var(--fg); font-weight:600;
+               display:flex; align-items:center; gap:9px; }
+  .ts-step h2 i{ font-style:normal; flex:0 0 auto; width:21px; height:21px; border-radius:50%;
+                 background:var(--panel2); border:1px solid var(--line2); color:var(--dim);
+                 font-size:11px; display:flex; align-items:center; justify-content:center; }
+  .ts-step ol{ margin:9px 0 0; padding-left:19px; color:var(--dim); font-size:13.5px;
+               line-height:1.85; }
+  .ts-step ol b, .ts-step p b{ color:var(--fg); font-weight:500; }
+  .ts-url{ display:flex; gap:8px; align-items:stretch; margin:10px 0 0; }
+  .ts-url input{ flex:1 1 auto; min-width:0; width:100%;
+                 font:400 15px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+                 color:var(--fg); background:#0b1017; border:1px solid var(--line2);
+                 border-radius:var(--r); padding:13px 12px;
+                 -webkit-user-select:text; user-select:text; }
+  .ts-btn{ display:inline-flex; align-items:center; justify-content:center;
+           min-height:46px; padding:0 18px; border-radius:var(--r); font-size:15px;
+           color:var(--fg); background:var(--panel2); border:1px solid var(--line2);
+           font-family:inherit; text-decoration:none; }
+  .ts-btn.pri{ background:#1c3f26; border-color:#2f7340; color:#e8f5ec; }
+  .ts-btn.warn{ background:#4a3410; border-color:#6b4b16; color:#ffe6bd; }
+  .ts-btn:active{ transform:scale(.985); }
+  /* 输入框抢宽度时按钮会被压成两行（"复" / "制"），这里钉住它 */
+  .ts-url .ts-btn{ flex:0 0 auto; white-space:nowrap; padding:0 16px; }
+  .ts-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:11px; }
+  .ts-note{ margin-top:10px; font-size:12.5px; line-height:1.7; color:var(--dim2); }
+
   /* 竖屏只是能凑合用，横屏才是设计目标 */
   @media (orientation:portrait){
     #colL{ flex:0 0 42vw; }
@@ -220,8 +262,77 @@
   </div>
 </div>
 
-<script>
-"use strict";
+<!-- 体感在 http 下拿不到数据时铺出来的引导页。
+     内容本身要能照着做，所以链接、证书下载、开关位置全写在上面，不留"自己查"。 -->
+<div id="tlsSheet" aria-hidden="true">
+  <div class="ts-wrap">
+    <div class="ts-h">
+      <h1>体感需要 HTTPS</h1>
+    </div>
+    <p class="ts-p">
+      iOS 从 13 起只把陀螺仪数据交给<b>安全上下文</b> —— 也就是 <b>https</b> 或本机回环。
+      普通 http 下，方向事件会被系统直接掐掉，按钮按了当然没反应。<br>
+      你现在打开的是 <b id="tsNow">—</b>。
+    </p>
+
+    <div class="ts-step" id="tsNoTls" hidden>
+      <h2><i>!</i>PC 那边还没开 HTTPS</h2>
+      <p class="ts-p" style="margin:8px 0 0">
+        证书文件已经生成好了（tools/certs/），缺的只是启动参数。关掉这个窗口，
+        在 PC 上重新双击 <b>tools\start-ipad.bat</b> —— 它发现证书就会自动开 8443。
+        如果启动日志里出现 <b>[x] HTTPS :8443 起不来</b>，把那行报错发我。
+      </p>
+    </div>
+
+    <div class="ts-step">
+      <h2><i>1</i>换成这条地址</h2>
+      <div class="ts-url">
+        <input id="tsUrl" type="text" readonly value="" spellcheck="false">
+        <button class="ts-btn" id="tsCopy">复制</button>
+      </div>
+      <div class="ts-row">
+        <a class="ts-btn pri" id="tsGo" href="#">打开 https 版</a>
+      </div>
+      <div class="ts-note" id="tsCopyNote">同一台 iPad、同一个网络。IP 是 PC 的地址，端口就是 HTTPS 那个。
+        若提示「不是私密连接」，先做完第 2 步再来点它。</div>
+    </div>
+
+    <div class="ts-step">
+      <h2><i>2</i>装一次根证书（约 1 分钟）</h2>
+      <p class="ts-p" style="margin:8px 0 0">不用 AirDrop、不用发邮件，就在这个页面上点：</p>
+      <div class="ts-row">
+        <a class="ts-btn warn" id="tsProf" href="/ca.mobileconfig">下载根证书</a>
+      </div>
+      <ol>
+        <li>Safari 问「此网站正尝试下载一个配置描述文件」→ <b>允许</b></li>
+        <li>设置 → 通用 → <b>VPN 与设备管理</b> → 已下载的描述文件 → <b>安装</b>
+            （提示「未签名」是正常的，继续装）</li>
+        <li>设置 → 通用 → 关于本机 → 拉到最底 <b>证书信任设置</b> →
+            打开 <b>DCS Peripheral Local CA</b> 的开关</li>
+        <li>回 Safari 打开第 1 步那条 https 地址，地址栏不再报警告</li>
+      </ol>
+    </div>
+
+    <div class="ts-step">
+      <h2><i>3</i>添加到主屏幕（建议）</h2>
+      <p class="ts-p" style="margin:8px 0 0">
+        在 <b>https</b> 页面上点分享 → 添加到主屏幕 → 以后从桌面图标打开，没有地址栏也没有工具栏。
+        这也是非要装证书的原因：自签证书在普通标签页里还能点「继续访问」，
+        但主屏窗口没有那个按钮，只会白屏。
+      </p>
+      <p class="ts-p" style="color:var(--dim2);font-size:12.5px">
+        想先试体感、暂时不装证书也行：打开 https 地址时提示「不是私密连接」，
+        点 <b>显示详细信息 → 访问此网站</b> 就能拿到传感器数据 —— 只是每次都要点一遍，且不能加到主屏。
+      </p>
+    </div>
+
+    <div class="ts-row" style="margin-top:16px">
+      <button class="ts-btn pri" id="tsClose">知道了</button>
+    </div>
+  </div>
+</div>
+
+<script>"use strict";
 (function(){
   var POST_MS = 20;           // 50 Hz，与既有协议一致
   var clamp = function(v,a,b){ return v<a?a:(v>b?b:v); };
@@ -396,6 +507,57 @@
   bindToggle("invY", "y");
   bindToggle("invT", "t");
 
+  // ---------------------------------------------------------------- HTTPS 引导
+  // 点体感没反应，只可能是两件事：没走 https，或者浏览器压根没这个接口。
+  // 以前这里弹一条 6 秒消失的 toast 就完了 —— 在 iPad 上等于没说，
+  // 因为「去哪儿开 https / 证书怎么装」靠一句话讲不清，得铺在屏幕上一步步对着做。
+  var tlsSheet = $("#tlsSheet"), tsUrl = $("#tsUrl"), tsCopyNote = $("#tsCopyNote");
+  var tlsPortHint = 8443;         // 默认端口；/info 报了真值就以真值为准
+
+  function httpsUrl(){
+    var h = location.hostname || "127.0.0.1";
+    return "https://" + h + ":" + tlsPortHint + "/yoke";
+  }
+
+  function paintTls(){
+    tsUrl.value = httpsUrl();
+    $("#tsGo").href = httpsUrl();
+  }
+
+  function showTlsHelp(){
+    $("#tsNow").textContent = location.protocol + "//" + location.host;
+    paintTls();
+    tlsSheet.classList.add("show");
+    tlsSheet.setAttribute("aria-hidden", "false");
+    // --tls-port 改过的话端口就不是 8443，写死会给出打不开的地址。
+    // 问 /info 要真值；老版本 beacon 没这个字段（undefined）就保持默认、不当成"没开"。
+    fetch("/info", { cache: "no-store" }).then(function(r){ return r.json(); }).then(function(j){
+      if (!j) return;
+      if (typeof j.https_port === "number" && j.https_port > 0){
+        tlsPortHint = j.https_port; paintTls();
+      } else if (j.https_port === 0){
+        $("#tsNoTls").hidden = false;     // 明确报 0 = PC 那边真没开
+      }
+    }).catch(function(){});
+  }
+
+  function hideTlsHelp(){
+    tlsSheet.classList.remove("show");
+    tlsSheet.setAttribute("aria-hidden", "true");
+  }
+
+  // http 下 navigator.clipboard 也是不存在的（同样卡在安全上下文），
+  // 所以走「选中 + execCommand」这条老路；万一也失败，文字已经在框里选中了，长按就能复制。
+  $("#tsCopy").addEventListener("click", function(){
+    tsUrl.focus();
+    try { tsUrl.setSelectionRange(0, tsUrl.value.length); } catch(e){}
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch(e){}
+    tsCopyNote.textContent = ok ? "已复制 —— 粘到地址栏回车即可。"
+                                : "已选中 —— 长按输入框手动复制。";
+  });
+  $("#tsClose").addEventListener("click", hideTlsHelp);
+
   // ---------------------------------------------------------------- 体感
   // iOS 只在安全上下文（https / localhost）里发传感器数据，http 下永远收不到 ——
   // 所以这里先把 isSecureContext 检查一遍，直接告诉用户原因，别让人对着没反应的按钮猜。
@@ -460,7 +622,7 @@
     // 顺序要紧：非安全上下文里 Chrome 直接把 DeviceOrientationEvent 从 window 上摘掉，
     // 先判 isSecureContext 才能给出「缺 HTTPS」而不是误导人的「没有传感器」。
     if (!window.isSecureContext){
-      tip("体感需要 HTTPS —— http 下浏览器不给传感器数据（见 docs/YOKE-IPAD.md）");
+      showTlsHelp();
       return;
     }
     if (typeof window.DeviceOrientationEvent === "undefined"){ tip("此浏览器没有方向传感器接口"); return; }
@@ -577,6 +739,8 @@
   window.addEventListener("blur", clearAll);
   window.addEventListener("pagehide", clearAll);
   document.addEventListener("touchmove", function(e){
+    // 整页禁滚是为了防止拖杆时把页面拖走；但 HTTPS 引导页是要上下翻着读的。
+    if (tlsSheet.contains(e.target)) return;
     if (e.cancelable) e.preventDefault();
   }, { passive: false });
   document.addEventListener("gesturestart", function(e){ e.preventDefault(); });

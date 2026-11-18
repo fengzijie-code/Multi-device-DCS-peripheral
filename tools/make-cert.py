@@ -178,11 +178,13 @@ def main() -> int:
     mc = make_mobileconfig()
 
     print()
-    print("  下一步（iPad 上做一次）：")
-    print(f"    1) 把 {mc.name} 传到 iPad（AirDrop / 邮件 / 同网 http 下载都行）")
-    print("    2) 设置 → 通用 → VPN 与设备管理 → 安装该描述文件")
-    print("    3) 设置 → 通用 → 关于本机 → 证书信任设置 → 打开该根证书的开关")
-    print("    4) 打开 https://<PC的IP>:8443/yoke ，地址栏应无警告")
+    print("  下一步（iPad 上做一次，页面会带着走）：")
+    print("    1) iPad 打开 http://<PC的IP>:8080/yoke → 点「体感」→ 会弹出引导页")
+    print("    2) 点页面上那个「下载根证书」（= /ca.mobileconfig，不用 AirDrop/邮件）")
+    print("    3) 设置 → 通用 → VPN 与设备管理 → 安装（提示「未签名」是正常的）")
+    print("    4) 设置 → 通用 → 关于本机 → 证书信任设置 → 打开「DCS Peripheral Local CA」")
+    print("    5) 打开 https://<PC的IP>:8443/yoke ，地址栏应无警告")
+    print(f"       （描述文件就在 {mc}，要手动传也行）")
     return 0
 
 
