@@ -57,3 +57,6 @@ vJoySetup.exe
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# https 握手日志（排查用，不进仓库）
+tools/.tls.log

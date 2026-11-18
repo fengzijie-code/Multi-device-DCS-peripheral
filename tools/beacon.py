@@ -125,6 +125,22 @@ TLS_PORT = 0
 PANEL_PATH = Path(__file__).resolve().parent / "panel.html"
 YOKE_PATH = Path(__file__).resolve().parent / "yoke.html"
 
+# https 侧的握手日志。iOS 在证书不被接受时**不会给浏览器任何提示**，直接在握手层
+# 断开（Safari 只会说「已丢失网络连接」）。这时候唯一能问的就是服务端：
+# 日志里要么压根没有这条连接（网络/防火墙），要么留着一行 SSLError（证书问题）。
+# 这一行就是分水岭，比任何猜测都可靠。
+TLS_LOG_PATH = Path(__file__).resolve().parent / ".tls.log"
+
+
+def tls_log(line: str) -> None:
+    try:
+        if TLS_LOG_PATH.is_file() and TLS_LOG_PATH.stat().st_size > 512_000:
+            TLS_LOG_PATH.unlink()
+        with TLS_LOG_PATH.open("a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%m-%d %H:%M:%S')} {line}\n")
+    except OSError:
+        pass
+
 _page_cache: dict[str, tuple[float, bytes]] = {}
 
 
@@ -849,6 +865,12 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(head + body)
         except (BrokenPipeError, ConnectionResetError):
             pass
+        # 页面级请求落一行到 .tls.log：能回答「请求到底到没到服务端、
+        # 服务端回没回、走的 TLS 还是明文」。50Hz 的三条数据通道不记。
+        if not any(k in self.path for k in ("/input", "/vjoy", "/ping")):
+            secure = isinstance(self.connection, ssl.SSLSocket)
+            tls_log(f"REQ   {self.client_address[0]} {'TLS' if secure else 'PLAIN'}"
+                    f" {code} {self.path}")
 
     def do_GET(self):
         u = urlparse(self.path)
@@ -1071,12 +1093,24 @@ class TLS4Server(V4Server):
             # 握手后放宽到 180 秒 —— yoke 是 50Hz 长连接，本来就不会空闲这么久；
             # 但用户切后台忘了关时，别让线程和连接永远挂着。
             conn.settimeout(180)
-        except (ssl.SSLError, OSError):
+        except ssl.SSLError as e:
+            # 这一类才值得追：证书被拒、协议/密码套件谈不拢、iOS 判证书不合规。
+            tls_log(f"FAIL  {client_address[0]} SSLError: {e}")
             try:
                 request.close()
             except OSError:
                 pass
             return
+        except OSError as e:
+            # 10053/10054 之类 = 对端自己断开（浏览器预连接被取消是常态），
+            # 和「证书被拒」是两回事，别混在一起看。
+            tls_log(f"ABORT {client_address[0]} {type(e).__name__}")
+            try:
+                request.close()
+            except OSError:
+                pass
+            return
+        tls_log(f"OK    {client_address[0]} {conn.version()} {conn.cipher()[0]}")
         try:
             self.finish_request(conn, client_address)
         except Exception:
