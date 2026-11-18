@@ -151,6 +151,7 @@
     <div id="stext">未连接</div>
     <div class="meter">RTT <b id="rtt">--</b></div>
     <div class="meter">收 <b id="hz">—</b> Hz</div>
+    <div class="meter">帧间隔峰 <b id="jit">--</b></div>
     <div class="meter">vJoy <b id="vj">--</b></div>
     <div class="sp"></div>
     <div id="tip"></div>
@@ -490,9 +491,9 @@
 
   // ---------------------------------------------------------------- 发送
   var dot = $("#dot"), stext = $("#stext"), rttEl = $("#rtt"),
-      hzEl = $("#hz"), vjEl = $("#vj");
+      hzEl = $("#hz"), vjEl = $("#vj"), jitEl = $("#jit");
   var inflight = false, fails = 0, okCount = 0, winStart = performance.now(),
-      rttAvg = 0, seq = 0;
+      rttAvg = 0, rttPeak = 0, seq = 0;
 
   function payload(){
     // 体感是基准，杆盘是微调：两个相加再夹住。杆盘松手回 0，所以净效果就是
@@ -521,7 +522,9 @@
     }).then(function(r){ return r.json(); }).then(function(j){
       var ms = performance.now() - t0;
       rttAvg = rttAvg ? rttAvg * 0.85 + ms * 0.15 : ms;
-      rttEl.textContent = rttAvg.toFixed(1) + " ms";
+      if (ms > rttPeak) rttPeak = ms;
+      // 均值只说明"能通"，峰值才说明"能不能飞"。两个一起显示。
+      rttEl.textContent = rttAvg.toFixed(1) + " · 峰 " + rttPeak.toFixed(0);
       seq = (j && typeof j.s === "number") ? j.s : seq + 1;
       okCount++; fails = 0;
       dot.className = "ok";
@@ -530,6 +533,12 @@
       vjEl.textContent = v === 1 ? "就绪" : (v === 2 ? "缺轴" : "未启动");
       vjEl.style.color = v === 1 ? "var(--teal)" : "var(--amber)";
       if (v !== 1) dot.className = "warn";
+      // g = 服务端看到的"近 100 帧最长到达间隔"。这才是摇杆真正吃的抖动：
+      // 客户端 RTT 好看、但帧是一阵一阵到的，手感照样一顿一顿。
+      if (j && typeof j.g === "number"){
+        jitEl.textContent = j.g.toFixed(0) + "ms";
+        jitEl.style.color = j.g > 80 ? "var(--red)" : (j.g > 45 ? "var(--amber)" : "var(--teal)");
+      } else { jitEl.textContent = "--"; jitEl.style.color = ""; }
     }).catch(function(){
       fails++;
       if (fails >= 3){
@@ -543,7 +552,9 @@
       var now = performance.now();
       if (now - winStart >= 1000){
         hzEl.textContent = Math.round(okCount * 1000 / (now - winStart));
+        rttEl.textContent = rttAvg.toFixed(1) + " · 峰 " + rttPeak.toFixed(0);
         okCount = 0; winStart = now;
+        rttPeak = 0;
       }
     });
   }

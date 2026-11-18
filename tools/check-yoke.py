@@ -60,7 +60,18 @@ with sync_playwright() as p:
     hz = pg.inner_text("#hz")
     rtt = pg.inner_text("#rtt")
     check("发包率 ~50Hz", hz.isdigit() and 30 <= int(hz) <= 60, f"hz={hz}")
-    check("RTT 有值", "ms" in rtt, f"rtt={rtt}")
+    check("RTT 有值", "峰" in rtt, f"rtt={rtt}")
+    s0 = snap()
+    g = s0.get("gap_ms") or {}
+    check("服务端到达帧率 ≈ 50Hz",
+          g.get("rate_hz") is not None and 40 <= g["rate_hz"] <= 60, str(g))
+    check("服务端有帧间隔峰值", g.get("max_ms") is not None, str(g))
+    # 回包里要带 g（帧间隔峰），HUD 靠它显示抖动
+    with urllib.request.urlopen(urllib.request.Request(
+            f"{BASE}/input", data=b'{"x":0,"y":0,"r":0,"b":0}',
+            headers={"Content-Type": "application/json"}), context=_SSL) as r:
+        resp = json.load(r)
+    check("POST 回包带 g（帧间隔峰）", "g" in resp, str(resp))
 
     cdp = ctx.new_cdp_session(pg)
 
@@ -179,7 +190,7 @@ with sync_playwright() as p:
     # ---- 各区域不能溢出视口
     over = pg.evaluate("""() => {
       const out = [];
-      document.querySelectorAll('#deck *').forEach(el => {
+      document.querySelectorAll('#deck *, #hud *').forEach(el => {
         const r = el.getBoundingClientRect();
         if (r.width > 1 && (r.right > innerWidth + 1 || r.bottom > innerHeight + 1
             || r.left < -1 || r.top < -1)) out.push(el.id || el.className);

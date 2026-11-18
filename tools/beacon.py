@@ -542,6 +542,7 @@ class InputHub:
     SPRING = ("x", "y", "r")     # 松手回零的轴（视角移除后只剩这三根）
     HOLD = ("t",)                            # 松手保持的轴
     MAX_BUTTONS = 30
+    GAP_WINDOW = 100             # 到达间隔的滑动窗口（帧）
 
     def __init__(self):
         self._lock = threading.Lock()
@@ -556,6 +557,9 @@ class InputHub:
         self._sink: tuple[str, int] | None = None
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._vjoy: dict = {}
+        # 到达间隔：均值好看不代表能用，摇杆怕的是偶发的长间隔（"杆卡了一下"）。
+        # 用滑动窗口而不是累计值 —— 一次卡顿不该永久污染统计。
+        self._gaps: collections.deque[float] = collections.deque(maxlen=self.GAP_WINDOW)
 
     def set_sink(self, host: str, port: int) -> None:
         self._sink = (host, port)
@@ -622,12 +626,17 @@ class InputHub:
             buttons = 0
 
         with self._lock:
+            now = time.time()
+            # 间隔只统计"连续帧"：超过 0.5s 视为断流，不把断流后的第一帧算成抖动
+            if self._last_rx and (now - self._last_rx) < 0.5:
+                self._gaps.append((now - self._last_rx) * 1000.0)
             self._axes = dict(axes)
             self._buttons = buttons
             self._seq += 1
-            self._last_rx = time.time()
+            self._last_rx = now
             seq = self._seq
             sink = self._sink
+            gap_max = max(self._gaps) if self._gaps else None
 
         if sink:
             payload = {k: v for k, v in axes.items() if v is not None}
@@ -637,9 +646,23 @@ class InputHub:
                 self._sock.sendto(json.dumps(payload).encode(), sink)
             except OSError:
                 pass
-        return {"axes": axes, "buttons": buttons, "seq": seq}
+        return {"axes": axes, "buttons": buttons, "seq": seq, "gap_max": gap_max}
+
+    def gap_stats(self) -> dict | None:
+        with self._lock:
+            gaps = list(self._gaps)
+        if not gaps:
+            return None
+        total = sum(gaps)
+        return {
+            "avg_ms": round(total / len(gaps), 1),
+            "max_ms": round(max(gaps), 1),
+            "rate_hz": round(len(gaps) * 1000.0 / total, 1) if total else None,
+            "window": len(gaps),
+        }
 
     def snapshot(self) -> dict:
+        stats = self.gap_stats()
         with self._lock:
             age = (time.time() - self._last_rx) if self._last_rx else None
             return {
@@ -649,6 +672,8 @@ class InputHub:
                 "age_ms": int(age * 1000) if age is not None else None,
                 "forwarding": self._sink is not None,
                 "vjoy": self.vjoy_status(),
+                # 到达间隔：avg 看出帧率、max 看抖动。摇杆能不能用，看的是 max。
+                "gap_ms": stats,
             }
 
     def brief(self) -> dict:
@@ -976,7 +1001,12 @@ class Handler(BaseHTTPRequestHandler):
         #   0 = vjoy_out 没在跑   1 = 就绪   2 = 在跑但有轴/按钮不可用
         vs = INPUT.vjoy_status()
         flag = 1 if (vs["alive"] and vs["ok"]) else (2 if vs["alive"] else 0)
-        self._send(200, b'{"s":%d,"v":%d}' % (st["seq"], flag), "application/json")
+        # g = 近 100 帧里最长的到达间隔（ms）。客户端把它显示出来，
+        # 就是为了让「均值 10ms」这种好看的数字不能掩盖偶发卡顿。
+        g = st.get("gap_max")
+        gtxt = "null" if g is None else ("%.1f" % g)
+        body = ('{"s":%d,"v":%d,"g":%s}' % (st["seq"], flag, gtxt)).encode()
+        self._send(200, body, "application/json")
 
 
 class V4Server(socketserver.ThreadingTCPServer):
