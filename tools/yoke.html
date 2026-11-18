@@ -58,6 +58,51 @@
              box-shadow:0 6px 20px rgba(0,0,0,.5); }
   #app.locked #lockHint{ display:block; }
 
+  /* ---------- 仪表条 ---------- */
+  /* 用平板当杆时看不见座舱，这几个数是唯一能瞄一眼的来源。
+     只在视觉上占 34px，且 pointer-events:none —— 绝不跟杆盘抢触摸。 */
+  #strip{ flex:0 0 auto; height:34px; display:flex; align-items:center; gap:14px;
+          padding:0 10px; background:#12171e; border-bottom:1px solid var(--line);
+          pointer-events:none; overflow:hidden; }
+  #strip .m{ display:flex; align-items:baseline; gap:4px; min-width:0;
+             font-variant-numeric:tabular-nums; }
+  #strip .m span{ font-size:10px; color:var(--dim2); letter-spacing:.05em; }
+  #strip .m b{ font-size:15px; font-weight:500; color:var(--fg); }
+  #strip .m i{ font-style:normal; font-size:10px; color:var(--dim2); }
+  #strip.nodata .m b{ color:var(--dim2); }
+  #adi{ position:relative; flex:0 0 auto; width:26px; height:26px; border-radius:50%;
+        overflow:hidden; border:1px solid var(--line2); background:#0b1017; }
+  #adiDisc{ position:absolute; left:0; width:100%; height:200%; top:-50%;
+            transition:transform .12s linear; }
+  #adiDisc .sky{ position:absolute; top:0; height:50%; width:100%; background:#1c3f5e; }
+  #adiDisc .gnd{ position:absolute; bottom:0; height:50%; width:100%; background:#4a3a26; }
+  #adiDisc .ln{ position:absolute; top:50%; left:0; width:100%; height:1px;
+                background:#c9d1d9; margin-top:-0.5px; }
+  #adiFix{ position:absolute; left:50%; top:50%; width:11px; height:1px;
+           background:var(--amber); margin:-0.5px 0 0 -5.5px; }
+
+  /* ---------- 手感面板 ---------- */
+  #setSheet{ position:fixed; inset:0; z-index:80; display:none;
+             background:var(--bg); overflow-y:auto; -webkit-overflow-scrolling:touch;
+             touch-action:pan-y;
+             padding:calc(env(safe-area-inset-top) + 16px) 18px
+                    calc(env(safe-area-inset-bottom) + 20px); }
+  #setSheet.show{ display:block; }
+  .setRow{ display:flex; align-items:center; gap:12px; margin:11px 0; }
+  .setRow label{ flex:0 0 98px; font-size:13px; color:var(--dim); }
+  .setRow input[type=range]{ flex:1 1 auto; min-width:0; height:34px; margin:0;
+        -webkit-appearance:none; appearance:none; background:transparent; }
+  .setRow input[type=range]::-webkit-slider-runnable-track{ height:4px; border-radius:2px;
+        background:#2a3038; }
+  .setRow input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none;
+        width:24px; height:24px; border-radius:50%; background:var(--blue);
+        border:2px solid #0d1117; margin-top:-10px; }
+  .setRow b{ flex:0 0 52px; text-align:right; font-size:14px; font-weight:500;
+             color:var(--fg); font-variant-numeric:tabular-nums; }
+  .ts-btn.sw{ min-height:38px; min-width:66px; font-size:14px; padding:0 12px;
+              margin-left:auto; }
+  .ts-btn.sw.on{ background:#1f4d2b; border-color:#2f7340; color:#e8f5ec; }
+
   /* ---------- 主体 ---------- */
   #deck{ flex:1 1 auto; display:flex; min-height:0; }
 
@@ -220,9 +265,20 @@
     <button class="chip" id="trimClr" style="display:none">清配平</button>
     <button class="chip" id="tiltBtn">体感</button>
     <button class="chip" id="zeroBtn" style="display:none">校零</button>
-    <button class="chip" id="invX">X 反</button>
-    <button class="chip" id="invY">Y 反</button>
-    <button class="chip" id="invT">油门反</button>
+    <button class="chip" id="setBtn">手感</button>
+  </div>
+
+  <div id="strip" class="nodata">
+    <div id="adi">
+      <div id="adiDisc"><div class="sky"></div><div class="gnd"></div><div class="ln"></div></div>
+      <div id="adiFix"></div>
+    </div>
+    <div class="m"><span>IAS</span><b id="sIas">--</b><i>kt</i></div>
+    <div class="m"><span>ALT</span><b id="sAlt">--</b><i>ft</i></div>
+    <div class="m"><span>VS</span><b id="sVs">--</b><i>fpm</i></div>
+    <div class="m"><span>G</span><b id="sG">--</b></div>
+    <div class="m"><span>HDG</span><b id="sHdg">--</b></div>
+    <div class="m"><span>FUEL</span><b id="sFuel">--</b><i id="sFuelU">%</i></div>
   </div>
 
   <div id="deck">
@@ -365,6 +421,50 @@
   </div>
 </div>
 
+<!-- 手感面板。参数和 Pixel 端 YokeSettings 是同一组默认值，
+     调完立刻生效并存在本机 —— 手感不对时不用改代码、也不用等我。 -->
+<div id="setSheet" aria-hidden="true">
+  <div class="ts-wrap">
+    <div class="ts-h"><h1>手感</h1></div>
+    <p class="ts-p">改动立刻生效并保存在这台 iPad 上。默认值取自 Pixel 端实飞调出来的那一组。</p>
+
+    <div class="ts-step">
+      <h2><i>1</i>体感行程</h2>
+      <div class="setRow"><label>死区</label>
+        <input type="range" id="rDead" min="0" max="8" step="0.5"><b id="vDead"></b></div>
+      <div class="setRow"><label>满行程</label>
+        <input type="range" id="rRange" min="12" max="40" step="1"><b id="vRange"></b></div>
+      <div class="setRow"><label>曲线</label>
+        <input type="range" id="rExpo" min="0" max="1" step="0.05"><b id="vExpo"></b></div>
+      <p class="ts-p" style="font-size:12.5px;color:var(--dim2);margin-bottom:0">
+        死区吃掉手持微抖；满行程是「倾斜多少度算满杆」，越小越灵敏也越累；
+        曲线 0 = 线性，越大中位越细、末端越陡。只影响体感，杆盘始终线性。
+      </p>
+    </div>
+
+    <div class="ts-step">
+      <h2><i>2</i>方向与开关</h2>
+      <div class="setRow"><label>横滚 X</label>
+        <button class="ts-btn sw" id="invX">关</button></div>
+      <div class="setRow"><label>俯仰 Y</label>
+        <button class="ts-btn sw" id="invY">关</button></div>
+      <div class="setRow"><label>油门</label>
+        <button class="ts-btn sw" id="invT">关</button></div>
+      <div class="setRow"><label>配平按钮</label>
+        <button class="ts-btn sw" id="swTrim">开</button></div>
+      <p class="ts-p" style="font-size:12.5px;color:var(--dim2);margin-bottom:0">
+        右边写着「开」就表示这条轴被反向。<b>配平按钮</b>只在飞直升机时有用
+        （把当前杆位锁住、松手不回中）；飞固定翼可以关掉，顶栏会少两个按钮。
+      </p>
+    </div>
+
+    <div class="ts-row" style="margin-top:16px">
+      <button class="ts-btn" id="setReset">恢复默认</button>
+      <button class="ts-btn pri" id="setClose">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script>"use strict";
 (function(){
   var POST_MS = 20;           // 50 Hz，与既有协议一致
@@ -399,6 +499,17 @@
   var pulseUntil = {};
   var tiltOverSince = 0;
 
+  // 手感参数。默认值 = Pixel 端 YokeSettings 实飞调出来的那一组：
+  // 死区 2.5°、行程 22°、expo 0.35。可在「手感」面板改，存在本机。
+  var DEFAULT_TUNE = { dead: 2.5, range: 22, expo: 0.35 };
+  var savedTune = store.get("tune", null) || {};
+  var tune = {
+    dead:  typeof savedTune.dead  === "number" ? savedTune.dead  : DEFAULT_TUNE.dead,
+    range: typeof savedTune.range === "number" ? savedTune.range : DEFAULT_TUNE.range,
+    expo:  typeof savedTune.expo  === "number" ? savedTune.expo  : DEFAULT_TUNE.expo
+  };
+  var trimOn = store.get("trimOn", true);   // 配平按钮默认显示，飞固定翼可以关掉
+
   var armBtn = $("#armBtn"), appEl = $("#app");
 
   function armUi(){
@@ -418,13 +529,15 @@
   function trimUi(){
     var mag = Math.max(Math.abs(trim.x), Math.abs(trim.y));
     var on = mag > 0.001;
+    $("#trimBtn").style.display = trimOn ? "" : "none";
+    $("#trimClr").style.display = (trimOn && on) ? "" : "none";
     $("#trimBtn").classList.toggle("on", on);
     $("#trimBtn").textContent = on ? "配平 " + mag.toFixed(2) : "配平";
-    $("#trimClr").style.display = on ? "" : "none";
   }
 
   // 取「当前实际输出」当新偏移（已含旧配平），所以连按两次是继续微调，不会翻倍。
   function captureTrim(){
+    if (!trimOn) return;
     var ox = clamp(st.x + (tilt.on ? tilt.x : 0) + trim.x, -1, 1);
     var oy = clamp(st.y + (tilt.on ? tilt.y : 0) + trim.y, -1, 1);
     trim.x = clamp(ox, -TRIM_MAX, TRIM_MAX);
@@ -619,7 +732,10 @@
   // ---------------------------------------------------------------- 反向开关
   function bindToggle(id, key){
     var el = $('#' + id);
-    var on = function(){ el.classList.toggle("on", !!inv[key]); };
+    var on = function(){
+      el.classList.toggle("on", !!inv[key]);
+      el.textContent = inv[key] ? "开" : "关";
+    };
     on();
     el.addEventListener("click", function(){
       inv[key] = !inv[key];
@@ -633,6 +749,56 @@
   bindToggle("invX", "x");
   bindToggle("invY", "y");
   bindToggle("invT", "t");
+
+  // ---------------------------------------------------------------- 手感面板
+  var setSheet = $("#setSheet");
+  var rDead = $("#rDead"), rRange = $("#rRange"), rExpo = $("#rExpo");
+
+  function paintTune(){
+    rDead.value = tune.dead; rRange.value = tune.range; rExpo.value = tune.expo;
+    $("#vDead").textContent = tune.dead.toFixed(1) + "°";
+    $("#vRange").textContent = tune.range.toFixed(0) + "°";
+    $("#vExpo").textContent = tune.expo.toFixed(2);
+    $("#swTrim").textContent = trimOn ? "开" : "关";
+    $("#swTrim").classList.toggle("on", trimOn);
+  }
+
+  function bindRange(el, key){
+    el.addEventListener("input", function(){
+      var v = parseFloat(el.value);
+      if (!isFinite(v)) return;
+      tune[key] = v;
+      store.set("tune", tune);
+      paintTune();
+      showAxes();
+    });
+  }
+  bindRange(rDead, "dead");
+  bindRange(rRange, "range");
+  bindRange(rExpo, "expo");
+
+  $("#setBtn").addEventListener("click", function(){
+    paintTune(); setSheet.classList.add("show");
+  });
+  $("#setClose").addEventListener("click", function(){
+    setSheet.classList.remove("show");
+  });
+  $("#setReset").addEventListener("click", function(){
+    tune.dead = DEFAULT_TUNE.dead; tune.range = DEFAULT_TUNE.range; tune.expo = DEFAULT_TUNE.expo;
+    store.set("tune", tune); paintTune(); tip("已恢复默认手感");
+  });
+  $("#swTrim").addEventListener("click", function(){
+    trimOn = !trimOn;
+    store.set("trimOn", trimOn);
+    // 关掉不只是藏按钮，还要把偏移清零 —— 否则切回固定翼时那个偏移还在，
+    // 而屏幕上已经没有任何东西显示它了（Pixel 端踩过这个坑）。
+    if (!trimOn){
+      trim.x = 0; trim.y = 0;
+      store.set("trimX", 0); store.set("trimY", 0);
+    }
+    paintTune(); trimUi(); showAxes();
+  });
+  paintTune();
 
   // ---------------------------------------------------------------- HTTPS 引导
   // 点体感没反应，只可能是两件事：没走 https，或者浏览器压根没这个接口。
@@ -688,9 +854,6 @@
   // ---------------------------------------------------------------- 体感
   // iOS 只在安全上下文（https / localhost）里发传感器数据，http 下永远收不到 ——
   // 所以这里先把 isSecureContext 检查一遍，直接告诉用户原因，别让人对着没反应的按钮猜。
-  // 手感参数取自 Pixel 端 YokeSettings 的默认值（那边是实飞调出来的）：
-  // 死区 2.5° 吃掉手持微抖，行程 22° 到满杆，expo 0.35 让中间变细、末端仍满。
-  var TILT_DEAD = 2.5, TILT_RANGE = 22, TILT_EXPO = 0.35;
   var tilt = { on:false, x:0, y:0, baseP:null, baseR:null, rawP:null, rawR:null };
   var tiltBtn = $("#tiltBtn"), zeroBtn = $("#zeroBtn"), tipEl = $("#tip");
   var padTag = $("#padTag");
@@ -716,8 +879,8 @@
     if (tilt.baseP === null){ tilt.baseP = tilt.rawP; tilt.baseR = tilt.rawR; }
     var degX = tilt.rawR - tilt.baseR;
     var degY = tilt.rawP - tilt.baseP;
-    tilt.x = curve(degX, TILT_DEAD, TILT_RANGE, TILT_EXPO) * (inv.x ? -1 : 1);
-    tilt.y = curve(degY, TILT_DEAD, TILT_RANGE, TILT_EXPO) * (inv.y ? -1 : 1);
+    tilt.x = curve(degX, tune.dead, tune.range, tune.expo) * (inv.x ? -1 : 1);
+    tilt.y = curve(degY, tune.dead, tune.range, tune.expo) * (inv.y ? -1 : 1);
 
     // 姿态异常兜底：只有「相对校零点翻过 180°」这种物理上不可能的姿态才算异常。
     // 正常拉过载时 tilt 到 90°+ 是合法的满杆输入，不能当成掉手机（Pixel 那边
@@ -882,6 +1045,55 @@
   var timer = setInterval(tick, POST_MS);
   tick();
 
+  // ---------------------------------------------------------------- 仪表条
+  // 1Hz 拉 /state。飞机读数是慢变量，和 /input 的 50Hz 是两条独立的路：
+  // 遥测断了不该影响操纵，操纵也不该被遥测拖慢。
+  var stripEl = $("#strip"), adiDisc = $("#adiDisc");
+  var sIas = $("#sIas"), sAlt = $("#sAlt"), sVs = $("#sVs"), sG = $("#sG"),
+      sHdg = $("#sHdg"), sFuel = $("#sFuel"), sFuelU = $("#sFuelU");
+
+  function put(el, v, dp){
+    el.textContent = (typeof v === "number" && isFinite(v)) ? v.toFixed(dp) : "--";
+  }
+
+  function pollState(){
+    fetch("/state", { cache: "no-store" }).then(function(r){ return r.json(); }).then(function(j){
+      var f = j && j.frame;
+      if (!f){                       // DCS 没跑，或遥测断了 —— 宁可全 "--" 也不显示旧数
+        stripEl.classList.add("nodata");
+        sIas.textContent = sAlt.textContent = sVs.textContent = "--";
+        sG.textContent = sHdg.textContent = sFuel.textContent = "--";
+        adiDisc.style.transform = "translateY(0px) rotate(0deg)";
+        return;
+      }
+      stripEl.classList.remove("nodata");
+      // 米/秒 → 节、英尺、英尺每分钟：DCS 玩家的习惯口径，和 /panel 保持一致
+      put(sIas, f.ias * 1.94384, 0);
+      put(sAlt, f.alt * 3.28084, 0);
+      put(sVs, f.vs * 196.85, 0);
+      put(sG, f.g, 1);
+      put(sHdg, (((f.hdg * 180 / Math.PI) % 360) + 360) % 360, 0);
+
+      // 油量有的是比例（0–1），有的是公斤。按量级判断，别写死一种机型。
+      var fuel = (f.fuel || 0) + (f.fuelx || 0);
+      if (fuel > 1.01){ put(sFuel, fuel, 0); sFuelU.textContent = "kg"; }
+      else { put(sFuel, fuel * 100, 0); sFuelU.textContent = "%"; }
+
+      // 颜色只在「该看一眼」时亮起来，否则满屏警告色等于没有警告
+      sVs.style.color = Math.abs(f.vs) > 15 ? "var(--amber)" : "";
+      sG.style.color = f.g > 9 ? "var(--red)" : (f.g > 7.5 ? "var(--amber)" : "");
+      sFuel.style.color = (fuel > 0 && (fuel > 1.01 ? fuel < 300 : fuel < 0.15))
+                          ? "var(--red)" : "";
+
+      // 姿态球：滚转整体旋转、俯仰上下平移。1° 俯仰 ≈ 1.2px，够看出抬头低头。
+      var py = clamp(f.pitch * 180 / Math.PI * 1.2, -12, 12);
+      var bk = -f.bank * 180 / Math.PI;
+      adiDisc.style.transform = "translateY(" + py.toFixed(1) + "px) rotate(" + bk.toFixed(1) + "deg)";
+    }).catch(function(){ stripEl.classList.add("nodata"); });
+  }
+  pollState();
+  setInterval(pollState, 1000);
+
   // ---------------------------------------------------------------- 兜底
   function clearAll(){
     st.x = 0; st.y = 0; st.r = 0; st.b = 0;
@@ -898,7 +1110,7 @@
   window.addEventListener("pagehide", clearAll);
   document.addEventListener("touchmove", function(e){
     // 整页禁滚是为了防止拖杆时把页面拖走；但 HTTPS 引导页是要上下翻着读的。
-    if (tlsSheet.contains(e.target)) return;
+    if (tlsSheet.contains(e.target) || setSheet.contains(e.target)) return;
     if (e.cancelable) e.preventDefault();
   }, { passive: false });
   document.addEventListener("gesturestart", function(e){ e.preventDefault(); });

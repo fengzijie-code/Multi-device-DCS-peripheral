@@ -73,6 +73,25 @@ with sync_playwright() as p:
         resp = json.load(r)
     check("POST 回包带 g（帧间隔峰）", "g" in resp, str(resp))
 
+    # ---- 仪表条：/state 的 1Hz 帧要真的落到界面上（需要 mock_export 在喂遥测）
+    pg.wait_for_function("() => document.querySelector('#sIas').textContent !== '--'",
+                         timeout=6000)
+    ias = pg.inner_text("#sIas").strip()
+    alt = pg.inner_text("#sAlt").strip()
+    hdg = pg.inner_text("#sHdg").strip()
+    check("仪表条有读数", ias.isdigit() and int(ias) > 0, f"ias={ias}")
+    check("高度有读数", alt.isdigit() and int(alt) > 0, f"alt={alt}")
+    check("航向有读数", hdg.isdigit() and 0 <= int(hdg) <= 360, f"hdg={hdg}")
+    tf = pg.evaluate("getComputedStyle(document.querySelector('#adiDisc')).transform")
+    check("姿态球有姿态", tf not in ("", "none", "matrix(1, 0, 0, 1, 0, 0)"), tf)
+    geo = pg.evaluate("""() => {
+      const s = document.querySelector('#strip').getBoundingClientRect();
+      const d = document.querySelector('#deck').getBoundingClientRect();
+      return {sBottom: Math.round(s.bottom), dTop: Math.round(d.top), h: Math.round(s.height)};
+    }""")
+    check("仪表条不压杆区", geo["sBottom"] <= geo["dTop"] + 1 and 30 <= geo["h"] <= 40, str(geo))
+
+
     cdp = ctx.new_cdp_session(pg)
 
     def touch(kind, x, y, tid=1):
@@ -139,6 +158,22 @@ with sync_playwright() as p:
     time.sleep(0.22)
     s = snap()
     check("清配平后回中", abs(s["axes"]["x"]) < 0.02, f"x={s['axes']['x']:.2f}")
+
+    # ---- 手感面板
+    pg.click("#setBtn")
+    time.sleep(0.25)
+    check("手感面板能打开", pg.is_visible("#setSheet"), "")
+    pg.screenshot(path=".tmp/yoke-set.png")
+    pg.eval_on_selector("#rRange",
+                        "el=>{el.value=40;el.dispatchEvent(new Event('input',{bubbles:true}))}")
+    time.sleep(0.12)
+    check("滑块改动生效", pg.inner_text("#vRange").strip() == "40°", pg.inner_text("#vRange"))
+    pg.click("#setReset")
+    time.sleep(0.12)
+    check("恢复默认", pg.inner_text("#vRange").strip() == "22°", pg.inner_text("#vRange"))
+    pg.click("#setClose")
+    time.sleep(0.25)
+    check("手感面板能关闭", not pg.is_visible("#setSheet"), "")
 
     # ---- 按钮最短脉冲：DCS 按模拟帧采样，20ms 的快速点按会丢
     gb0 = pg.eval_on_selector('[data-bit="11"]',
@@ -207,6 +242,8 @@ with sync_playwright() as p:
     time.sleep(0.25)
     if secure:
         check("https 下不弹引导页", not pg.is_visible("#tlsSheet"), "")
+        check("顶栏标记 https", pg.inner_text("#sec").strip() == "https",
+              pg.inner_text("#sec").strip())
         # 回归：以前把握手做在 accept() 里，一个"连上但不发 ClientHello"的
         # 连接就能把整个 8443 堵死（现象是「刚才还能开，现在打不开」）。
         import socket as _sk
@@ -238,6 +275,19 @@ with sync_playwright() as p:
         orient(0, 15)                      # 右倾 15°
         s = snap()
         check("右倾 15° ≈ x 0.51", abs(s["axes"]["x"] - 0.509) < 0.06, f"x={s['axes']['x']:.3f}")
+
+        # 手感参数必须真的进到曲线里，不能只是 UI 上动了个数字：
+        # 满行程 22° → 40°，同样倾 15° 的输出应当明显变小（约 0.23）
+        pg.click("#setBtn"); time.sleep(0.15)
+        pg.eval_on_selector("#rRange",
+                            "el=>{el.value=40;el.dispatchEvent(new Event('input',{bubbles:true}))}")
+        pg.click("#setClose"); time.sleep(0.15)
+        orient(0, 16); orient(0, 15)       # 逼出一次事件，让曲线用新参数重算
+        s = snap()
+        check("满行程调大后输出变小", s["axes"]["x"] < 0.35, f"x={s['axes']['x']:.3f}")
+        pg.click("#setBtn"); time.sleep(0.12)
+        pg.click("#setReset"); pg.click("#setClose"); time.sleep(0.15)
+        orient(0, 16); orient(0, 15)
         # 12° → v=(12-2.5)/19.5=0.487 → 0.487*0.65 + 0.487³*0.35 ≈ 0.357
         orient(-12, 15)
         s = snap()
@@ -264,6 +314,8 @@ with sync_playwright() as p:
         cdp.send("DeviceOrientation.clearDeviceOrientationOverride")
     else:
         # 缺 https 时不该只弹一句 6 秒就消失的 toast —— 要铺出能照着做的引导页。
+        check("顶栏标记 http", pg.inner_text("#sec").strip() == "http",
+              pg.inner_text("#sec").strip())
         with urllib.request.urlopen(f"{BASE}/info", context=_SSL) as r:
             info = json.load(r)
         port = info.get("https_port") or 0
