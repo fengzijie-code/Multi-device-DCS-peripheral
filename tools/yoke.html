@@ -36,6 +36,10 @@
   #dot.warn{ background:var(--amber); }
   #dot.bad{ background:var(--red); }
   #stext{ font-size:13px; color:var(--dim); min-width:96px; }
+  /* 入口协议：https 才是能开体感的那个。主屏图标没有地址栏，
+     不开这一格用户永远看不出自己在哪一边（而这正是"被跳回 http"的观感来源）。 */
+  #sec{ font-size:11px; letter-spacing:.03em; min-width:36px; color:var(--dim2);
+        font-variant-numeric:tabular-nums; }
   .meter{ font-size:12px; color:var(--dim2); font-variant-numeric:tabular-nums; }
   .meter b{ color:var(--dim); font-weight:400; }
   #hud .sp{ flex:1; }
@@ -175,6 +179,7 @@
   .ts-url .ts-btn{ flex:0 0 auto; white-space:nowrap; padding:0 16px; }
   .ts-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:11px; }
   .ts-note{ margin-top:10px; font-size:12.5px; line-height:1.7; color:var(--dim2); }
+  .ts-note b{ color:var(--fg); font-weight:500; }
 
   /* 竖屏只是能凑合用，横屏才是设计目标 */
   @media (orientation:portrait){
@@ -191,6 +196,7 @@
   <div id="hud">
     <div id="dot"></div>
     <div id="stext">未连接</div>
+    <div id="sec" title="这一帧走的是哪个入口">--</div>
     <div class="meter">RTT <b id="rtt">--</b></div>
     <div class="meter">收 <b id="hz">—</b> Hz</div>
     <div class="meter">帧间隔峰 <b id="jit">--</b></div>
@@ -285,21 +291,11 @@
     </div>
 
     <div class="ts-step">
-      <h2><i>1</i>换成这条地址</h2>
-      <div class="ts-url">
-        <input id="tsUrl" type="text" readonly value="" spellcheck="false">
-        <button class="ts-btn" id="tsCopy">复制</button>
-      </div>
-      <div class="ts-row">
-        <a class="ts-btn pri" id="tsGo" href="#">打开 https 版</a>
-      </div>
-      <div class="ts-note" id="tsCopyNote">同一台 iPad、同一个网络。IP 是 PC 的地址，端口就是 HTTPS 那个。
-        若提示「不是私密连接」，先做完第 2 步再来点它。</div>
-    </div>
-
-    <div class="ts-step">
-      <h2><i>2</i>装一次根证书（约 1 分钟）</h2>
-      <p class="ts-p" style="margin:8px 0 0">不用 AirDrop、不用发邮件，就在这个页面上点：</p>
+      <h2><i>1</i>先装一次根证书</h2>
+      <p class="ts-p" style="margin:8px 0 0">
+        不装也能用（下一步可以绕过警告），但每次都要手点一遍，而且加不了主屏图标。
+        就从这个页面点，不用 AirDrop、不用发邮件：
+      </p>
       <div class="ts-row">
         <a class="ts-btn warn" id="tsProf" href="/ca.mobileconfig">下载根证书</a>
       </div>
@@ -309,20 +305,38 @@
             （提示「未签名」是正常的，继续装）</li>
         <li>设置 → 通用 → 关于本机 → 拉到最底 <b>证书信任设置</b> →
             打开 <b>DCS Peripheral Local CA</b> 的开关</li>
-        <li>回 Safari 打开第 1 步那条 https 地址，地址栏不再报警告</li>
       </ol>
+      <p class="ts-p" style="color:var(--dim2);font-size:12.5px">
+        第 3 步最容易漏：只安装、不开信任开关，证书还是「不受信任」，下一步照样报警告。
+      </p>
+    </div>
+
+    <div class="ts-step">
+      <h2><i>2</i>打开这条地址</h2>
+      <div class="ts-url">
+        <input id="tsUrl" type="text" readonly value="" spellcheck="false">
+        <button class="ts-btn" id="tsCopy">复制</button>
+      </div>
+      <div class="ts-row">
+        <a class="ts-btn pri" id="tsGo" href="#">打开 https 版</a>
+      </div>
+      <div class="ts-note" id="tsCopyNote">
+        同一台 iPad、同一个网络。IP 是 PC 的地址，端口就是 HTTPS 那个。<br>
+        如果还提示「不是私密连接」：点 <b>显示详细信息 → 访问此网站</b> 就能进去。
+        <b>别点「取消」</b> —— 取消会退回上一个页面，也就是 http 那版，看着就像被跳回去了。
+      </div>
     </div>
 
     <div class="ts-step">
       <h2><i>3</i>添加到主屏幕（建议）</h2>
       <p class="ts-p" style="margin:8px 0 0">
         在 <b>https</b> 页面上点分享 → 添加到主屏幕 → 以后从桌面图标打开，没有地址栏也没有工具栏。
-        这也是非要装证书的原因：自签证书在普通标签页里还能点「继续访问」，
-        但主屏窗口没有那个按钮，只会白屏。
+        主屏图标只会指向你添加时那个地址，所以<b>一定要在第 2 步的 https 页面上添加</b>；
+        在 http 页面上添加，图标以后永远打开 http。
       </p>
       <p class="ts-p" style="color:var(--dim2);font-size:12.5px">
-        想先试体感、暂时不装证书也行：打开 https 地址时提示「不是私密连接」，
-        点 <b>显示详细信息 → 访问此网站</b> 就能拿到传感器数据 —— 只是每次都要点一遍，且不能加到主屏。
+        这也是非要装证书的原因：自签证书在普通标签页里还能点「继续访问」，
+        但主屏窗口没有那个按钮，只会白屏。
       </p>
     </div>
 
@@ -653,7 +667,7 @@
 
   // ---------------------------------------------------------------- 发送
   var dot = $("#dot"), stext = $("#stext"), rttEl = $("#rtt"),
-      hzEl = $("#hz"), vjEl = $("#vj"), jitEl = $("#jit");
+      hzEl = $("#hz"), vjEl = $("#vj"), jitEl = $("#jit"), secEl = $("#sec");
   var inflight = false, fails = 0, okCount = 0, winStart = performance.now(),
       rttAvg = 0, rttPeak = 0, seq = 0;
 
@@ -691,6 +705,12 @@
       okCount++; fails = 0;
       dot.className = "ok";
       stext.textContent = "已连接";
+      // 服务端说这一帧走的是 TLS 还是明文。standalone 窗口没有地址栏，
+      // 只有这里能告诉用户「你现在开的是 http，所以体感不会有数据」。
+      if (j && (j.sec === 1 || j.sec === 0)){
+        secEl.textContent = j.sec === 1 ? "https" : "http";
+        secEl.style.color = j.sec === 1 ? "var(--teal)" : "var(--red)";
+      }
       var v = j && j.v;
       vjEl.textContent = v === 1 ? "就绪" : (v === 2 ? "缺轴" : "未启动");
       vjEl.style.color = v === 1 ? "var(--teal)" : "var(--amber)";
@@ -708,6 +728,8 @@
         stext.textContent = "断开 · 重试中";
         vjEl.textContent = "--";
         vjEl.style.color = "";
+        secEl.textContent = "--";
+        secEl.style.color = "";
       }
     }).then(function(){
       inflight = false;

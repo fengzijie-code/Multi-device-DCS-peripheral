@@ -153,6 +153,20 @@ with sync_playwright() as p:
     time.sleep(0.25)
     if secure:
         check("https 下不弹引导页", not pg.is_visible("#tlsSheet"), "")
+        # 回归：以前把握手做在 accept() 里，一个"连上但不发 ClientHello"的
+        # 连接就能把整个 8443 堵死（现象是「刚才还能开，现在打不开」）。
+        import socket as _sk
+        _host = pg.evaluate("location.hostname")
+        _port = int(pg.evaluate("location.port"))
+        stuck = _sk.create_connection((_host, _port), timeout=3)
+        try:
+            t0 = time.time()
+            with urllib.request.urlopen(f"{BASE}/info", context=_SSL, timeout=6) as r:
+                r.read()
+            dt = time.time() - t0
+            check("有哑连接占着时 HTTPS 仍能服务", dt < 3.0, f"{dt*1000:.0f}ms")
+        finally:
+            stuck.close()
         def orient(beta, gamma):
             cdp.send("DeviceOrientation.setDeviceOrientationOverride",
                      {"alpha": 0, "beta": beta, "gamma": gamma})

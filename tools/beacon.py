@@ -559,6 +559,7 @@ class InputHub:
         self._buttons = 0
         self._seq = 0
         self._last_rx = 0.0
+        self._secure: bool | None = None    # 最近一帧走的是不是 TLS；None = 还没收到过
         self._sink: tuple[str, int] | None = None
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._vjoy: dict = {}
@@ -618,7 +619,7 @@ class InputHub:
             return 0.0
         return max(0.0, min(1.0, f))
 
-    def feed(self, obj: dict) -> dict:
+    def feed(self, obj: dict, secure: bool | None = None) -> dict:
         axes = {k: self._clamp(obj.get(k, 0.0)) for k in self.SPRING}
         # 油门单独处理：字段缺失表示「这次别管油门」，不能当成 0，
         # 否则手机一解锁中没动油门，DCS 里的油门就被拽到慢车。
@@ -635,6 +636,11 @@ class InputHub:
             # 间隔只统计"连续帧"：超过 0.5s 视为断流，不把断流后的第一帧算成抖动
             if self._last_rx and (now - self._last_rx) < 0.5:
                 self._gaps.append((now - self._last_rx) * 1000.0)
+            # 这一帧是从 https 还是 http 进来的。放进快照和回包，
+            # 页面就能在顶栏直说「链路 http」—— 主屏 standalone 没有地址栏，
+            # 用户没法从界面上看出自己开的是哪个入口。
+            if secure is not None:
+                self._secure = secure
             self._axes = dict(axes)
             self._buttons = buttons
             self._seq += 1
@@ -676,6 +682,7 @@ class InputHub:
                 "seq": self._seq,
                 "age_ms": int(age * 1000) if age is not None else None,
                 "forwarding": self._sink is not None,
+                "secure": self._secure,
                 "vjoy": self.vjoy_status(),
                 # 到达间隔：avg 看出帧率、max 看抖动。摇杆能不能用，看的是 max。
                 "gap_ms": stats,
@@ -995,7 +1002,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, b'{"ok":1}', "application/json")
             return
 
-        st = INPUT.feed(obj)
+        # 连接对象是不是 SSLSocket，就是这一帧走没走 https 的唯一判据。
+        _secure = isinstance(self.connection, ssl.SSLSocket)
+        st = INPUT.feed(obj, secure=_secure)
         # 「谁在喂操纵量」只在来源变化时打一行。
         # 这条是为了一个很贵的坑：手机 App 没关、iPad 页面又开着，两边同时 POST，
         # 杆量会一半被覆盖成别人的值，现象是「杆一顿一顿回中」，光看数字查不出来。
@@ -1014,7 +1023,8 @@ class Handler(BaseHTTPRequestHandler):
         # 就是为了让「均值 10ms」这种好看的数字不能掩盖偶发卡顿。
         g = st.get("gap_max")
         gtxt = "null" if g is None else ("%.1f" % g)
-        body = ('{"s":%d,"v":%d,"g":%s}' % (st["seq"], flag, gtxt)).encode()
+        body = ('{"s":%d,"v":%d,"g":%s,"sec":%d}'
+                % (st["seq"], flag, gtxt, 1 if _secure else 0)).encode()
         self._send(200, body, "application/json")
 
 
@@ -1031,6 +1041,55 @@ class V6Server(socketserver.ThreadingTCPServer):
     daemon_threads = True
     address_family = socket.AF_INET6
     request_queue_size = 64
+
+
+class TLS4Server(V4Server):
+    """HTTPS 版本 —— 把握手从 accept 线程挪到每个连接自己的线程。
+
+    之前的写法是在**监听 socket 上** wrap_socket（`server.socket =
+    ctx.wrap_socket(server.socket, server_side=True)`）。那样 TLS 握手发生在
+    `serve_forever()` 里的 `accept()` 内部，也就是主线程：
+    任何一个「TCP 连上了但迟迟不发 ClientHello」的对端 —— 浏览器的预连接、
+    iOS 的探测、掉线留下的半开连接 —— 都会让 accept 卡住，
+    此后**所有**新连接都排在后面拿不到处理，8443 看起来就是彻底死了，
+    而 8080 照常工作。症状正是「刚才还能打开，现在打不开」，且不带任何报错。
+
+    所以这里只 accept 裸 TCP，把握手丢进线程池的线程里做：
+    一个握手慢/失败只毁掉它自己那条连接。
+    """
+    ssl_ctx: ssl.SSLContext | None = None
+
+    def process_request(self, request, client_address):
+        threading.Thread(target=self._tls_serve, args=(request, client_address),
+                         daemon=True).start()
+
+    def _tls_serve(self, request, client_address):
+        try:
+            # 握手最多等 20 秒：正常局域网握手 <50ms，等这么久还没握上就是对方的问题。
+            request.settimeout(20)
+            conn = self.ssl_ctx.wrap_socket(request, server_side=True)
+            # 握手后放宽到 180 秒 —— yoke 是 50Hz 长连接，本来就不会空闲这么久；
+            # 但用户切后台忘了关时，别让线程和连接永远挂着。
+            conn.settimeout(180)
+        except (ssl.SSLError, OSError):
+            try:
+                request.close()
+            except OSError:
+                pass
+            return
+        try:
+            self.finish_request(conn, client_address)
+        except Exception:
+            pass          # 客户端半路断开是常态，别刷屏
+        finally:
+            try:
+                self.shutdown_request(conn)
+            except OSError:
+                pass
+
+    def handle_error(self, request, client_address):
+        # 超时/断连走这里。默认实现会打一整段 traceback，一条一条淹掉有用的日志。
+        pass
 
 
 # ---------------------------------------------------------------- 启动
@@ -1063,10 +1122,8 @@ def start_servers(port: int, ipv4_only: bool,
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             ctx.minimum_version = ssl.TLSVersion.TLSv1_2
             ctx.load_cert_chain(tls_cert, tls_key)
-            st = V4Server(("0.0.0.0", tls_port), Handler)
-            # 换掉监听 socket 后，握手发生在 accept 里（单线程），
-            # 一个客户端时无所谓；将来真变多客户端再改成握手丢进线程。
-            st.socket = ctx.wrap_socket(st.socket, server_side=True)
+            st = TLS4Server(("0.0.0.0", tls_port), Handler)
+            st.ssl_ctx = ctx          # 监听 socket 保持裸 TCP，握手在每连接的线程里做
             threading.Thread(target=st.serve_forever, daemon=True).start()
             servers.append(("HTTPS", st))
             TLS_PORT = tls_port
