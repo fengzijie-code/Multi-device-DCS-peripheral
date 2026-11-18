@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DCS 杆">
+<meta name="theme-color" content="#0d1117">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" href="data:,">
+<title>DCS 杆 · 输入端</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c232c; --line:#2a3038; --line2:#3a424c;
+    --fg:#e6edf3; --dim:#8b949e; --dim2:#6e7681;
+    --teal:#3fb950; --amber:#d29922; --red:#f85149; --blue:#4a9eff;
+    --r:10px;
+  }
+  *{ box-sizing:border-box; -webkit-user-select:none; user-select:none;
+     -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; height:100%; overflow:hidden;
+     background:var(--bg); color:var(--fg); overscroll-behavior:none;
+     font:400 14px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",system-ui,sans-serif; }
+  body{ touch-action:none; }
+  #app{ position:fixed; inset:0; display:flex; flex-direction:column;
+        padding:env(safe-area-inset-top) env(safe-area-inset-right)
+                env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+  /* ---------- 顶栏 ---------- */
+  #hud{ flex:0 0 auto; height:42px; display:flex; align-items:center; gap:10px;
+        padding:0 10px; background:var(--panel); border-bottom:1px solid var(--line); }
+  #dot{ width:9px; height:9px; border-radius:50%; background:var(--dim2); flex:0 0 auto; }
+  #dot.ok{ background:var(--teal); }
+  #dot.warn{ background:var(--amber); }
+  #dot.bad{ background:var(--red); }
+  #stext{ font-size:13px; color:var(--dim); min-width:96px; }
+  .meter{ font-size:12px; color:var(--dim2); font-variant-numeric:tabular-nums; }
+  .meter b{ color:var(--dim); font-weight:400; }
+  #hud .sp{ flex:1; }
+  .chip{ font-size:12px; color:var(--dim); background:var(--panel2);
+         border:1px solid var(--line); border-radius:999px; padding:5px 10px; }
+  .chip.on{ color:#0d1117; background:var(--amber); border-color:var(--amber); }
+
+  /* ---------- 主体 ---------- */
+  #deck{ flex:1 1 auto; display:flex; min-height:0; }
+
+  /* 左：油门 + 脚舵 + 起降 */
+  #colL{ flex:0 0 30vw; display:flex; min-width:0; }
+  #thr{ position:relative; flex:0 0 100px; margin:10px 0 10px 10px;
+        background:linear-gradient(#0f151c,#0a0f14);
+        border:1px solid var(--line); border-radius:var(--r);
+        overflow:hidden; }
+  #ticks{ position:absolute; inset:0; pointer-events:none; opacity:.7;
+          background:repeating-linear-gradient(to top,#3a4652 0 1px,transparent 1px 10%); }
+  #thrFill{ position:absolute; left:0; right:0; bottom:0; height:0%;
+            background:linear-gradient(0deg,#17351f,#2f7340); opacity:.9; }
+  #thrKnob{ position:absolute; left:4px; right:4px; height:3px; bottom:0;
+            background:var(--teal); border-radius:2px; }
+  #thrVal{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%);
+           text-align:center; font-size:17px; font-variant-numeric:tabular-nums;
+           color:var(--fg); text-shadow:0 1px 3px #000; }
+  #thrTag{ position:absolute; left:0; right:0; bottom:6px; text-align:center;
+           font-size:11px; color:#cfe3d4; text-shadow:0 1px 3px #000; }
+  #thr.idle #thrVal{ color:var(--amber); }
+
+  #colL2{ flex:1 1 auto; display:flex; flex-direction:column; gap:10px;
+          padding:10px; min-width:0; }
+  #rud{ flex:1.35 1 0; display:flex; flex-direction:column; gap:10px; min-height:0; }
+  #rud .k{ flex:1 1 0; }
+  #gear{ flex:1 1 0; display:grid; grid-template-columns:repeat(3,1fr);
+         grid-template-rows:repeat(2,1fr); gap:10px; min-height:0; }
+
+  /* 右：武器 + 杆盘 + 雷达 */
+  #colR{ flex:1 1 auto; display:grid; grid-template-columns:1fr 30%;
+         grid-template-rows:34% 1fr; gap:10px; padding:10px; min-width:0; }
+  #padWrap{ grid-column:1; grid-row:1 / span 2; display:grid; place-items:center;
+            min-width:0; min-height:0; container-type:size; }
+  #wep{ grid-column:2; grid-row:1; display:grid; grid-template-columns:1fr 1fr;
+        grid-template-rows:1fr 1fr; gap:10px; min-height:0; }
+  #radar{ grid-column:2; grid-row:2; display:flex; flex-direction:column; gap:10px;
+          min-height:0; }
+
+  /* ---------- 通用按键 ---------- */
+  .k{ position:relative; display:flex; align-items:center; justify-content:center;
+      text-align:center; border-radius:var(--r); background:var(--panel);
+      border:1px solid var(--line2); color:var(--fg); font-size:15px;
+      padding:4px; line-height:1.15; transition:background .06s,transform .06s,border-color .06s; }
+  .k.on{ background:#2c3a4a; border-color:var(--blue); transform:scale(.985); }
+  .k .sub{ position:absolute; bottom:5px; left:0; right:0; font-size:10px;
+           color:var(--dim2); letter-spacing:.02em; }
+  .k.red{ border-color:#5c2727; color:#ffd9d9; }
+  .k.red.on{ background:#7a2323; border-color:var(--red); }
+  .k.amber{ border-color:#5a4420; color:#ffe6bd; }
+  .k.amber.on{ background:#6b4b16; border-color:var(--amber); }
+  .k.wide{ font-size:17px; }
+  .k.big{ font-size:19px; }
+  .k.hold::after{ content:""; position:absolute; top:8px; right:8px; width:5px; height:5px;
+                  border-radius:50%; background:var(--line2); }
+  .k.hold.on::after{ background:var(--teal); }
+
+  /* ---------- 杆盘 ---------- */
+  #pad{ position:relative; width:min(100%,100cqh); height:auto; max-width:100%;
+        aspect-ratio:1 / 1; border-radius:50%;
+        background:radial-gradient(circle at 50% 50%,#182029 0%,#0f151b 70%,#0c1116 100%);
+        border:1px solid var(--line); overflow:hidden; }
+  #pad .cross{ position:absolute; background:#232a33; }
+  #pad .cx{ left:50%; top:8%; bottom:8%; width:1px; }
+  #pad .cy{ top:50%; left:8%; right:8%; height:1px; }
+  #pad .lim{ position:absolute; left:50%; top:50%; width:72%; height:72%;
+             transform:translate(-50%,-50%); border:1px dashed #2b333d; border-radius:50%; }
+  #ring{ position:absolute; width:0; height:0; display:none; }
+  #ring::before{ content:""; position:absolute; left:-46px; top:-46px; width:92px; height:92px;
+                 border:1px solid #3a4652; border-radius:50%; }
+  #dotk{ position:absolute; width:0; height:0; opacity:0; transition:opacity .08s; }
+  #dotk::before{ content:""; position:absolute; left:-17px; top:-17px; width:34px; height:34px;
+                 border-radius:50%; background:#4a9eff; box-shadow:0 0 0 3px #16324d; }
+  #dotk.on{ opacity:1; }
+  #padTag{ position:absolute; left:0; right:0; bottom:10px; text-align:center;
+           font-size:11px; color:var(--dim2); pointer-events:none; }
+  #padVal{ position:absolute; left:0; right:0; top:10px; text-align:center;
+           font-size:11px; color:var(--dim2); font-variant-numeric:tabular-nums;
+           pointer-events:none; }
+
+  /* ---------- 雷达簇 ---------- */
+  #lockWrap{ flex:0 0 24%; display:flex; min-height:0; }
+  #tdc{ flex:1 1 0; display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:1fr 1fr 1fr;
+        gap:8px; min-height:0; }
+  #tdc .k{ font-size:20px; }
+  .up{ grid-area:1 / 2; } .left{ grid-area:2 / 1; } .right{ grid-area:2 / 3; } .down{ grid-area:3 / 2; }
+  .mid{ grid-area:2 / 2; display:flex; align-items:center; justify-content:center;
+        font-size:10px; color:var(--dim2); }
+
+  /* 竖屏只是能凑合用，横屏才是设计目标 */
+  @media (orientation:portrait){
+    #colL{ flex:0 0 42vw; }
+    #gear{ grid-template-columns:repeat(2,1fr); grid-template-rows:repeat(3,1fr); }
+    #thr{ flex-basis:84px; }
+    #hud::after{ content:"建议横屏"; font-size:11px; color:var(--amber);
+                 border:1px solid #4a3a1a; border-radius:999px; padding:4px 8px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div id="dot"></div>
+    <div id="stext">未连接</div>
+    <div class="meter">RTT <b id="rtt">--</b></div>
+    <div class="meter">收 <b id="hz">—</b> Hz</div>
+    <div class="meter">vJoy <b id="vj">--</b></div>
+    <div class="sp"></div>
+    <button class="chip" id="invX">X 反</button>
+    <button class="chip" id="invY">Y 反</button>
+    <button class="chip" id="invT">油门反</button>
+  </div>
+
+  <div id="deck">
+    <div id="colL">
+      <div id="thr" class="idle">
+        <div id="thrFill"></div>
+        <div id="ticks"></div>
+        <div id="thrKnob"></div>
+        <div id="thrVal">--</div>
+        <div id="thrTag">未接管</div>
+      </div>
+      <div id="colL2">
+        <div id="rud">
+          <div class="k big hold" data-axis="r" data-dir="-1">左舵<span class="sub">按住</span></div>
+          <div class="k big hold" data-axis="r" data-dir="1">右舵<span class="sub">按住</span></div>
+        </div>
+        <div id="gear">
+          <div class="k" data-bit="0">襟翼<span class="sub">收 · BTN1</span></div>
+          <div class="k" data-bit="1">襟翼<span class="sub">放 · BTN2</span></div>
+          <div class="k" data-bit="2">起落架<span class="sub">BTN3</span></div>
+          <div class="k" data-bit="12">减速板<span class="sub">开 · BTN13</span></div>
+          <div class="k" data-bit="13">减速板<span class="sub">收 · BTN14</span></div>
+          <div class="k hold" data-bit="14">轮刹<span class="sub">按住 · BTN15</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="colR">
+      <div id="padWrap">
+        <div id="pad">
+          <div class="cross cx"></div><div class="cross cy"></div><div class="lim"></div>
+          <div id="ring"></div><div id="dotk"></div>
+          <div id="padVal">0.00 / 0.00</div>
+          <div id="padTag">杆量 · 触点浮动</div>
+        </div>
+      </div>
+
+      <div id="wep">
+        <div class="k red big hold" data-bit="11">机炮<span class="sub">BTN12</span></div>
+        <div class="k red big hold" data-bit="6">投放<span class="sub">BTN7</span></div>
+        <div class="k amber wide" data-bit="10">干扰弹<span class="sub">BTN11</span></div>
+        <div class="k wide" data-bit="3">武器切换<span class="sub">BTN4</span></div>
+      </div>
+
+      <div id="radar">
+        <div id="lockWrap">
+          <div class="k hold" data-bit="5" style="flex:1">雷达锁定<span class="sub">BTN6</span></div>
+        </div>
+        <div id="tdc">
+          <div class="k up" data-bit="7">▲</div>
+          <div class="k left" data-bit="9">◀</div>
+          <div class="mid">TDC</div>
+          <div class="k right" data-bit="4">▶</div>
+          <div class="k down" data-bit="8">▼</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var POST_MS = 20;           // 50 Hz，与既有协议一致
+  var clamp = function(v,a,b){ return v<a?a:(v>b?b:v); };
+  var $ = function(s){ return document.querySelector(s); };
+
+  var store = {
+    get: function(k,d){ try{ var v=localStorage.getItem("yoke."+k); return v===null?d:JSON.parse(v); }catch(e){ return d; } },
+    set: function(k,v){ try{ localStorage.setItem("yoke."+k, JSON.stringify(v)); }catch(e){} }
+  };
+
+  // ---------------------------------------------------------------- 状态
+  // t = null 表示「还没接管油门」。必须是真的不发这个字段 ——
+  // beacon 把缺失的 t 解释成「这次别动油门」，发 0 会把飞机拽到慢车。
+  var st = { x:0, y:0, r:0, t:null, b:0 };
+  var inv = { x: store.get("invX", false), y: store.get("invY", false), t: store.get("invT", false) };
+
+  var bitCount = {};   // 同一个按钮被多指按住时，别让先松的手指清掉位
+
+  // ---------------------------------------------------------------- 轴：杆盘
+  var pad = $("#pad"), ring = $("#ring"), dotk = $("#dotk");
+  var padVal = $("#padVal");
+  var padId = null, maxR = 120, ax = 0, ay = 0, dx = 0, dy = 0;
+
+  function padRect(){ return pad.getBoundingClientRect(); }
+
+  pad.addEventListener("pointerdown", function(e){
+    if (padId !== null) return;
+    e.preventDefault();
+    padId = e.pointerId;
+    try { pad.setPointerCapture(e.pointerId); } catch(err){}
+    var r = padRect();
+    maxR = Math.min(r.width, r.height) * 0.34;
+    ax = e.clientX - r.left;
+    ay = e.clientY - r.top;
+    dx = 0; dy = 0;
+    drawPad();
+    dotk.classList.add("on");
+  });
+
+  pad.addEventListener("pointermove", function(e){
+    if (e.pointerId !== padId) return;
+    e.preventDefault();
+    var r = padRect();
+    dx = e.clientX - r.left - ax;
+    dy = e.clientY - r.top - ay;
+    var d = Math.sqrt(dx*dx + dy*dy);
+    if (d > maxR){                       // 拖到边界：锚点跟着走，手感像真实杆的行程
+      var k = (d - maxR) / d;
+      ax += dx * k; ay += dy * k;
+      dx -= dx * k; dy -= dy * k;
+      d = maxR;
+    }
+    st.x = clamp((inv.x ? -1 : 1) * (dx / maxR), -1, 1);
+    st.y = clamp((inv.y ? -1 : 1) * (-dy / maxR), -1, 1);
+    drawPad();
+  });
+
+  function endPad(e){
+    if (e && e.pointerId !== padId) return;
+    padId = null; st.x = 0; st.y = 0; dotk.classList.remove("on");
+    ring.style.display = "none";
+    padVal.textContent = "0.00 / 0.00";
+  }
+  pad.addEventListener("pointerup", endPad);
+  pad.addEventListener("pointercancel", endPad);
+
+  function drawPad(){
+    ring.style.display = "block";
+    ring.style.left = ax + "px";
+    ring.style.top = ay + "px";
+    dotk.style.left = (ax + dx) + "px";
+    dotk.style.top = (ay + dy) + "px";
+    padVal.textContent = st.x.toFixed(2) + " / " + st.y.toFixed(2);
+  }
+
+  // ---------------------------------------------------------------- 轴：油门
+  var thr = $("#thr"), thrFill = $("#thrFill"), thrKnob = $("#thrKnob"),
+      thrVal = $("#thrVal"), thrTag = $("#thrTag");
+  var thrId = null;
+
+  function setThr(e){
+    var r = thr.getBoundingClientRect();
+    var v = 1 - (e.clientY - r.top) / r.height;
+    v = clamp(v, 0, 1);
+    if (inv.t) v = 1 - v;
+    st.t = v;
+    thr.classList.remove("idle");
+    thrTag.textContent = "油门";
+    thrFill.style.height = (v*100).toFixed(1) + "%";
+    thrKnob.style.bottom = "calc(" + (v*100).toFixed(1) + "% - 1px)";
+    thrVal.textContent = Math.round(v*100) + "%";
+  }
+
+  thr.addEventListener("pointerdown", function(e){
+    if (thrId !== null) return;
+    e.preventDefault();
+    thrId = e.pointerId;
+    try { thr.setPointerCapture(e.pointerId); } catch(err){}
+    setThr(e);
+  });
+  thr.addEventListener("pointermove", function(e){
+    if (e.pointerId !== thrId) return;
+    e.preventDefault();
+    setThr(e);
+  });
+  function thrEnd(e){
+    if (e && e.pointerId !== thrId) return;
+    thrId = null;    // 保持型：松手停在原地，不清 t
+  }
+  thr.addEventListener("pointerup", thrEnd);
+  thr.addEventListener("pointercancel", thrEnd);
+
+  // ---------------------------------------------------------------- 按钮 + 脚舵
+  function press(el){
+    var axis = el.dataset.axis;
+    if (axis){                       // 脚舵：两个按住键直接写轴（反了在 DCS 里 Invert）
+      st[axis] = parseFloat(el.dataset.dir);
+    } else {
+      var bit = parseInt(el.dataset.bit, 10);
+      bitCount[bit] = (bitCount[bit] || 0) + 1;
+      st.b |= (1 << bit);
+    }
+    el.classList.add("on");
+  }
+  function release(el){
+    var axis = el.dataset.axis;
+    if (axis){
+      st[axis] = 0;
+    } else {
+      var bit = parseInt(el.dataset.bit, 10);
+      bitCount[bit] = Math.max(0, (bitCount[bit] || 0) - 1);
+      if (!bitCount[bit]) st.b &= ~(1 << bit);
+    }
+    el.classList.remove("on");
+  }
+
+  document.querySelectorAll(".k").forEach(function(el){
+    el.addEventListener("pointerdown", function(e){
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch(err){}
+      press(el);
+    });
+    el.addEventListener("pointerup", function(e){ e.preventDefault(); release(el); });
+    el.addEventListener("pointercancel", function(){ release(el); });
+    el.addEventListener("lostpointercapture", function(){ release(el); });
+  });
+
+  // ---------------------------------------------------------------- 反向开关
+  function bindToggle(id, key){
+    var el = $('#' + id);
+    var on = function(){ el.classList.toggle("on", !!inv[key]); };
+    on();
+    el.addEventListener("click", function(){
+      inv[key] = !inv[key];
+      store.set("inv" + key.toUpperCase(), inv[key]);
+      on();
+      if (key === "t" && st.t !== null) st.t = 1 - st.t;
+      if (key === "x"){ st.x = -st.x; }
+      if (key === "y") st.y = -st.y;
+    });
+  }
+  bindToggle("invX", "x");
+  bindToggle("invY", "y");
+  bindToggle("invT", "t");
+
+  // ---------------------------------------------------------------- 发送
+  var dot = $("#dot"), stext = $("#stext"), rttEl = $("#rtt"),
+      hzEl = $("#hz"), vjEl = $("#vj");
+  var inflight = false, fails = 0, okCount = 0, winStart = performance.now(),
+      rttAvg = 0, seq = 0;
+
+  function payload(){
+    var o = { x: +st.x.toFixed(4), y: +st.y.toFixed(4), r: +st.r.toFixed(4), b: st.b };
+    if (st.t !== null) o.t = +st.t.toFixed(4);
+    return JSON.stringify(o);
+  }
+
+  function tick(){
+    if (inflight) return;
+    inflight = true;
+    var t0 = performance.now();
+    fetch("/input", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload(),
+      cache: "no-store"
+    }).then(function(r){ return r.json(); }).then(function(j){
+      var ms = performance.now() - t0;
+      rttAvg = rttAvg ? rttAvg * 0.85 + ms * 0.15 : ms;
+      rttEl.textContent = rttAvg.toFixed(1) + " ms";
+      seq = (j && typeof j.s === "number") ? j.s : seq + 1;
+      okCount++; fails = 0;
+      dot.className = "ok";
+      stext.textContent = "已连接";
+      var v = j && j.v;
+      vjEl.textContent = v === 1 ? "就绪" : (v === 2 ? "缺轴" : "未启动");
+      vjEl.style.color = v === 1 ? "var(--teal)" : "var(--amber)";
+      if (v !== 1) dot.className = "warn";
+    }).catch(function(){
+      fails++;
+      if (fails >= 3){
+        dot.className = "bad";
+        stext.textContent = "断开 · 重试中";
+        vjEl.textContent = "--";
+        vjEl.style.color = "";
+      }
+    }).then(function(){
+      inflight = false;
+      var now = performance.now();
+      if (now - winStart >= 1000){
+        hzEl.textContent = Math.round(okCount * 1000 / (now - winStart));
+        okCount = 0; winStart = now;
+      }
+    });
+  }
+
+  var timer = setInterval(tick, POST_MS);
+  tick();
+
+  // ---------------------------------------------------------------- 兜底
+  function clearAll(){
+    st.x = 0; st.y = 0; st.r = 0; st.b = 0;
+    bitCount = {};
+    document.querySelectorAll(".k.on").forEach(function(el){ el.classList.remove("on"); });
+    endPad(); thrId = null;
+  }
+
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState !== "visible"){ clearAll(); }
+    else { keepAwake(); }
+  });
+  window.addEventListener("blur", clearAll);
+  window.addEventListener("pagehide", clearAll);
+  document.addEventListener("touchmove", function(e){
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener("gesturestart", function(e){ e.preventDefault(); });
+
+  // 屏幕常亮（iOS 16.4+）。失败就算了，别影响主功能。
+  var wl = null;
+  function keepAwake(){
+    if (!navigator.wakeLock || wl) return;
+    navigator.wakeLock.request("screen").then(function(s){
+      wl = s;
+      s.addEventListener("release", function(){ wl = null; });
+    }).catch(function(){});
+  }
+  keepAwake();
+  document.addEventListener("pointerdown", function once(){
+    keepAwake();
+  }, { once: true });
+})();
+</script>
+</body>
+</html>

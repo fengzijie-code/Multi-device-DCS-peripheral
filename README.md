@@ -198,6 +198,7 @@ tools\start-usb.bat        # 开机后只跑这一个
 | [`docs/HANDOFF.md`](docs/HANDOFF.md) | **先读这个** |
 | `docs/PANEL.md` | iPad 仪表盘：字段含义、三个硬限制 |
 | `docs/YOKE.md` | 手机摇杆：页面、手感、配平、DCS 绑键 |
+| [`docs/YOKE-IPAD.md`](docs/YOKE-IPAD.md) | **iPad 当杆**：`/yoke` 输入端、添加到主屏幕、为什么不是真 app |
 | `docs/BINDING.md` | vJoy 按钮/轴 ↔ 功能对照表 |
 | `docs/DCS-DATA.md` | DCS 能读到什么、读不到什么（实测） |
 | `docs/JF17-CONTROLS.md` | 68 个可远程操作的座舱开关 |

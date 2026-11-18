@@ -112,31 +112,45 @@ START_TIME = time.time()
 # 两块页面，定位完全不同：
 #   /        自检页 —— 回答「通不通」，里面全是探针和波形，跑在手机浏览器里。
 #   /panel   辅助仪表 —— 回答「现在飞机什么状态」，给 iPad 横屏当慢变量屏。
-# 仪表页单独放成 panel.html 而不是塞进 f-string：HTML 太长，塞进去要把每个
+#   /yoke    输入端 —— iPad 横屏当杆/油门/脚舵/按钮，替代手机。
+# 页面单独放成 .html 而不是塞进 f-string：HTML 太长，塞进去要把每个
 # 花括号都转义成 {{ }}，改一次错一次。按 mtime 缓存，改完刷新即生效。
 
 PANEL_PATH = Path(__file__).resolve().parent / "panel.html"
-_panel_cache: tuple[float, bytes] = (-1.0, b"")
+YOKE_PATH = Path(__file__).resolve().parent / "yoke.html"
 
-_MISSING_PANEL = (
-    "<!doctype html><meta charset='utf-8'>"
-    "<body style='background:#0d1117;color:#e6edf3;font:16px system-ui;padding:24px'>"
-    "<h1 style='font-size:20px'>找不到 panel.html</h1>"
-    "<p style='color:#8b949e'>它应该和 beacon.py 放在同一个目录（tools/）。</p>"
-).encode("utf-8")
+_page_cache: dict[str, tuple[float, bytes]] = {}
+
+
+def _missing_page(name: str) -> bytes:
+    return (
+        f"<!doctype html><meta charset='utf-8'>"
+        "<body style='background:#0d1117;color:#e6edf3;font:16px system-ui;padding:24px'>"
+        f"<h1 style='font-size:20px'>找不到 {name}</h1>"
+        "<p style='color:#8b949e'>它应该和 beacon.py 放在同一个目录（tools/）。</p>"
+    ).encode("utf-8")
+
+
+def static_page(path: Path) -> bytes:
+    """按 mtime 缓存地读一份页面。改完文件刷新浏览器即生效，不用重启服务。"""
+    key = str(path)
+    mtime, body = _page_cache.get(key, (-1.0, b""))
+    try:
+        m = path.stat().st_mtime
+    except OSError:
+        return _missing_page(path.name)
+    if m != mtime:
+        body = path.read_bytes()
+        _page_cache[key] = (m, body)
+    return body
 
 
 def panel_body() -> bytes:
-    global _panel_cache
-    mtime, body = _panel_cache
-    try:
-        m = PANEL_PATH.stat().st_mtime
-    except OSError:
-        return _MISSING_PANEL
-    if m != mtime:
-        body = PANEL_PATH.read_bytes()
-        _panel_cache = (m, body)
-    return body
+    return static_page(PANEL_PATH)
+
+
+def yoke_body() -> bytes:
+    return static_page(YOKE_PATH)
 
 
 def not_found_html(path: str) -> bytes:
@@ -161,7 +175,8 @@ def not_found_html(path: str) -> bytes:
 <p style="color:#8b949e;margin:0 0 18px">你请求的是 <code>{_html.escape(path)}</code></p>
 <p>可用的入口：</p>
 <ul>
-  <li><a href="/panel">/panel</a> —— 辅助仪表盘（iPad 用这个）</li>
+  <li><a href="/yoke">/yoke</a> —— 输入端（iPad 当杆/油门，替代手机）</li>
+  <li><a href="/panel">/panel</a> —— 辅助仪表盘</li>
   <li><a href="/">/</a> —— 链路自检页</li>
   <li><a href="/state">/state</a> —— 遥测原始 JSON</li>
 </ul>
@@ -847,6 +862,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in ("/panel", "/panel.html"):
             self._send(200, panel_body(), "text/html; charset=utf-8")
+            return
+
+        if path in ("/yoke", "/yoke.html"):
+            self._send(200, yoke_body(), "text/html; charset=utf-8")
             return
 
         # 404 也给人话：把可用入口列出来，拼错了能自己看出来
