@@ -1224,6 +1224,8 @@ def main() -> int:
     ap.add_argument("--input-out", metavar="HOST:PORT", default="127.0.0.1:5011",
                     help="把手机发来的操纵量转成 UDP 发给 vjoy_out.py"
                          "（默认 127.0.0.1:5011，给 none 关闭转发）")
+    ap.add_argument("--usb", action="store_true",
+                    help="USB / adb 隧道模式：不列 Wi-Fi 地址、不提 HTTPS —— 手机走的是 127.0.0.1")
     ap.add_argument("--tls-port", type=int, default=0,
                     help="额外开一个 HTTPS 端口（iPad 体感必须有 https），如 8443")
     ap.add_argument("--tls-cert", default=None, help="服务端证书 PEM")
@@ -1243,7 +1245,8 @@ def main() -> int:
 
     print()
     print("═" * 62)
-    print("  可达性信标 · 用手机浏览器打开下面任意一个地址")
+    print("  可达性信标 · " + ("手机走 USB 隧道（adb reverse）" if args.usb
+                             else "用手机浏览器打开下面任意一个地址"))
     print("═" * 62)
 
     servers = start_servers(args.port, args.ipv4_only,
@@ -1269,48 +1272,68 @@ def main() -> int:
             print(f"  [x] --input-out 格式应为 host:port，收到 {args.input_out!r}")
             return 1
 
-    print()
-    print("· 候选地址")
-    n = 0
-    for a in enumerate_ipv4():
-        if a.get("virtual"):
-            continue
-        print(f"  http://{a['ip']}:{args.port}/          {a['adapter']}")
-        n += 1
-    for ip in global_ipv6_addresses():
-        print(f"  http://[{ip}]:{args.port}/")
-        n += 1
-    if n == 0:
-        print("  （没找到可用地址，检查 Wi-Fi 连接）")
-
-    if args.tls_port and any(name == "HTTPS" for name, _ in servers):
+    if args.usb:
+        # USB 模式只印这一条。手机是经 adb reverse 把 127.0.0.1:<port> 接到这台
+        # 机器的，局域网 IP 走的是另一条完全不同的路（Wi-Fi），在这儿全列出来
+        # 只会让人去打开一个「有时候能通」的地址，然后以为 USB 坏了。
         print()
-        print("· HTTPS（iPad 体感 / 陀螺仪必须走这个）")
+        print("· 手机打开")
+        print(f"  http://127.0.0.1:{args.port}/yoke")
+        tips = [
+            f"隧道断了用 adb reverse tcp:{args.port} tcp:{args.port} 重建（本窗口的看守会自动试）",
+            "页面上能看到 RTT 数字跳动 = 链路通；一直 --  = 不通",
+        ]
+        if args.udp_in:
+            tips.append(f"遥测出口 http://127.0.0.1:{args.port}/state —— Android 客户端读这个")
+        if INPUT.snapshot()["forwarding"]:
+            tips.append(f"操纵量转发到 {args.input_out} —— 手机 POST /input 即生效")
+            tips.append("  没装 vJoy 也不会报错，只是 DCS 看不见轴；用 /input 可查收包数")
+        if recorder:
+            tips.append(f"正在录制到 {recorder.path} —— 关掉本窗口即结束")
+    else:
+        print()
+        print("· 候选地址")
+        n = 0
         for a in enumerate_ipv4():
             if a.get("virtual"):
                 continue
-            print(f"  https://{a['ip']}:{args.tls_port}/yoke")
-        print("  [i] 第一次用要把根证书装到 iPad 并信任，步骤见 docs/YOKE-IPAD.md")
-        print(f"      iPad Safari 打开 http://<本机IP>:{args.port}/ca.mobileconfig 即可下载")
-    elif args.tls_port:
-        print()
-        print("  [!] HTTPS 没起来 —— 体感将不可用（http 下 iOS 不给传感器数据）")
+            print(f"  http://{a['ip']}:{args.port}/          {a['adapter']}")
+            n += 1
+        for ip in global_ipv6_addresses():
+            print(f"  http://[{ip}]:{args.port}/")
+            n += 1
+        if n == 0:
+            print("  （没找到可用地址，检查 Wi-Fi 连接）")
+
+        if args.tls_port and any(name == "HTTPS" for name, _ in servers):
+            print()
+            print("· HTTPS（iPad 体感 / 陀螺仪必须走这个）")
+            for a in enumerate_ipv4():
+                if a.get("virtual"):
+                    continue
+                print(f"  https://{a['ip']}:{args.tls_port}/yoke")
+            print("  [i] 第一次用要把根证书装到 iPad 并信任，步骤见 docs/YOKE-IPAD.md")
+            print(f"      iPad Safari 打开 http://<本机IP>:{args.port}/ca.mobileconfig 即可下载")
+        elif args.tls_port:
+            print()
+            print("  [!] HTTPS 没起来 —— 体感将不可用（http 下 iOS 不给传感器数据）")
+
+        tips = [
+            "手机必须连同一个 Wi-Fi（或已接入同一 Tailscale 网络）",
+            "首次启动 Windows 会弹防火墙框，务必勾选「专用网络」并允许",
+            "页面上能看到 RTT 数字跳动 = 链路通；一直 --  = 不通",
+            "逐个地址试，哪个通用哪个 —— 不同地址走的是不同路径",
+        ]
+        if args.udp_in:
+            tips.append(f"遥测出口 http://<上面的IP>:{args.port}/state —— Android 客户端读这个")
+        if recorder:
+            tips.append(f"正在录制到 {recorder.path} —— 关掉本窗口即结束")
+        if INPUT.snapshot()["forwarding"]:
+            tips.append(f"操纵量转发到 {args.input_out} —— 手机 POST /input 即生效")
+            tips.append("  没装 vJoy 也不会报错，只是 DCS 看不见轴；用 /input 可查收包数")
 
     print()
     print("· 提示")
-    tips = [
-        "手机必须连同一个 Wi-Fi（或已接入同一 Tailscale 网络）",
-        "首次启动 Windows 会弹防火墙框，务必勾选「专用网络」并允许",
-        "页面上能看到 RTT 数字跳动 = 链路通；一直 --  = 不通",
-        "逐个地址试，哪个通用哪个 —— 不同地址走的是不同路径",
-    ]
-    if args.udp_in:
-        tips.append(f"遥测出口 http://<上面的IP>:{args.port}/state —— Android 客户端读这个")
-    if recorder:
-        tips.append(f"正在录制到 {recorder.path} —— 关掉本窗口即结束")
-    if INPUT.snapshot()["forwarding"]:
-        tips.append(f"操纵量转发到 {args.input_out} —— 手机 POST /input 即生效")
-        tips.append("  没装 vJoy 也不会报错，只是 DCS 看不见轴；用 /input 可查收包数")
     for i, t in enumerate(tips, 1):
         print(f"  {i}) {t}")
     print()

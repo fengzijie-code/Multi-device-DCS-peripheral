@@ -301,9 +301,13 @@ def http_get(url: str, timeout: float = 3.0) -> tuple[int, str]:
         return 0, f"{type(e).__name__}: {e}"
 
 
-def show_card(port: int) -> None:
+def show_card(port: int, usb: bool = False) -> None:
     """等服务真起来之后再去问 /info —— 这样印出来的 IP 就是服务在听的那些，
-    不是 ipconfig 里可能存在的网关、虚拟网卡、169.254 自分配地址。"""
+    不是 ipconfig 里可能存在的网关、虚拟网卡、169.254 自分配地址。
+
+    usb=True 时只印 adb 隧道那一条：局域网 IP 走的是 Wi-Fi，和隧道是两条路，
+    在 USB 模式下把人往局域网地址上引，只会让人以为隧道坏了。
+    """
     base = f"http://127.0.0.1:{port}"
     info = None
     for _ in range(40):                     # 最多等 8 秒
@@ -319,6 +323,21 @@ def show_card(port: int) -> None:
     if not info:
         print(f"\n  {C.Y}{WARN}{C.X} 8 秒内没等到服务应答，"
               f"看上面有没有 [beacon] 的报错。\n")
+        return
+
+    if usb:
+        code_h, _ = http_get(f"{base}/yoke")
+        mark = (f"http {C.G}200{C.X}" if code_h == 200
+                else f"http {C.R}{code_h or '无应答'}{C.X}")
+        print()
+        print("  " + "─" * 62)
+        print(f"  {C.B}手机打开这一条（走 adb 隧道，别用局域网 IP）{C.X}")
+        print(f"    {C.C}http://127.0.0.1:{port}/yoke{C.X}")
+        print()
+        print(f"  {C.D}局域网 IP 走的是 Wi-Fi，和隧道是两条路；在这条路上试它只会像「隧道坏了」{C.X}")
+        print("  " + "─" * 62)
+        print("  自检：" + mark)
+        print()
         return
 
     ips = [e["ip"] for e in info.get("ipv4", []) if not e.get("virtual")]
@@ -398,27 +417,35 @@ def main() -> int:
     head("DCS 外设 · 一键启动" + ("（手机 USB）" if phone else "（iPad）"))
 
     if not args.no_check:
-        cert_ok = ensure_cert()
+        if not phone:
+            # 证书和防火墙只有 iPad 那条路用得着。USB 模式下印这两行是噪音，
+            # 更容易让人以为「USB 也需要装证书」。
+            cert_ok = ensure_cert()
         if not check_ports(args.port, args.tls_port, args.vjoy_port, args.no_vjoy):
             print()
             return 2
-        fw = firewall_ok()
-        if fw is False:
-            line("防火墙", None, "没有放行规则 —— iPad 连不上，八成就卡在这",
-                 f"以管理员身份运行一次 tools\\open-firewall.bat\n"
-                 f"或者：python tools\\start.py --firewall")
-            if args.firewall:
-                print(f"  [防火墙] 正在提权添加规则 …")
-                elevate_firewall()
-        elif fw is True:
-            line("防火墙", True, f"已有放行规则「{FW_RULE}」")
-        if not cert_ok:
-            print(f"\n  {C.Y}{WARN}{C.X} 没有 HTTPS 证书，继续启动，"
-                  f"但体感用不了。\n")
+        if not phone:
+            fw = firewall_ok()
+            if fw is False:
+                line("防火墙", None, "没有放行规则 —— iPad 连不上，八成就卡在这",
+                     f"以管理员身份运行一次 tools\\open-firewall.bat\n"
+                     f"或者：python tools\\start.py --firewall")
+                if args.firewall:
+                    print(f"  [防火墙] 正在提权添加规则 …")
+                    elevate_firewall()
+            elif fw is True:
+                line("防火墙", True, f"已有放行规则「{FW_RULE}」")
+            if not cert_ok:
+                print(f"\n  {C.Y}{WARN}{C.X} 没有 HTTPS 证书，继续启动，"
+                      f"但体感用不了。\n")
+        elif args.firewall:
+            # USB 模式下不主动提这件事，但用户明确要了就照做
+            print(f"  [防火墙] 正在提权添加规则 …")
+            elevate_firewall()
 
     # 服务起来之后再把上手地址印出来。用后台线程，是因为 run-all.main()
     # 会一直阻塞在自己的等待循环里，没有"启动完成"的回调可以挂。
-    threading.Thread(target=show_card, args=(args.port,), daemon=True).start()
+    threading.Thread(target=show_card, args=(args.port, phone), daemon=True).start()
 
     argv = ["--port", str(args.port), "--udp-in", str(args.udp_in),
             "--tls-port", str(args.tls_port),

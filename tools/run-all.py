@@ -384,6 +384,14 @@ def main() -> int:
         py, "-u", os.path.join("tools", "beacon.py"),
         "--port", str(args.port), "--ipv4-only", "--udp-in", str(args.udp_in),
     ]
+    # USB 模式：手机走 adb reverse 到 127.0.0.1，那一整块「候选地址」是噪音，
+    # 更糟的是会误导人去打开局域网 IP（那条路走 Wi-Fi，和隧道无关）。
+    if not args.no_usb:
+        beacon_args.append("--usb")
+    # 转发目标也得跟着 --vjoy-port 走，否则 beacon 还按默认的 5011 发，
+    # 而 vjoy_out 在听 19011 —— 杆就是不动，且两边日志都「正常」。
+    # --no-vjoy 时照样保留转发：有人是另开窗口手动跑 vjoy_out 的。
+    beacon_args += ["--input-out", f"127.0.0.1:{args.vjoy_port}"]
     certs = Path("tools") / "certs"
     if not args.no_tls and (certs / "server.crt").is_file() and (certs / "server.key").is_file():
         beacon_args += [
