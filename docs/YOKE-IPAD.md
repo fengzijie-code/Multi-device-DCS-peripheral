@@ -23,6 +23,39 @@
 这样启动的是 iPadOS 的 standalone 窗口：没有地址栏、没有工具栏、没有下拉刷新，
 全屏铺满，和 app 的观感一致。`apple-mobile-web-app-capable` 那几个 meta 就是干这个的。
 
+### 一键启动脚本做了什么
+
+`tools\start-ipad.bat` 本身几乎不干活：找到 python、把 `%*` 原样递给
+`tools\start.py`、退出码非 0 时 `pause` 让窗口别闪就没。**所有中文提示都在
+`start.py` 里**，因为 `.bat` 里的中文会被控制台代码页搅烂，然后后面每一行都被
+当成命令解析 —— 这是「窗口一闪就没了」最经典的成因。`.bat` 保持纯 ASCII。
+
+`start.py` 在起服务之前查四件事，因为这四件在 iPad 上的表现**一模一样**，
+都是「打不开 / 已丢失网络连接」，不查就只能对着 iPad 猜：
+
+| 查什么 | 不查会怎样 | 自己怎么修 |
+|---|---|---|
+| 证书在不在、剩几天 | Safari 报「不是私密连接」 | 自动调 `make-cert.py` 重签 leaf，根 CA 不动 |
+| 证书 SAN 里有没有**当前这个 IP** | 换热点/换网线后必炸 | 同上，重签后 iPad **不用重装描述文件** |
+| 8080 / 8443 / 5011 有没有被上次的窗口占着 | 服务起不来，页面打不开 | 印出占用者 `python.exe (PID 1234)` 和现成的 `taskkill` 命令 |
+| 防火墙规则 `DCS Peripheral Bridge` 在不在 | iPad 连不上，八成就卡在这 | 提示跑一次 `open-firewall.bat`，或 `start.py --firewall` 自动提权 |
+
+服务起来之后它会去问自己的 `/info`，把**真实在听的那个 IP** 印成可直接点的地址
+（不是从 `ipconfig` 里猜，那会混进网关、虚拟网卡、169.254 自分配地址），
+再顺手自检 `http 200 · https 200`。
+
+> **端口判据为什么用 `netstat` 的 LISTENING 行，而不是试探性 bind。**
+> Windows 的 `SO_REUSEADDR` 语义和 Unix 相反：端口正被别人 `listen` 着，
+> 加了 `SO_REUSEADDR` 的 `bind` **照样成功**（这正是 Windows 上端口劫持能成立的
+> 根因）。实测 `bind ok` 但端口确实被占，于是预检会印出假的「都空闲」，
+> 而真正的失败推迟到 beacon 的 `listen` 那一步，表现成「窗口一闪」。
+> 所以 TCP 走 `netstat` 判 LISTENING，UDP 没有 LISTENING 状态、只能试绑
+> （UDP 不加 `SO_REUSEADDR`，绑失败就是真占用）。
+
+停止：窗口里 `Ctrl+C`。批处理问 `Terminate batch job (Y/N)?` 时答 **N** 才能看到
+最后几行；答 Y 也行，`run-all` 在 `KeyboardInterrupt` 里已经把子进程逐个停掉、
+**vJoy 先回中**再退，两条路都会回中。
+
 ### 两个会让人以为「功能没做」的坑
 
 **① 改完 `beacon.py` 必须重启进程。** 它是常驻服务，进程里跑的是启动那一刻的代码。
