@@ -7,7 +7,7 @@
 全机型通用 · 单人驾驶 · 不用买额外硬件
 
 [![License](https://img.shields.io/badge/license-MIT-6fe3cb?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/badge/release-v1.4.0-63c8ff?style=flat-square)](VERSIONS.md)
+[![Release](https://img.shields.io/github/v/release/fengzijie-code/Multi-device-DCS-peripheral?style=flat-square&color=63c8ff)](https://github.com/fengzijie-code/Multi-device-DCS-peripheral/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20iPadOS-ffb454?style=flat-square)](#-快速开始)
 [![DCS](https://img.shields.io/badge/DCS%20World-All%20Aircraft-e33f92?style=flat-square)](docs/BINDING.md)
 
