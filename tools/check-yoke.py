@@ -302,16 +302,28 @@ with sync_playwright() as p:
     check("未接管时不发 t", "t" not in s["axes"] or s["axes"]["t"] is None,
           str(s["axes"].get("t")))
 
+    # 油门默认反转（invT 默认开，补偿 DCS 那边反着的轴向）：
+    # 发送值 = 1 − 手指位置；但**屏上旋钮必须跟着手走** —— 这条是
+    # 「手往上、屏上油门往下」那次翻车的验收，反转永远不许碰显示层。
     tb = pg.eval_on_selector("#thr", "el=>{const r=el.getBoundingClientRect();"
                                      "return {x:r.x,y:r.y,w:r.width,h:r.height}}")
     touch("start", tb["x"] + tb["w"] / 2, tb["y"] + tb["h"] * 0.25, tid=2)
     time.sleep(0.18)
     s = snap()
-    check("油门上 1/4 处 ≈ 75%", abs(s["axes"]["t"] - 0.75) < 0.05, f"t={s['axes']['t']:.2f}")
+    check("油门上 1/4 处发送值 ≈ 25%（默认反转）",
+          abs(s["axes"]["t"] - 0.25) < 0.05, f"t={s['axes']['t']:.2f}")
+    knob = pg.evaluate("""() => {
+      const k = document.querySelector('#thrKnob').getBoundingClientRect();
+      const t = document.querySelector('#thr').getBoundingClientRect();
+      return {knobTop: k.top + k.height / 2 - t.top, thrH: t.height};
+    }""")
+    check("屏上油门旋钮跟着手走（停在手指的上 1/4）",
+          abs(knob["knobTop"] - tb["h"] * 0.25) < tb["h"] * 0.12,
+          f"knob@{knob['knobTop']:.0f}px / {knob['thrH']:.0f}px")
     touch("end", 0, 0, tid=2)
     time.sleep(0.25)
     s = snap()
-    check("油门松手保持", abs(s["axes"]["t"] - 0.75) < 0.05, f"t={s['axes']['t']:.2f}")
+    check("油门松手保持", abs(s["axes"]["t"] - 0.25) < 0.05, f"t={s['axes']['t']:.2f}")
 
     # ---- 上锁时油门字段必须消失（缺 t = 别动油门，发 0 = 拽到慢车）
     pg.click("#armBtn")
@@ -322,7 +334,7 @@ with sync_playwright() as p:
     time.sleep(0.25)
     s = snap()
     check("解锁后油门值还在", s["axes"].get("t") is not None
-          and abs(s["axes"]["t"] - 0.75) < 0.05, str(s["axes"].get("t")))
+          and abs(s["axes"]["t"] - 0.25) < 0.05, str(s["axes"].get("t")))
 
     # ---- 按钮：机炮 BTN12 = bit11（战斗页）
     pg.click('#tabs .tb[data-page="combat"]')

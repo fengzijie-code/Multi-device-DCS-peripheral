@@ -516,7 +516,8 @@ body{ touch-action:none; }
         <div class="setRow"><label>配平按钮</label>
           <button class="ts-btn sw" id="swTrim">开</button></div>
         <p class="ts-p" style="font-size:12px;margin-bottom:0">
-          右边写着「开」就表示这条轴被反向。<b>配平按钮</b>只在飞直升机时有用
+          右边写着「开」就表示这条轴被反向。<b>油门默认就是开的</b>（DCS 油门轴方向相反，
+          iPad 这头负责补回来）；屏上的油门条永远跟着手走，不受这里影响。<b>配平按钮</b>只在飞直升机时有用
           （把当前杆位锁住、松手不回中）；飞固定翼可以关掉，顶栏会少两个按钮。
         </p>
       </div>
@@ -640,7 +641,9 @@ body{ touch-action:none; }
   // t = null 表示「还没接管油门」。必须是真的不发这个字段 ——
   // beacon 把缺失的 t 解释成「这次别动油门」，发 0 会把飞机拽到慢车。
   var st = { x:0, y:0, r:0, t:null, b:0 };
-  var inv = { x: store.get("invX", false), y: store.get("invY", false), t: store.get("invT", false) };
+  // 油门默认反转：DCS 那边的油门轴是反着的，iPad 这头负责补回来。
+  // 显示层永远不参与反转（见 setThr），所以用户看到的始终是「上推 = 加油门」。
+  var inv = { x: store.get("invX", false), y: store.get("invY", false), t: store.get("invT", true) };
 
   // ---------------------------------------------------------------- 上锁 / 配平 / 曲线
   // 这一块是从 Pixel 端（android/…/input/YokeController.kt）照搬的，那边每个决定的
@@ -812,10 +815,12 @@ body{ touch-action:none; }
 
   function setThr(e){
     var r = thr.getBoundingClientRect();
-    var v = 1 - (e.clientY - r.top) / r.height;
-    v = clamp(v, 0, 1);
-    if (inv.t) v = 1 - v;
-    st.t = v;
+    // v 是「手指位置」：顶 = 1。屏上的旋钮、油门条、读数**一律按 v 画**，
+    // 让显示永远跟着手走 —— 上推就是加油门。
+    // 反转只作用在发往 DCS 的 st.t 上（那边轴向是反的，iPad 负责补）。
+    // 之前把 v 反转完再拿去画，才会出现「手往上、屏上油门往下」的鬼画面。
+    var v = clamp(1 - (e.clientY - r.top) / r.height, 0, 1);
+    st.t = inv.t ? 1 - v : v;
     thr.classList.remove("idle");
     thrTag.textContent = "油门";
     thrFill.style.height = (v*100).toFixed(1) + "%";
