@@ -24,7 +24,8 @@
 ## 快速启动
 
 ```
-tools\start-usb.bat        # 开机后只跑这一个
+tools\start-usb.bat        # 开机后只跑这一个（手机 USB）
+tools\start-ipad.bat       # 只把 iPad 当杆用：不接手机、不建 adb 隧道
 ```
 
 ## v1.00 —— 第一个正式 release（2026-11-13）
@@ -191,6 +192,50 @@ tools\start-usb.bat        # 开机后只跑这一个
 
 ---
 
+## v1.4.0 —— iPad 当杆、玻璃 HUD、一键启动（2026-11-19）
+
+> **触发**：iPad 那条路要能真的飞。用户给了 4 张 F-18 的 iPad 画面，要求照"边缘那一圈
+> 叠加 UI"的观感重做，并明确只说横屏（不做竖排）。随后依次修了脚舵位置、顶部安全区、
+> 解锁键够不着、启动时一堆 Wi-Fi 噪音这些实飞才会暴露的问题。
+>
+> **这一版没有新 APK**：`android/` 自 `v1.3.7` 一个字节没动，Android 端继续用
+> `release/v1.3.7/DCS-Peripheral-Android-v1.3.7.apk`（`versionName 1.3.7` / `versionCode 11`）。
+> 变的是 PC 服务和 iPad 页面。
+
+| 项 | 值 |
+|---|---|
+| Git tag | `v1.4.0` |
+| Android | 未改动，仍 `1.3.7` / `11` |
+| 说明 | [`release/v1.4.0/RELEASE.md`](release/v1.4.0/RELEASE.md) |
+| 升级 | `git pull` 后双击 `tools\start-ipad.bat`；iPad 上刷新页面即可（不必重装、不必重装描述文件） |
+
+**这一版包含**：
+
+- **iPad 输入端 `/yoke` 重做**（`tools/yoke.html`，1400 行）——
+  照 Pixel 端分四页：**仪表 / 起降 / 战斗 / 校准**；换页时杆盘**不挪位**（`#colL` 定宽、
+  两套右列面板互相顶替），因为推着杆切页时杆心跳一下，杆量会甩。
+- **美术换成"玻璃 HUD"**：不画面板 —— 没有卡片底色、没有边框盒子、没有实心顶栏，
+  只有 1px 细描边、圆、小字距的浅色字。克制是有原因的：底图是 DCS 座舱，
+  任何实心色块都会变成"网页控件"贴在上面。
+- **手感内核**从 Pixel 端搬齐：默认上锁、按钮最短脉冲 120ms、死区/行程/expo 三参数、
+  配平（force trim）、体感（陀螺仪）与校零、姿态异常兜底。
+- **一键启动** `tools/start.py` + 两个 `.bat` 薄壳 —— 起服务前先查四件事
+  （证书有效 / SAN 含当前 IP / 三个端口空闲 / 防火墙放行），因为它们失败时在 iPad 上
+  表现完全一样；服务起来后印**真实在听**的那个 IP，并自检 `http 200 · https 200`。
+- **修复**（都是实飞才暴露的）：
+  - 证书有效期 3650 天 → **365 天**：iOS 上限 398 天，超了在握手层直接断开，
+    Safari 只报"已丢失网络连接"，是最容易误判成网络问题的一个坑。
+  - TLS 握手从事主线程的 `accept()` 里挪走：以前一条"连上但不发 ClientHello"的
+    连接就能把整个 8443 堵死。
+  - 8443 兼收明文 HTTP（地址栏只写 `ip:8443` 的那种请求），并补 `close_notify`。
+  - 端口预检改按 `netstat` 的 LISTENING 判 —— Windows 的 `SO_REUSEADDR` 语义和 Unix
+    相反，端口被占时加了它 `bind` 照样成功，试探性 `bind` 会给出假的"空闲"。
+  - `mock` 的 `--target`、`beacon` 的 `--input-out` 都跟着端口参数走（以前改了端口
+    就"两边日志都正常、杆却不动"）；USB 模式不再打印一整屏 Wi-Fi 地址。
+- **JF-17 训练页**（`jf17-trainer/`）：座舱虚拟按键训练 + 冷启动流程。
+
+---
+
 ## 文档索引
 
 | 文档 | 内容 |
@@ -204,3 +249,31 @@ tools\start-usb.bat        # 开机后只跑这一个
 | `docs/JF17-CONTROLS.md` | 68 个可远程操作的座舱开关 |
 | `docs/JF17-MFD.md` | MFD 周边键语义（U1/D3/R8…） |
 | `docs/LAYOUT.md` | 外设分工框架：什么该上手机 |
+
+---
+
+## 版权与许可
+
+```
+MIT License · Copyright (c) 2026 fengzijie
+```
+
+本项目（`android/`、`tools/`、`dcs/`、`docs/`、`jf17-trainer/` 下的自写代码与文档）
+按 [MIT 许可证](LICENSE) 发布：可以自由使用、修改、再分发、商用，只需保留版权声明
+与许可声明；**不提供任何担保**。
+
+### 不在 MIT 覆盖范围内的东西
+
+| 文件 / 内容 | 归属 |
+|---|---|
+| `vJoySetup.exe` | 第三方安装包（vJoy，作者 Shaul Eizikovich）。版权与许可归其作者，本项目只是转存方便安装 |
+| `DCS JF-17 Thunder Guide.pdf` | 第三方参考资料，版权归原作者。仅作学习参考随仓库保存，不适用 MIT |
+| DCS World、JF-17 模块 | 商标与版权归 Eagle Dynamics / Deka Ironwork Simulations 各自所有，本项目与其无隶属关系 |
+
+如果你要分发本项目，**把 `vJoySetup.exe` 和那份 PDF 摘出去**，只发代码和文档，
+能省掉一整套第三方许可问题 —— 它们都不参与程序运行。
+
+### 换许可证的话
+
+改 `LICENSE` 一个文件 + 上面那行 `MIT License` 即可；代码里没有逐文件的
+SPDX 头注释，所以不存在"改不干净"的地方。
