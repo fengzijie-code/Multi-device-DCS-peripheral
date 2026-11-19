@@ -4,12 +4,12 @@
 
 **把 Pixel 手机变成摇杆，把 iPad 变成仪表盘和座舱控制面板。**
 
-主打 JF-17 · 单人驾驶 · 不用买额外硬件
+全机型通用 · 单人驾驶 · 不用买额外硬件
 
 [![License](https://img.shields.io/badge/license-MIT-6fe3cb?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/badge/release-v1.4.0-63c8ff?style=flat-square)](VERSIONS.md)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20iPadOS-ffb454?style=flat-square)](#-快速开始)
-[![DCS](https://img.shields.io/badge/DCS%20World-JF--17-e33f92?style=flat-square)](docs/BINDING.md)
+[![DCS](https://img.shields.io/badge/DCS%20World-All%20Aircraft-e33f92?style=flat-square)](docs/BINDING.md)
 
 [快速开始](#-快速开始) · [界面](#-界面) · [文档](#-文档) · [更新日志](VERSIONS.md) · [许可](#-许可)
 
@@ -27,6 +27,7 @@
 - **不需要装 app 商店的东西**，iPad 端连安装都不用 —— Safari 打开、「添加到主屏幕」，就是一个全屏窗口。
 - **不需要云**，所有数据在 127.0.0.1 和局域网里走。
 - **不需要改 DCS**，只在 `Saved Games/DCS/Scripts/` 放一个 `Export.lua`。
+- **不绑机型**：操纵最终落到 vJoy 的 4 根轴 + 15 个按钮，DCS 里绑的是「功能」不是某一架飞机，飞什么机型都能用。
 
 ### 三条链路
 
@@ -37,6 +38,19 @@
 ```
 
 实测 **50.0 Hz**、单帧 **3 ms**、看门狗 **531 ms** 回中。
+
+### 全机型通用到什么程度
+
+杆、油门、脚舵、按钮最后都变成 **vJoy 的 4 根轴 + 15 个按钮**。DCS 里绑的是「Roll / Pitch / Throttle / Flaps」这些功能名，不看机型 —— 所以换飞机不用改一行代码，只需要在 DCS 里照着自己的机型重绑一遍。真正跟机体绑死的只有座舱那一路：
+
+| 链路 | 与机型的关系 | 换机型要做什么 |
+|---|---|---|
+| **操纵上行**（4 轴 + 15 按钮 → vJoy） | 无关 | 在 DCS 里按[绑键表](docs/BINDING.md)对自己的机型绑一遍 |
+| **遥测下行**（IAS / ALT / G / AOA …） | 无关，走 DCS 通用 `LoGet` 接口 | 什么都不用改。个别字段可能为空或量纲不同（油量已按量级自适应，不写死机型） |
+| **座舱开关**（`/cmd`，68 个） | **绑死 JF-17** | 要自己从该机型的 `clickabledata.lua` 解析 `device:command`，方法见 [JF-17 控件清单](docs/JF17-CONTROLS.md) |
+| **MFD 文本** | 只在 JF-17 上实测过（设备号 8 / 9 / 10） | 其他机型要重新探设备号，且不保证有 indication 文本 |
+
+一句话：**固定翼、直升机都能飞，操纵和遥测天生通用；座舱开关目前只做了 JF-17，别的机型得自己补编号。**
 
 ---
 
@@ -61,7 +75,7 @@
 |---|---|
 | Windows PC | vJoy 只有 Windows 版，DCS 也在这台机器上 |
 | [vJoy](https://sourceforge.net/projects/vjoystick/) 驱动 | 根目录 `vJoySetup.exe`，装一次。**Configure vJoy 里把按钮数设到 ≥ 15**，重启 DCS 生效 |
-| DCS World + JF-17 | 绑键见 [`docs/BINDING.md`](docs/BINDING.md) §2 |
+| DCS World + **任意机型** | 固定翼、直升机都行。操纵与遥测天生通用，只有座舱开关是 JF-17 专属；绑键见[绑键表](docs/BINDING.md) |
 | iPad **或** Android 手机 | iPad 走 Wi-Fi（要装一次根证书）；手机走 USB 数据线 |
 
 ### 四步
@@ -132,7 +146,7 @@ android/          Android 摇杆 App（Kotlin + Compose，APK 在 release/）
 tools/            PC 侧：beacon.py（桥接）、vjoy_out.py（vJoy 输出）、
                   yoke.html（iPad 输入端）、start.py（一键启动）、check-yoke.py（验收）
 dcs/              Export.lua —— DCS 侧导出脚本
-jf17-trainer/     座舱虚拟按键训练 + 冷启动流程（浏览器打开就能用）
+jf17-trainer/     JF-17 座舱按键训练 + 冷启动流程（机型专用，浏览器打开就能用）
 docs/             文档（见下）
 release/          按版本归档的 APK
 ```
@@ -141,18 +155,18 @@ release/          按版本归档的 APK
 
 ## 📚 文档
 
-| 文档 | 内容 |
-|---|---|
-| [`docs/HANDOFF.md`](docs/HANDOFF.md) | **接手先读这个**：当前状态、架构、踩过的坑、下一步 |
-| [`docs/YOKE-IPAD.md`](docs/YOKE-IPAD.md) | iPad 当杆：四页版面、手感、体感与证书、打不开怎么查 |
-| [`docs/YOKE.md`](docs/YOKE.md) | 手机摇杆：页面、配平、USB 链路 |
-| [`docs/PANEL.md`](docs/PANEL.md) | iPad 仪表盘：字段含义、三个硬限制 |
-| [`docs/BINDING.md`](docs/BINDING.md) | vJoy 按钮/轴 ↔ DCS 功能对照表 |
-| [`docs/DCS-DATA.md`](docs/DCS-DATA.md) | DCS 能读到什么、读不到什么（实测） |
-| [`docs/JF17-CONTROLS.md`](docs/JF17-CONTROLS.md) | 68 个可远程操作的座舱开关 |
-| [`docs/JF17-MFD.md`](docs/JF17-MFD.md) | MFD 周边键语义（U1 / D3 / R8…） |
-| [`docs/LAYOUT.md`](docs/LAYOUT.md) | 外设分工框架：什么该上手机 |
-| [`VERSIONS.md`](VERSIONS.md) | **版本历史**：每一版改了什么、为什么改 |
+| 文档 | 讲什么 | 什么时候翻 |
+|---|---|---|
+| **[接手必读](docs/HANDOFF.md)**<br><sub>`docs/HANDOFF.md`</sub> | 当前状态、架构、踩过的坑、下一步 | **第一次进这个仓库就先看它** |
+| **[iPad 当杆](docs/YOKE-IPAD.md)**<br><sub>`docs/YOKE-IPAD.md`</sub> | 四页版面、手感、体感与证书、打不开怎么查 | 要上 iPad |
+| **[手机摇杆](docs/YOKE.md)**<br><sub>`docs/YOKE.md`</sub> | 页面、配平、USB 链路 | 要上手机 |
+| **[仪表盘](docs/PANEL.md)**<br><sub>`docs/PANEL.md`</sub> | 字段含义、三个硬限制 | 看不懂某一个数 |
+| **[绑键表](docs/BINDING.md)**<br><sub>`docs/BINDING.md`</sub> | vJoy 轴/按钮 ↔ DCS 功能，怎么绑、反了怎么办 | 第一次进 DCS 绑键 |
+| **[遥测实测](docs/DCS-DATA.md)**<br><sub>`docs/DCS-DATA.md`</sub> | DCS 能读到什么、读不到什么 | 想加新字段 |
+| **[座舱开关](docs/JF17-CONTROLS.md)**<br><sub>`docs/JF17-CONTROLS.md`</sub> | 68 个可远程操作的开关（**JF-17 专属**，含命令号算法） | 想给别的机型补开关 |
+| **[MFD 周边键](docs/JF17-MFD.md)**<br><sub>`docs/JF17-MFD.md`</sub> | U1 / D3 / R8… 的语义（**JF-17 专属**） | 要按 MFD 边框键 |
+| **[外设分工](docs/LAYOUT.md)**<br><sub>`docs/LAYOUT.md`</sub> | 什么该上手机、什么该留在座舱 | 想加控件，先定放哪 |
+| **[版本历史](VERSIONS.md)**<br><sub>`VERSIONS.md`</sub> | 每一版改了什么、为什么改 | 想知道某个改动从哪来的 |
 
 ---
 
@@ -182,6 +196,7 @@ python tools\check-yoke.py http://<本机IP>:18080/yoke      :: 70 项（必须�
   证书有效期受 iOS 限制（≤ 398 天），换网段后要重签 leaf（`start.py` 会自动发现）。
 - **同时按下的点数贴着 iPad 上限**：推杆 + 油门 + 脚舵 + 按钮一起用时已经满了。
 - **单人驾驶场景**，没做多端同步仲裁；两个端同时推会互相覆盖。
+- **座舱开关只做了 JF-17**。`/cmd` 里那 68 个编号来自 JF-17 的 `clickabledata.lua`，换机型得自己解析补表（算法写在 [`docs/JF17-CONTROLS.md`](docs/JF17-CONTROLS.md) 开头）。**轴和按钮不受影响**，那两层本来就与机型无关。
 - **没有视角轴**。手机端那个「右上角拖拽看四周」的视角区在 v1.2.0 整条链路移除了，见下。
 
 ### 没有头瞄（head tracking）怎么办？
@@ -212,7 +227,7 @@ MIT License · Copyright (c) 2026 fengzijie
 |---|---|
 | `DCS JF-17 Thunder Guide.pdf` | 第三方参考资料，版权归原作者；仅作学习参考，不在 MIT 内 |
 | `vJoySetup.exe` | 第三方安装包（vJoy，作者 Shaul Eizikovich）。**已被 `.gitignore` 排除，不在仓库里**，只在本地根目录方便安装 |
-| DCS World / JF-17 模块 | 商标与版权归 Eagle Dynamics / Deka Ironwork 各自所有，本项目与其无隶属关系 |
+| DCS World 及各机型模块（含 JF-17） | 商标与版权归 Eagle Dynamics / Deka Ironwork 各自所有，本项目与其无隶属关系 |
 
 要分发本项目，把上面那份 PDF 摘出去即可 —— 它不参与程序运行。
 
@@ -223,4 +238,4 @@ MIT License · Copyright (c) 2026 fengzijie
 
 ---
 
-<div align="center"><sub>Made for flying JF-17 with an iPad on the knee.</sub></div>
+<div align="center"><sub>Made for flying with an iPad on the knee.</sub></div>
