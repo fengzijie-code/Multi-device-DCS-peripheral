@@ -405,8 +405,9 @@ with sync_playwright() as p:
             time.sleep(0.22)
 
         orient(0, 0)                       # 基准
-        check("体感开启后不复位", pg.inner_text("#padTag").startswith("体感"),
-              pg.inner_text("#padTag"))
+        # 杆量读数已从盘面撤掉（只留绿点指示器），体感是否活着看顶栏 chip
+        check("体感开启后不复位", pg.inner_text("#tiltBtn").strip() == "体感 开",
+              pg.inner_text("#tiltBtn"))
         # 曲线按 Pixel 端默认值：死区 2.5°、行程 22°、expo 0.35
         #   15° → v=(15-2.5)/19.5=0.641 → 0.641*0.65 + 0.641³*0.35 ≈ 0.509
         orient(0, 15)                      # 右倾 15°

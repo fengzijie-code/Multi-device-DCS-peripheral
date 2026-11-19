@@ -171,10 +171,8 @@ body{ touch-action:none; }
              rgba(168,200,228,.24) 0deg .28deg, transparent .28deg 15deg);
   -webkit-mask-image:radial-gradient(closest-side, transparent 0 94%, #000 94% 98.6%, transparent 98.6%);
   mask-image:radial-gradient(closest-side, transparent 0 94%, #000 94% 98.6%, transparent 98.6%); }
-#padVal{ position:absolute; left:0; right:0; top:8.5%; text-align:center;
-         font:400 12px/1 var(--mono); letter-spacing:.12em; color:var(--ink3); }
-#padTag{ position:absolute; left:0; right:0; bottom:8.5%; text-align:center;
-         font-size:10.5px; letter-spacing:.12em; color:var(--ink3); }
+/* 盘面上不放文字读数（2026-11-20 撤掉 #padVal/#padTag）：杆盘只留
+   绿点指示器 —— 数字和标签会盖在瞄准线上，实飞时眼睛需要的是位置不是数值 */
 #ring{ position:absolute; width:0; height:0; display:none; }
 #ring::before{ content:""; position:absolute; left:-52px; top:-52px; width:104px; height:104px;
                border-radius:50%; border:1px solid rgba(216,233,248,.45); }
@@ -382,8 +380,6 @@ body{ touch-action:none; }
         <div class="tickring"></div>
         <div class="cross cx"></div><div class="cross cy"></div><div class="lim"></div>
         <div id="ring"></div><div id="dotk"></div>
-        <div id="padVal">0.00 / 0.00</div>
-        <div id="padTag">杆量 · 触点浮动</div>
       </div>
     </div>
 
@@ -708,14 +704,14 @@ body{ touch-action:none; }
     trim.x = clamp(ox, -TRIM_MAX, TRIM_MAX);
     trim.y = clamp(oy, -TRIM_MAX, TRIM_MAX);
     store.set("trimX", trim.x); store.set("trimY", trim.y);
-    trimUi(); showAxes();
+    trimUi();
     tip(Math.max(Math.abs(trim.x), Math.abs(trim.y)) < 0.001 ? "配平已清零" : "已配平，松手保持");
   }
 
   function clearTrim(){
     trim.x = 0; trim.y = 0;
     store.set("trimX", 0); store.set("trimY", 0);
-    trimUi(); showAxes(); tip("配平已清零");
+    trimUi(); tip("配平已清零");
   }
 
   $("#trimBtn").addEventListener("click", captureTrim);
@@ -744,7 +740,6 @@ body{ touch-action:none; }
 
   // ---------------------------------------------------------------- 轴：杆盘
   var pad = $("#pad"), ring = $("#ring"), dotk = $("#dotk");
-  var padVal = $("#padVal");
   var padId = null, maxR = 120, ax = 0, ay = 0, dx = 0, dy = 0;
 
   function padRect(){ return pad.getBoundingClientRect(); }
@@ -785,19 +780,9 @@ body{ touch-action:none; }
     if (e && e.pointerId !== padId) return;
     padId = null; st.x = 0; st.y = 0; dotk.classList.remove("on");
     ring.style.display = "none";
-    showAxes();
   }
   pad.addEventListener("pointerup", endPad);
   pad.addEventListener("pointercancel", endPad);
-
-  // 盘上的读数是"实际送出去的轴"，体感开着时要把体感的量算进去，
-  // 否则一边飞一边看到 0.00/0.00 会以为杆量没生效。
-  function showAxes(){
-    var tx = tilt.on ? tilt.x : 0;
-    var ty = tilt.on ? tilt.y : 0;
-    padVal.textContent = clamp(st.x + tx + trim.x, -1, 1).toFixed(2) + " / " +
-                         clamp(st.y + ty + trim.y, -1, 1).toFixed(2);
-  }
 
   function drawPad(){
     ring.style.display = "block";
@@ -805,7 +790,6 @@ body{ touch-action:none; }
     ring.style.top = ay + "px";
     dotk.style.left = (ax + dx) + "px";
     dotk.style.top = (ay + dy) + "px";
-    showAxes();
   }
 
   // ---------------------------------------------------------------- 轴：油门
@@ -1007,7 +991,6 @@ body{ touch-action:none; }
       tune[key] = v;
       store.set("tune", tune);
       paintTune();
-      showAxes();
     });
   }
   bindRange(rDead, "dead");
@@ -1027,7 +1010,7 @@ body{ touch-action:none; }
       trim.x = 0; trim.y = 0;
       store.set("trimX", 0); store.set("trimY", 0);
     }
-    paintTune(); trimUi(); showAxes();
+    paintTune(); trimUi();
   });
   paintTune();
 
@@ -1088,7 +1071,6 @@ body{ touch-action:none; }
   var tilt = { on:false, x:0, y:0, baseP:null, baseR:null, rawP:null, rawR:null };
   var tiltBtn = $("#tiltBtn"), zeroBtn = $("#zeroBtn"), tipEl = $("#tip");
   var tilSt = $("#tilSt"), tilNow = $("#tilNow");
-  var padTag = $("#padTag");
   var tipTimer = null;
 
   function tip(msg){
@@ -1101,7 +1083,6 @@ body{ touch-action:none; }
     tiltBtn.classList.toggle("on", tilt.on);
     tiltBtn.textContent = tilt.on ? "体感 开" : "体感";
     zeroBtn.style.display = tilt.on ? "" : "none";
-    if (!tilt.on) padTag.textContent = "杆量 · 触点浮动";
     if (tilSt){
       tilSt.textContent = tilt.on ? "已开（正在读数）"
                         : (window.isSecureContext ? "未开 · 点顶栏「体感」"
@@ -1131,8 +1112,6 @@ body{ touch-action:none; }
       tiltOverSince = 0;
     }
 
-    showAxes();
-    padTag.textContent = "体感 " + degX.toFixed(0) + "° / " + degY.toFixed(0) + "°";
     // 校准页要能看见"现在到底读到多少度"，否则校零只能闭着眼点。
     // 只在那一页可见时写 DOM —— 60Hz 刷一个隐藏元素是白烧电。
     if (tilNow && appEl.getAttribute("data-page") === "calib"){
