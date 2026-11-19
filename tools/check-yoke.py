@@ -201,7 +201,7 @@ with sync_playwright() as p:
         cdp.send("Input.dispatchTouchEvent",
                  {"type": t, "touchPoints": pt if kind != "end" else []})
 
-    # ---- 杆盘：从中心往上推
+    # ---- 杆盘：纯体感（2026-11-20 起）—— 盘面不吃触摸，只显示体感杆位
     box = pg.eval_on_selector("#pad", "el=>{const r=el.getBoundingClientRect();"
                                       "return {x:r.x,y:r.y,w:r.width,h:r.height}}")
     check("杆盘是正方形", abs(box["w"] - box["h"]) < 2, f"{box['w']:.0f}x{box['h']:.0f}")
@@ -210,55 +210,23 @@ with sync_playwright() as p:
 
     # ---- 上锁：默认不发任何操纵量（和 Pixel 端一致）
     check("默认上锁", pg.inner_text("#armTxt").strip() == "解锁", pg.inner_text("#armTxt"))
+
+    # ---- 纯体感的硬约束：盘面触摸必须被无视（杆量只来自陀螺仪）
     touch("start", cx, cy)
-    touch("move", cx, cy - box["h"] * 0.2)
+    touch("move", cx + box["w"] * 0.25, cy - box["h"] * 0.25)
     time.sleep(0.18)
     s = snap()
-    check("上锁时推杆无输出",
+    check("盘面触摸不再驱动杆量",
           abs(s["axes"]["x"]) < 0.01 and abs(s["axes"]["y"]) < 0.01, str(s["axes"]))
     touch("end", 0, 0)
+
+    # 盘面上唯一的动态元素是体感绿点 —— 体感没开时必须不显示
+    check("体感未开时绿点不显示", not pg.evaluate(
+        "document.querySelector('#dotk').classList.contains('on')"), "")
+
     pg.click("#armBtn")
     time.sleep(0.2)
     check("点一下即解锁", "已解锁" in pg.inner_text("#armTxt"), pg.inner_text("#armTxt"))
-
-    touch("start", cx, cy)
-    touch("move", cx, cy - box["h"] * 0.2)
-    time.sleep(0.18)
-    s = snap()
-    check("上推 = y 正（拉杆）", s["axes"]["y"] > 0.4, f"y={s['axes']['y']:.2f}")
-    check("上推不动横滚", abs(s["axes"]["x"]) < 0.05, f"x={s['axes']['x']:.2f}")
-
-    touch("move", cx + box["w"] * 0.22, cy)
-    time.sleep(0.18)
-    s = snap()
-    check("右推 = x 正（右滚）", s["axes"]["x"] > 0.45, f"x={s['axes']['x']:.2f}")
-
-    # 推过头：锚点跟随，输出必须被夹在 1.0
-    touch("move", cx + box["w"] * 0.9, cy)
-    time.sleep(0.18)
-    s = snap()
-    check("推过头仍夹在 1.0", 0.95 <= s["axes"]["x"] <= 1.0, f"x={s['axes']['x']:.3f}")
-
-    touch("end", 0, 0)
-    time.sleep(0.18)
-    s = snap()
-    check("松手回中 x/y=0", abs(s["axes"]["x"]) < 0.02 and abs(s["axes"]["y"]) < 0.02,
-          str(s["axes"]))
-
-    # ---- 配平：推住杆 → 记配平 → 松手应当「保持」，而不是回中
-    touch("start", cx, cy)
-    touch("move", cx + box["w"] * 0.2, cy)
-    time.sleep(0.15)
-    pg.evaluate("document.querySelector('#trimBtn').click()")
-    time.sleep(0.1)
-    touch("end", 0, 0)
-    time.sleep(0.22)
-    s = snap()
-    check("配平后松手保持杆位", s["axes"]["x"] > 0.3, f"x={s['axes']['x']:.2f}")
-    pg.evaluate("document.querySelector('#trimClr').click()")
-    time.sleep(0.22)
-    s = snap()
-    check("清配平后回中", abs(s["axes"]["x"]) < 0.02, f"x={s['axes']['x']:.2f}")
 
     # ---- 校准页（原来是「手感」弹窗，现在是一整页）
     pg.click("#setBtn")
@@ -413,6 +381,27 @@ with sync_playwright() as p:
         orient(0, 15)                      # 右倾 15°
         s = snap()
         check("右倾 15° ≈ x 0.51", abs(s["axes"]["x"] - 0.509) < 0.06, f"x={s['axes']['x']:.3f}")
+
+        # 绿点指示器：体感开着必须显示，且偏向倾角一侧
+        dot = pg.evaluate("""() => {
+          const k = document.querySelector('#dotk'), p = document.querySelector('#pad');
+          const kb = k.getBoundingClientRect(), pb = p.getBoundingClientRect();
+          return {on: k.classList.contains('on'),
+                  dx: kb.left - (pb.left + pb.width / 2)};
+        }""")
+        check("体感绿点指示器跟随杆位", dot["on"] and dot["dx"] > 20, str(dot))
+
+        # ---- 配平（纯体感版）：倾着 15° 时记配平 → 回到基准仍保持 → 清零回中
+        pg.evaluate("document.querySelector('#trimBtn').click()")
+        time.sleep(0.15)
+        orient(0, 0)
+        s = snap()
+        check("配平后回正仍保持杆位", abs(s["axes"]["x"] - 0.509) < 0.08,
+              f"x={s['axes']['x']:.3f}")
+        pg.evaluate("document.querySelector('#trimClr').click()")
+        time.sleep(0.15)
+        s = snap()
+        check("清配平后回中", abs(s["axes"]["x"]) < 0.03, f"x={s['axes']['x']:.3f}")
 
         # 手感参数必须真的进到曲线里，不能只是 UI 上动了个数字：
         # 满行程 22° → 40°，同样倾 15° 的输出应当明显变小（约 0.23）

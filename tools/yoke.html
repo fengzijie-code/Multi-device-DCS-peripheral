@@ -173,9 +173,8 @@ body{ touch-action:none; }
   mask-image:radial-gradient(closest-side, transparent 0 94%, #000 94% 98.6%, transparent 98.6%); }
 /* 盘面上不放文字读数（2026-11-20 撤掉 #padVal/#padTag）：杆盘只留
    绿点指示器 —— 数字和标签会盖在瞄准线上，实飞时眼睛需要的是位置不是数值 */
-#ring{ position:absolute; width:0; height:0; display:none; }
-#ring::before{ content:""; position:absolute; left:-52px; top:-52px; width:104px; height:104px;
-               border-radius:50%; border:1px solid rgba(216,233,248,.45); }
+/* 绿点 = 体感杆位指示器（纯体感后盘面唯一的动态元素）：
+   体感开着才显示，贴到 .lim 圈 = 满杆。触摸圈 #ring 已随触摸输入一起撤掉 */
 #dotk{ position:absolute; width:0; height:0; opacity:0; transition:opacity .08s; }
 #dotk::before{ content:""; position:absolute; left:-9px; top:-9px; width:18px; height:18px;
                border-radius:50%; background:rgba(216,233,248,.92);
@@ -379,7 +378,7 @@ body{ touch-action:none; }
       <div id="pad">
         <div class="tickring"></div>
         <div class="cross cx"></div><div class="cross cy"></div><div class="lim"></div>
-        <div id="ring"></div><div id="dotk"></div>
+        <div id="dotk"></div>
       </div>
     </div>
 
@@ -636,7 +635,7 @@ body{ touch-action:none; }
   // ---------------------------------------------------------------- 状态
   // t = null 表示「还没接管油门」。必须是真的不发这个字段 ——
   // beacon 把缺失的 t 解释成「这次别动油门」，发 0 会把飞机拽到慢车。
-  var st = { x:0, y:0, r:0, t:null, b:0 };
+  var st = { r:0, t:null, b:0 };
   // 油门默认反转：DCS 那边的油门轴是反着的，iPad 这头负责补回来。
   // 显示层永远不参与反转（见 setThr），所以用户看到的始终是「上推 = 加油门」。
   var inv = { x: store.get("invX", false), y: store.get("invY", false), t: store.get("invT", true) };
@@ -648,9 +647,9 @@ body{ touch-action:none; }
   // 上锁：默认不动飞机。页面加载、断线重连、网络恢复的瞬间都**不能**把上一次的杆量
   //   重放一遍 —— 那是这类控制器最容易摔机的一种意外。所以默认锁着，并且每次打开
   //   页面都重新锁（不持久化）。
-  // 配平：平板是「绝对位置」映射，松手 = 杆回中立。固定翼没问题（中位就是平飞点），
-  //   但直升机的中立周期变距不是平飞位 —— 悬停要一直顶着杆。真机靠 force trim
-  //   把杆位锁住，我们没有力反馈杆，只能在软件里补这一层。
+  // 配平：杆量只来自体感，「握平」不一定是平飞/悬停位 —— 直升机悬停要一直
+  //   顶着杆。真机靠 force trim 把杆位锁住，我们没有力反馈杆，只能在软件里补这一层：
+  //   按「配平」把当前体感输出记成偏移，之后手回平也保持。
   var armed = false;
   var TRIM_MAX = 0.7;        // 满杆配平等于一起飞就压到底，不给到 1.0
   var trim = { x: store.get("trimX", 0) || 0, y: store.get("trimY", 0) || 0 };
@@ -699,8 +698,8 @@ body{ touch-action:none; }
   // 取「当前实际输出」当新偏移（已含旧配平），所以连按两次是继续微调，不会翻倍。
   function captureTrim(){
     if (!trimOn) return;
-    var ox = clamp(st.x + (tilt.on ? tilt.x : 0) + trim.x, -1, 1);
-    var oy = clamp(st.y + (tilt.on ? tilt.y : 0) + trim.y, -1, 1);
+    var ox = clamp((tilt.on ? tilt.x : 0) + trim.x, -1, 1);
+    var oy = clamp((tilt.on ? tilt.y : 0) + trim.y, -1, 1);
     trim.x = clamp(ox, -TRIM_MAX, TRIM_MAX);
     trim.y = clamp(oy, -TRIM_MAX, TRIM_MAX);
     store.set("trimX", trim.x); store.set("trimY", trim.y);
@@ -738,58 +737,22 @@ body{ touch-action:none; }
 
   var bitCount = {};   // 同一个按钮被多指按住时，别让先松的手指清掉位
 
-  // ---------------------------------------------------------------- 轴：杆盘
-  var pad = $("#pad"), ring = $("#ring"), dotk = $("#dotk");
-  var padId = null, maxR = 120, ax = 0, ay = 0, dx = 0, dy = 0;
+  // ---------------------------------------------------------------- 轴：杆盘（纯体感，无触摸）
+  // 2026-11-20：盘面**不再吃任何触摸** —— 杆量只来自体感（陀螺仪）。
+  // 盘面降级成纯输入指示器：绿点 = 当前体感杆位，贴到 .lim 圈 = 满杆。
+  // 油门/脚舵/按钮仍是触摸，只有杆这条轴是体感专属。
+  var pad = $("#pad"), dotk = $("#dotk");
 
-  function padRect(){ return pad.getBoundingClientRect(); }
-
-  pad.addEventListener("pointerdown", function(e){
-    if (padId !== null) return;
-    e.preventDefault();
-    padId = e.pointerId;
-    try { pad.setPointerCapture(e.pointerId); } catch(err){}
-    var r = padRect();
-    maxR = Math.min(r.width, r.height) * 0.34;
-    ax = e.clientX - r.left;
-    ay = e.clientY - r.top;
-    dx = 0; dy = 0;
-    drawPad();
+  // 体感每个传感器帧都会走一遍（applyTilt），绿点跟着重画。
+  // y 轴沿用旧盘面约定：y 正（拉杆）= 点向上，和原来「上推 = 拉杆」的读法一致。
+  function drawDot(){
+    if (!tilt.on){ dotk.classList.remove("on"); return; }
+    var r = pad.getBoundingClientRect();
+    if (!r.width) return;
+    var R = Math.min(r.width, r.height) * 0.335;    // .lim 圈半径 = 满杆
+    dotk.style.left = (r.width / 2 + tilt.x * R) + "px";
+    dotk.style.top = (r.height / 2 - tilt.y * R) + "px";
     dotk.classList.add("on");
-  });
-
-  pad.addEventListener("pointermove", function(e){
-    if (e.pointerId !== padId) return;
-    e.preventDefault();
-    var r = padRect();
-    dx = e.clientX - r.left - ax;
-    dy = e.clientY - r.top - ay;
-    var d = Math.sqrt(dx*dx + dy*dy);
-    if (d > maxR){                       // 拖到边界：锚点跟着走，手感像真实杆的行程
-      var k = (d - maxR) / d;
-      ax += dx * k; ay += dy * k;
-      dx -= dx * k; dy -= dy * k;
-      d = maxR;
-    }
-    st.x = clamp((inv.x ? -1 : 1) * (dx / maxR), -1, 1);
-    st.y = clamp((inv.y ? -1 : 1) * (-dy / maxR), -1, 1);
-    drawPad();
-  });
-
-  function endPad(e){
-    if (e && e.pointerId !== padId) return;
-    padId = null; st.x = 0; st.y = 0; dotk.classList.remove("on");
-    ring.style.display = "none";
-  }
-  pad.addEventListener("pointerup", endPad);
-  pad.addEventListener("pointercancel", endPad);
-
-  function drawPad(){
-    ring.style.display = "block";
-    ring.style.left = ax + "px";
-    ring.style.top = ay + "px";
-    dotk.style.left = (ax + dx) + "px";
-    dotk.style.top = (ay + dy) + "px";
   }
 
   // ---------------------------------------------------------------- 轴：油门
@@ -938,8 +901,9 @@ body{ touch-action:none; }
       store.set("inv" + key.toUpperCase(), inv[key]);
       on();
       if (key === "t" && st.t !== null) st.t = 1 - st.t;
-      if (key === "x"){ st.x = -st.x; }
-      if (key === "y") st.y = -st.y;
+      // 体感轴立刻翻转当前输出（下一帧传感器数据会按新方向重算），中间不跳变
+      if (key === "x"){ tilt.x = -tilt.x; drawDot(); }
+      if (key === "y"){ tilt.y = -tilt.y; drawDot(); }
     });
   }
   bindToggle("invX", "x");
@@ -1083,6 +1047,7 @@ body{ touch-action:none; }
     tiltBtn.classList.toggle("on", tilt.on);
     tiltBtn.textContent = tilt.on ? "体感 开" : "体感";
     zeroBtn.style.display = tilt.on ? "" : "none";
+    drawDot();   // 体感关掉时把绿点指示器一起收掉
     if (tilSt){
       tilSt.textContent = tilt.on ? "已开（正在读数）"
                         : (window.isSecureContext ? "未开 · 点顶栏「体感」"
@@ -1111,6 +1076,8 @@ body{ touch-action:none; }
     } else {
       tiltOverSince = 0;
     }
+
+    drawDot();   // 绿点 = 体感杆位指示器，每个传感器帧跟着重画
 
     // 校准页要能看见"现在到底读到多少度"，否则校零只能闭着眼点。
     // 只在那一页可见时写 DOM —— 60Hz 刷一个隐藏元素是白烧电。
@@ -1191,14 +1158,11 @@ body{ touch-action:none; }
     // 发 0 会把进近中的飞机直接拽到慢车，这是「上锁」最容易做错的地方。
     if (!armed) return '{"x":0,"y":0,"r":0,"b":0}';
 
-    // 体感是基准，杆盘是微调：两个相加再夹住。杆盘松手回 0，所以净效果就是
-    // 「体感给主行程，手指还能临时补一点」。配平最后叠加 —— 它代表「用户想要的
-    // 输出」，不是「手的位置」，所以和发送值在同一侧。
-    var tx = tilt.on ? tilt.x : 0;
-    var ty = tilt.on ? tilt.y : 0;
+    // 纯体感：杆量 = 体感输出 + 配平偏移，再夹住。配平代表「用户想要的
+    // 输出」，所以和体感在同一侧相加。
     var o = {
-      x: +clamp(st.x + tx + trim.x, -1, 1).toFixed(4),
-      y: +clamp(st.y + ty + trim.y, -1, 1).toFixed(4),
+      x: +clamp((tilt.on ? tilt.x : 0) + trim.x, -1, 1).toFixed(4),
+      y: +clamp((tilt.on ? tilt.y : 0) + trim.y, -1, 1).toFixed(4),
       r: +st.r.toFixed(4),
       b: st.b
     };
@@ -1359,10 +1323,10 @@ body{ touch-action:none; }
 
   // ---------------------------------------------------------------- 兜底
   function clearAll(){
-    st.x = 0; st.y = 0; st.r = 0; st.b = 0;
+    st.r = 0; st.b = 0;
     bitCount = {};
     document.querySelectorAll(".k.on").forEach(function(el){ el.classList.remove("on"); });
-    endPad(); thrId = null; rudId = null; drawRud();
+    thrId = null; rudId = null; drawRud();
   }
 
   document.addEventListener("visibilitychange", function(){
