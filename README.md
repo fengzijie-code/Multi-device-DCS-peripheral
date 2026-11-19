@@ -8,10 +8,10 @@
 
 [![License](https://img.shields.io/badge/license-MIT-6fe3cb?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/badge/release-v1.4.0-63c8ff?style=flat-square)](VERSIONS.md)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20iPadOS-ffb454?style=flat-square)](#快速开始)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20iPadOS-ffb454?style=flat-square)](#-快速开始)
 [![DCS](https://img.shields.io/badge/DCS%20World-JF--17-e33f92?style=flat-square)](docs/BINDING.md)
 
-[快速开始](#快速开始) · [界面](#界面) · [文档](#文档) · [更新日志](VERSIONS.md) · [许可](#许可)
+[快速开始](#-快速开始) · [界面](#-界面) · [文档](#-文档) · [更新日志](VERSIONS.md) · [许可](#-许可)
 
 </div>
 
@@ -19,7 +19,7 @@
 
 ---
 
-## 这是什么
+## 📌 这是什么
 
 一套本地跑的三件套：**PC 上三个 Python 进程**，加**一个单文件网页**。
 手机或 iPad 打开网页就是操纵面，DCS 的遥测反向往回推。
@@ -40,7 +40,7 @@
 
 ---
 
-## 特性
+## ✨ 特性
 
 | | |
 |---|---|
@@ -53,7 +53,7 @@
 
 ---
 
-## 快速开始
+## 🚀 快速开始
 
 ### 需要什么
 
@@ -100,7 +100,7 @@ tools\start-ipad.bat mock     :: 60 Hz 假遥测，不要和真 DCS 同时开
 
 ---
 
-## 界面
+## 🎮 界面
 
 玻璃 HUD 风格：不画面板，只有 1px 细描边、圆、小字距的浅色字。底图是 DCS 座舱，
 任何实心色块都会立刻变成"网页控件贴在上面"，所以整页没有一个卡片底色。
@@ -125,7 +125,7 @@ tools\start-ipad.bat mock     :: 60 Hz 假遥测，不要和真 DCS 同时开
 
 ---
 
-## 项目结构
+## 📦 项目结构
 
 ```
 android/          Android 摇杆 App（Kotlin + Compose，APK 在 release/）
@@ -139,7 +139,7 @@ release/          按版本归档的 APK
 
 ---
 
-## 文档
+## 📚 文档
 
 | 文档 | 内容 |
 |---|---|
@@ -156,7 +156,7 @@ release/          按版本归档的 APK
 
 ---
 
-## 开发与验收
+## 🧪 开发与验收
 
 页面不是"看着差不多"就算完 —— `tools/check-yoke.py` 用 playwright + 系统 Chrome，
 在 1194×834 的 iPad 横屏视口里**真的发触摸事件**（CDP `Input.dispatchTouchEvent`），
@@ -175,7 +175,7 @@ python tools\check-yoke.py http://<本机IP>:18080/yoke      :: 70 项（必须�
 
 ---
 
-## 已知限制
+## 🚧 已知限制
 
 - **只做横屏**。竖排明确不做 —— 竖起来时杆盘和按键都挤不下。
 - **体感必须走 HTTPS**，而且要在 iPad 上装一次根 CA：iOS 不给明文页面的传感器数据。
@@ -185,7 +185,7 @@ python tools\check-yoke.py http://<本机IP>:18080/yoke      :: 70 项（必须�
 
 ---
 
-## 许可
+## 📄 许可
 
 ```
 MIT License · Copyright (c) 2026 fengzijie
@@ -204,7 +204,7 @@ MIT License · Copyright (c) 2026 fengzijie
 
 要分发本项目，把上面那份 PDF 摘出去即可 —— 它不参与程序运行。
 
-## 致谢
+## 🙏 致谢
 
 - [vJoy](https://sourceforge.net/projects/vjoystick/) —— 虚拟摇杆驱动，整条"操纵上行"的最后一步
 - [DCS-BIOS](https://github.com/DCS-Skunkworks/DCS-BIOS) —— 调研座舱反向控制时的参照（GPL-3.0），本项目未直接使用其代码
