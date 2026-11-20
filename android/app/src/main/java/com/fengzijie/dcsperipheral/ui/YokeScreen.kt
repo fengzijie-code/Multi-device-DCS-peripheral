@@ -181,6 +181,18 @@ fun YokeScreen(
         Column(Modifier.width(340.dp).fillMaxHeight()) {
             ArmButton(armed = st.armed, ready = st.ready, onClick = onToggleArm)
 
+            Spacer(Modifier.height(4.dp))
+            // 陀螺仪总开关：一键切断体感杆舵（横滚/俯仰/拧手机都来自同一个
+            // 传感器），只留触摸控件。贴着解锁键放 —— 它和解锁是一对开关：
+            // 先定「传感器要不要用」，再定「用的时候发不发数据」，
+            // 都在最顺手的第一眼位置，不用往列底找。
+            Chip(
+                text = if (set.tiltOn) "陀螺仪 开 · 体感杆舵" else "陀螺仪 关 · 杆舵回中",
+                on = set.tiltOn,
+                onClick = onToggleTilt,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             Spacer(Modifier.height(3.dp))
             VjoyLine(st.vjoy)
 
@@ -257,19 +269,6 @@ fun YokeScreen(
                 )
             }
 
-            Spacer(Modifier.height(4.dp))
-            // 陀螺仪总开关：一键切断体感杆舵（横滚/俯仰/拧手机都来自同一个
-            // 传感器），只留触摸控件。放在起降页而不是校准页 —— 关它多半是
-            // 飞行中途的临时动作（滑行、传感器抽风），临时动作不该绕远路。
-            Chip(
-                text = if (set.tiltOn) "陀螺仪 开 · 体感杆舵" else "陀螺仪 关 · 杆舵回中",
-                on = set.tiltOn,
-                onClick = onToggleTilt,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            // 右下角：脚舵。剩余高度全部留白，把它压到列底 —— 与 iPad 端
-            // 脚舵贴右下的布局对齐。松手回中的比例滑块，操作逻辑没变。
             Spacer(Modifier.weight(1f))
             Row(
                 Modifier.fillMaxWidth().height(44.dp),
