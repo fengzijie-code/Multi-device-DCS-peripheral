@@ -175,7 +175,9 @@ fun YokeScreen(
         }
 
         // ---------------- 右：解锁 / 状态 / 视角 ----------------
-        Column(Modifier.width(272.dp).fillMaxHeight()) {
+        // 272 → 340dp：为了给右下角脚舵拉宽（横向行程越大越精），整列跟着加宽，
+        // 列里其它控件都是 fillMaxWidth，自动一起变宽。
+        Column(Modifier.width(340.dp).fillMaxHeight()) {
             ArmButton(armed = st.armed, ready = st.ready, onClick = onToggleArm)
 
             Spacer(Modifier.height(3.dp))
@@ -256,11 +258,9 @@ fun YokeScreen(
 
             // 右下角：脚舵。剩余高度全部留白，把它压到列底 —— 与 iPad 端
             // 脚舵贴右下的布局对齐。松手回中的比例滑块，操作逻辑没变。
-            // 高度给到 72dp：滑块轨道粗细按容器高度的 16% 自适应，加高
-            // 等于直接加按压面积；侧风落地要一直压住，窄条太容易滑出。
             Spacer(Modifier.weight(1f))
             Row(
-                Modifier.fillMaxWidth().height(72.dp),
+                Modifier.fillMaxWidth().height(44.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
