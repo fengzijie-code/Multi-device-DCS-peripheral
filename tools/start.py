@@ -406,6 +406,8 @@ def main() -> int:
     ap.add_argument("--firewall", action="store_true",
                     help="加一次防火墙放行规则（会弹 UAC）")
     ap.add_argument("--no-check", action="store_true", help="跳过预检（排障时用）")
+    ap.add_argument("--captive", action="store_true",
+                    help="启动有线直连探测应答器（captive.py）—— 仅网线直连需要")
     args = ap.parse_args()
 
     enable_ansi()
@@ -452,6 +454,8 @@ def main() -> int:
             "--vjoy-port", str(args.vjoy_port)]
     if not phone:
         argv += ["--no-usb", "--no-watch"]
+    if args.captive:
+        argv += ["--captive"]
     if args.no_vjoy:
         argv += ["--no-vjoy"]
     if mock:

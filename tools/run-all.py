@@ -303,8 +303,9 @@ def main() -> int:
     ap.add_argument("--tls-port", type=int, default=8443,
                     help="HTTPS 端口（iPad 体感需要；证书不存在则自动跳过）")
     ap.add_argument("--no-tls", action="store_true", help="不开 HTTPS")
-    ap.add_argument("--no-captive", action="store_true",
-                    help="不启动 iOS 联网探测应答器（有线直连 Safari 拒绝发包时需要它）")
+    ap.add_argument("--captive", action="store_true",
+                    help="启动 iOS 联网探测应答器（captive.py）—— 只有网线直连才需要，"
+                         "无线为主时不要开：它常驻占用 80/TCP + 53/UDP")
     ap.add_argument("--vjoy-port", type=int, default=5011,
                     help="操纵量内部转发端口")
     args = ap.parse_args()
@@ -413,10 +414,11 @@ def main() -> int:
             "--port", str(args.vjoy_port),
             "--report", f"http://127.0.0.1:{args.port}",
         ]))
-    # iPad 直连网线时 iOS 把这条网卡标成「无互联网」，Safari 会拒绝往它发请求
-    # （ping 全通、网页打不开就是这个）。captive.py 把 iOS 的联网探测
-    # （captive.apple.com）应答掉，iOS 才肯认这条网。起不来（端口被占）不挡启动。
-    if args.no_usb and not args.no_captive:
+    # v1.4.2 起 captive 改为**显式开启**（--captive）：无线是主路径，不应默认
+    # 常驻占着 80/TCP + 53/UDP。iPad 网线直连时 iOS 会把「无互联网」网卡标成
+    # 离线，Safari 拒绝发包（ping 全通、网页打不开就是这个）—— 这时才需要
+    # captive.py 把 iOS 的联网探测应答掉。起不来（端口被占）不挡启动。
+    if args.no_usb and args.captive:
         children.append(Child("captive", [
             py, "-u", os.path.join("tools", "captive.py"),
         ]))
