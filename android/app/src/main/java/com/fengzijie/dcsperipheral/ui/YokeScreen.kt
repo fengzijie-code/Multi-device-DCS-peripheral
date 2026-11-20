@@ -120,10 +120,35 @@ fun YokeScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
             Spacer(Modifier.height(5.dp))
-            // 脚舵不再占中列一整行，挪到右列底部（右下角），和 iPad 端
-            // tools/yoke.html 的 #rud（right:22px; bottom:56px）位置对应 ——
-            // 两端手感一致，中列整行也让给杆位盘。带文字标签保留：
-            // 之前只靠「拧手机」，屏幕上没有任何可见控件，可见性比优雅重要。
+            // 配平 + 起落架在上，襟翼在下：都是两键一行，按钮变宽更好按。
+            // 脚舵挪到右下角后这条占的还是中列，加高只会吃杆位盘，所以
+            // 拆两行纯粹是操作分组：上面「构型选择」，下面「襟翼收放」。
+            // 配置页关掉配平时不占位，起落架独占一行。
+            Row(
+                Modifier.fillMaxWidth().height(46.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (set.trimOn) {
+                    TrimButton(
+                        trim = st.trimY,
+                        enabled = st.armed,
+                        onCapture = onTrimCapture,
+                        onClear = onTrimClear,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                HoldButton(
+                    text = "起落架",
+                    sub = "收放",
+                    enabled = st.armed,
+                    onDown = { onButtonDown(YokeBtn.GEAR) },
+                    onUp = { onButtonUp(YokeBtn.GEAR) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Spacer(Modifier.height(5.dp))
             Row(
                 Modifier.fillMaxWidth().height(46.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -143,27 +168,6 @@ fun YokeScreen(
                     enabled = st.armed,
                     onDown = { onButtonDown(YokeBtn.FLAPS_DOWN) },
                     onUp = { onButtonUp(YokeBtn.FLAPS_DOWN) },
-                    modifier = Modifier.weight(1f),
-                )
-                // 配平夹在襟翼和起落架中间：这一行本来就是「起降构型」操作，
-                // 配平（尤其直升机的周期变距配平）在语义上也属于这一组，
-                // 而且手指扫过这一行就够得到，不用再往上够杆位盘。
-                // 配置页关掉时不占位，剩下三个按钮自己均分宽度。
-                if (set.trimOn) {
-                    TrimButton(
-                        trim = st.trimY,
-                        enabled = st.armed,
-                        onCapture = onTrimCapture,
-                        onClear = onTrimClear,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                HoldButton(
-                    text = "起落架",
-                    sub = "收放",
-                    enabled = st.armed,
-                    onDown = { onButtonDown(YokeBtn.GEAR) },
-                    onUp = { onButtonUp(YokeBtn.GEAR) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -252,9 +256,11 @@ fun YokeScreen(
 
             // 右下角：脚舵。剩余高度全部留白，把它压到列底 —— 与 iPad 端
             // 脚舵贴右下的布局对齐。松手回中的比例滑块，操作逻辑没变。
+            // 高度给到 72dp：滑块轨道粗细按容器高度的 16% 自适应，加高
+            // 等于直接加按压面积；侧风落地要一直压住，窄条太容易滑出。
             Spacer(Modifier.weight(1f))
             Row(
-                Modifier.fillMaxWidth().height(44.dp),
+                Modifier.fillMaxWidth().height(72.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
