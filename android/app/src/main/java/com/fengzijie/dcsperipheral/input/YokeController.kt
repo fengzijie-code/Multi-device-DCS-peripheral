@@ -31,6 +31,14 @@ data class YokeSettings(
     val invertY: Boolean = true,
     /** 横握（配合横屏 UI）：左右倾斜绕的是设备 X 轴，对应横滚。 */
     val swapAxes: Boolean = true,
+    /**
+     * 陀螺仪总开关：关掉后倾角整条输入链（横滚/俯仰/拧手机脚舵）全部归零，
+     * 只有触摸控件（脚舵滑块、油门、按钮）还起作用。杆位盘会显示杆位回中。
+     *
+     * 场景：地面滑行/整备时手一歪杆就乱动；或者传感器抽风时先一切断保命。
+     * 关闭时解锁不再要求先校零（没有杆输入，校零无从谈起）。
+     */
+    val tiltOn: Boolean = true,
     // ---- 脚舵：靠「拧手机」（绕屏幕法线旋转）----
     val rudderOn: Boolean = true,
     val rudderDeadbandDeg: Float = 4f,
@@ -226,6 +234,10 @@ class YokeController(
             trimY = 0f
             notice = "配平已关闭并清零"
         }
+        // 关陀螺仪必须立刻在屏幕上留一句话：杆位盘归中是真的「没输入」，
+        // 不是链路断了。不提示的话用户会以为自己摔了遥控链路。
+        if (!s.tiltOn && settings.tiltOn) notice = "陀螺仪已关闭，杆舵回中"
+        if (s.tiltOn && !settings.tiltOn) notice = null
         settings = s
     }
 
@@ -238,7 +250,9 @@ class YokeController(
     }
 
     fun setArmed(on: Boolean) {
-        if (on && !tilt.hasNeutral) {
+        // 陀螺仪关着时没有杆输入可言，校零这道门直接放行；
+        // 不然开关一关，连「解锁」都点不动，等于整个页面废了。
+        if (on && settings.tiltOn && !tilt.hasNeutral) {
             notice = "先校零：把手机摆到舒服的位置，点「校零」"
             return
         }
@@ -375,7 +389,10 @@ class YokeController(
             val s = settings
 
             // --- 读传感器 + 解算 ---
-            val rv = tilt.relativeRotVecDeg()
+            // 陀螺仪开关关掉时整条倾角链直接归零：横滚/俯仰/拧手机脚舵都
+            // 来自这一个传感器，没有「只关杆留舵」的中间态 —— 那种半关状态
+            // 用户根本没法建立正确的心智模型。触摸控件不受影响。
+            val rv = if (s.tiltOn) tilt.relativeRotVecDeg() else null
             val hasNeutral = rv != null
             var rollRaw = 0f
             var pitchRaw = 0f
@@ -497,7 +514,8 @@ class YokeController(
                     armed = armed,
                     sensorOk = tilt.available,
                     hasNeutral = hasNeutral,
-                    ready = tilt.available && hasNeutral,
+                    // 陀螺仪关着时不需要校零也能解锁（没有杆输入，校零无意义）
+                    ready = tilt.available && (hasNeutral || !s.tiltOn),
                     // 杆位盘显示**控制位置**（原始倾角），不是发给飞机的指令值。
                     // 后仰 → 点向下 → 机头抬起，和真机「拉杆」一致。
                     // 反转只影响 y 的符号，不影响这里的幅度，所以调死区/行程时

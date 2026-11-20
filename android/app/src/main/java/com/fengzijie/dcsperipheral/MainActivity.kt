@@ -236,6 +236,11 @@ private fun Root() {
                     },
                     onTrimCapture = { ctl?.captureTrim() },
                     onTrimClear = { ctl?.clearTrim() },
+                    onToggleTilt = {
+                        yset = yset.copy(tiltOn = !yset.tiltOn)
+                        saveYokeSettings(prefs, yset)
+                        ctl?.updateSettings(yset)
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
@@ -420,6 +425,7 @@ private fun loadYokeSettings(p: android.content.SharedPreferences): YokeSettings
         invertX = p.getBoolean("yk_invx", false),
         invertY = p.getBoolean("yk_invy", true),
         swapAxes = p.getBoolean("yk_swap", true),
+        tiltOn = p.getBoolean("yk_tilt_on", true),
         rudderOn = p.getBoolean("yk_rudder_on", true),
         rudderDeadbandDeg = p.getFloat("yk_rudder_db", 4f),
         rudderRangeDeg = p.getFloat("yk_rudder_range", 28f),
@@ -438,6 +444,7 @@ private fun saveYokeSettings(p: android.content.SharedPreferences, s: YokeSettin
         .putBoolean("yk_invx", s.invertX)
         .putBoolean("yk_invy", s.invertY)
         .putBoolean("yk_swap", s.swapAxes)
+        .putBoolean("yk_tilt_on", s.tiltOn)
         .putBoolean("yk_rudder_on", s.rudderOn)
         .putFloat("yk_rudder_db", s.rudderDeadbandDeg)
         .putFloat("yk_rudder_range", s.rudderRangeDeg)
