@@ -47,10 +47,15 @@ powershell -NoProfile -Command "Get-NetIPAddress -InterfaceIndex 49 -AddressFami
 echo ============================================================
 echo  Now on the iPad (Settings ^> Ethernet):
 echo    1. Configure IP -^> Manual
-echo       IP:    192.168.77.2
-echo       Mask:  255.255.255.0
+echo       IP:     192.168.77.2
+echo       Mask:   255.255.255.0
 echo       Router: 192.168.77.1
-echo    2. Run tools\start-ipad.bat on this PC (re-signs cert)
-echo    3. Safari on iPad:  https://192.168.77.1:8443/yoke
+echo    2. Configure DNS -^> Manual -^> 192.168.77.1
+echo       (the captive.py probe responder answers DNS on this PC;
+echo        without it iOS marks the link "no network" and Safari
+echo        refuses to send anything over the cable)
+echo    3. Run tools\open-firewall.bat once as admin (ports 80/53)
+echo    4. Run tools\start-ipad.bat on this PC (re-signs cert)
+echo    5. Safari on iPad:  https://192.168.77.1:8443/yoke
 echo ============================================================
 pause

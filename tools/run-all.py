@@ -303,6 +303,8 @@ def main() -> int:
     ap.add_argument("--tls-port", type=int, default=8443,
                     help="HTTPS 端口（iPad 体感需要；证书不存在则自动跳过）")
     ap.add_argument("--no-tls", action="store_true", help="不开 HTTPS")
+    ap.add_argument("--no-captive", action="store_true",
+                    help="不启动 iOS 联网探测应答器（有线直连 Safari 拒绝发包时需要它）")
     ap.add_argument("--vjoy-port", type=int, default=5011,
                     help="操纵量内部转发端口")
     args = ap.parse_args()
@@ -410,6 +412,13 @@ def main() -> int:
             py, "-u", os.path.join("tools", "vjoy_out.py"),
             "--port", str(args.vjoy_port),
             "--report", f"http://127.0.0.1:{args.port}",
+        ]))
+    # iPad 直连网线时 iOS 把这条网卡标成「无互联网」，Safari 会拒绝往它发请求
+    # （ping 全通、网页打不开就是这个）。captive.py 把 iOS 的联网探测
+    # （captive.apple.com）应答掉，iOS 才肯认这条网。起不来（端口被占）不挡启动。
+    if args.no_usb and not args.no_captive:
+        children.append(Child("captive", [
+            py, "-u", os.path.join("tools", "captive.py"),
         ]))
     if args.mock:
         # --target 必须跟着 --udp-in 走：mock_export 的默认目标写死 5010，

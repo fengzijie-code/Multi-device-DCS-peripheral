@@ -34,18 +34,24 @@ netsh advfirewall firewall delete rule name="DCS Peripheral Bridge" >nul 2>&1
 
 netsh advfirewall firewall add rule ^
     name="DCS Peripheral Bridge" ^
-    dir=in action=allow protocol=TCP localport=8080,8443 ^
+    dir=in action=allow protocol=TCP localport=80,8080,8443 ^
+    profile=private,public
+
+netsh advfirewall firewall add rule ^
+    name="DCS Peripheral Bridge" ^
+    dir=in action=allow protocol=UDP localport=53 ^
     profile=private,public
 
 if errorlevel 1 (
     echo.
-    echo [x] Failed to add rule.
+    echo [x] Failed to add rules.
     pause
     exit /b 1
 )
 
 echo.
-echo [OK] Done. Inbound TCP 8080 and 8443 are now allowed on Private and Public.
+echo [OK] Done. Inbound TCP 80/8080/8443 and UDP 53 are now allowed on Private and Public.
+echo      (80/TCP + 53/UDP = the captive-portal responder for iPad wired connections.)
 echo.
 echo Next: go back to the app and it should connect within a couple of seconds.
 echo If it STILL times out, the campus Wi-Fi is doing client isolation,

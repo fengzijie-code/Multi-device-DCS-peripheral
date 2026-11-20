@@ -258,3 +258,11 @@ payload 简化为「体感输出 + 配平偏移」；校准页反转开关会立
 油门 / 脚舵 / 按钮仍是触摸 —— 只有杆这条轴是体感专属。
 `check-yoke.py`：触摸拖杆必须无输出、体感绿点跟随杆位、配平改走体感链路
 （倾 15° 记配平 → 回正保持 → 清零回中）。
+
+### v1.4.1 追加：有线直连助手 captive.py（2026-11-20）
+
+网线直连后 ping 全通但 Safari 显示「未连接互联网」且不发一个包 —— iOS 把探测不到
+互联网的网卡标成离线。新增 `tools/captive.py`（`start-ipad.bat` 在 iPad 模式自动带上）：
+DNS :53 把所有域名答成本机（按询问者网段挑地址），HTTP :80 对 iOS/Windows/Chrome 的
+探测路径各答各的正文（Success / 204 / Microsoft Connect Test），iOS 从此认这条网。
+配套：`open-firewall.bat` 增加放行 80/TCP + 53/UDP；iPad 侧需手动 DNS 指到电脑。
