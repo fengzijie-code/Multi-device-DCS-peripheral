@@ -109,7 +109,7 @@ fun YokeScreen(
             modifier = Modifier.width(62.dp).fillMaxHeight(),
         )
 
-        // ---------------- 中：杆位 + 脚舵 + 动作按钮 ----------------
+        // ---------------- 中：杆位 + 动作按钮（脚舵已移至右列底部） ----------------
         Column(Modifier.weight(1f).fillMaxHeight()) {
             StickPad(
                 rollDeg = st.rollDeg,
@@ -120,31 +120,10 @@ fun YokeScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
             Spacer(Modifier.height(5.dp))
-
-            // 脚舵单列一行，带文字标签。之前只靠「拧手机」，屏幕上没有
-            // 任何可见控件 —— 用户根本不知道脚舵在哪。可见性比优雅重要。
-            Row(
-                Modifier.fillMaxWidth().height(34.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "脚舵",
-                    color = if (st.armed) Ink.Amber else Ink.Dim,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    modifier = Modifier.width(30.dp),
-                )
-                RudderBar(
-                    value = st.rudder,
-                    enabled = st.armed,
-                    onSet = onRudder,
-                    onRelease = onRudderRelease,
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                )
-            }
-
-            Spacer(Modifier.height(5.dp))
+            // 脚舵不再占中列一整行，挪到右列底部（右下角），和 iPad 端
+            // tools/yoke.html 的 #rud（right:22px; bottom:56px）位置对应 ——
+            // 两端手感一致，中列整行也让给杆位盘。带文字标签保留：
+            // 之前只靠「拧手机」，屏幕上没有任何可见控件，可见性比优雅重要。
             Row(
                 Modifier.fillMaxWidth().height(46.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -268,6 +247,30 @@ fun YokeScreen(
                     on = false,
                     onRun = onSettings,
                     modifier = Modifier.weight(1f),
+                )
+            }
+
+            // 右下角：脚舵。剩余高度全部留白，把它压到列底 —— 与 iPad 端
+            // 脚舵贴右下的布局对齐。松手回中的比例滑块，操作逻辑没变。
+            Spacer(Modifier.weight(1f))
+            Row(
+                Modifier.fillMaxWidth().height(44.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "脚舵",
+                    color = if (st.armed) Ink.Amber else Ink.Dim,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.width(30.dp),
+                )
+                RudderBar(
+                    value = st.rudder,
+                    enabled = st.armed,
+                    onSet = onRudder,
+                    onRelease = onRudderRelease,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
             }
         }
